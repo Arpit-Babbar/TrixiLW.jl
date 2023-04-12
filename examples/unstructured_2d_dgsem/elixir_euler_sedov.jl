@@ -44,6 +44,7 @@ indicator_sc = IndicatorHennemannGassner(equations, basis,
                                          alpha_min=0.001,
                                          alpha_smooth=true,
                                          variable=density_pressure)
+
 volume_integral = TrixiLW.VolumeIntegralFRShockCapturing(indicator_sc;
                                                       volume_flux_fv=surface_flux,
                                                       reconstruction = TrixiLW.FirstOrderReconstruction()
@@ -95,7 +96,7 @@ stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds=(5.0e-6, 5.0e-6)
 time_int_tol = 1e-8
 tolerances = (;abstol = time_int_tol, reltol = time_int_tol);
 dt_initial = 1e-2;
-sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
+sol, summary_callback = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
                       time_step_computation = TrixiLW.Adaptive(),
                       # time_step_computation = TrixiLW.CFLBased(cfl_number),
                       limiters = (;stage_limiter!)

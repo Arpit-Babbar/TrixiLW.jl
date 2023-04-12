@@ -46,6 +46,9 @@ include(solvers_dir() * "/dgsem_structured/containers_2d.jl")
 include(solvers_dir() * "/dgsem_unstructured_2d/dg_2d.jl")
 include(solvers_dir() * "/dgsem_unstructured_2d/containers.jl")
 
+# P4estMesh
+include(solvers_dir() * "/dgsem_p4est/dg_2d.jl")
+include(solvers_dir() * "/dgsem_p4est/containers.jl")
 
 export time_discretization
 

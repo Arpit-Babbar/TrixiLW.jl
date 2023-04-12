@@ -53,7 +53,7 @@ callbacks = (;
 ###############################################################################
 # run the simulation
 
-# sol = solve(ode, CarpenterKennedy2N54(williamson_condition=false),
+# sol, summary_callback = solve(ode, CarpenterKennedy2N54(williamson_condition=false),
 #             dt=1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
 #             save_everystep=false, callback=callbacks);
 
@@ -61,7 +61,7 @@ callbacks = (;
 time_int_tol = 1e-8
 tolerances = (;abstol = time_int_tol, reltol = time_int_tol)
 dt_initial = 1e-6
-sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
+sol, summary_callback = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
                      #  time_step_computation = TrixiLW.Adaptive()
                       time_step_computation = TrixiLW.CFLBased(cfl_number)
                       );
