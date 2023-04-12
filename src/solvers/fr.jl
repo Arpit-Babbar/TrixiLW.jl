@@ -1,5 +1,3 @@
-# TODO - Break dg_lw.jl into files!
-
 using Trixi: AbstractVolumeIntegral, DG, summary_header, summary_line,
    increment_indent, summary_footer,
    TreeMesh, StructuredMesh, UnstructuredMesh2D, P4estMesh,
@@ -153,10 +151,5 @@ function compute_low_order_flux(u_ll, u_rr, equations, dg, normal_direction,
    fn = sign_jacobian * surface_flux(u_ll, u_rr, normal_direction, equations)
    return fn
 end
-
-# TODO - This is not needed, right? It has no types specific to TrixiLW.jl
-# function initialize!(cb::DiscreteCallback{Condition,Affect!}, u, t, integrator) where {Condition,Affect!<:Trixi.typeof(Trixi.summary_callback)}
-#    Trixi.initialize_summary_callback(cb, u, t, integrator)
-# end
 
 end # muladd

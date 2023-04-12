@@ -1864,18 +1864,13 @@ using MuladdMacro
       uext_threaded = alloc_for_threads(constructor, 1) # u extended by face extrapolation
 
       uext_threaded = [OffsetArray(zeros(nvar, nnodes(dg) + 2, nnodes(dg) + 2),
-         OffsetArrays.Origin(1, 0, 0))
+                                   OffsetArrays.Origin(1, 0, 0))
                        for _ in 1:Threads.nthreads()]
       mh_face_arrays = [(OffsetArray(zeros(nvar, 4, nnodes(dg) + 2, nnodes(dg) + 2),
-            OffsetArrays.Origin(1, 1, 0, 0)),
-         OffsetArray(zeros(nvar, 4, nnodes(dg) + 2, nnodes(dg) + 2),
-            OffsetArrays.Origin(1, 1, 0, 0)))
+                                     OffsetArrays.Origin(1, 1, 0, 0)),
+                         OffsetArray(zeros(nvar, 4, nnodes(dg) + 2, nnodes(dg) + 2),
+                                     OffsetArrays.Origin(1, 1, 0, 0)))
                         for _ in 1:Threads.nthreads()]
-      # constructor = x -> abstract_constructor(Tuple{nvar, 4, nnodes(dg)+2, nnodes(dg)+2}, x, (1,1,0,0))
-      # # @views unph_threaded = alloc_for_threads(constructor, 1)[1] # u^{n+1/2} at faces
-      # # @views uf_threaded = alloc_for_threads(constructor, 1)[1]   # u^n at faces
-
-      # mh_face_arrays = alloc_for_threads(constructor, 2) # u^{n+1/2}, u^n at faces
 
       # Wow, even this is not needed
       x_subfaces, y_subfaces, ξ_extended = compute_subcells(mesh, dg::DG,
