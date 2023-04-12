@@ -239,7 +239,7 @@ semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
 # Create ODE problem with time span `tspan`
 tspan = (0.0, 0.5)
 ode = TrixiLW.semidiscretize(semi, time_discretization(solver), tspan);
-lw_update = TrixiLW.semidiscretize_lw(semi, time_discretization(solver), tspan);
+lw_update = TrixiLW.semidiscretize(semi, time_discretization(solver), tspan);
 
 summary_callback = SummaryCallback()
 analysis_interval = 100

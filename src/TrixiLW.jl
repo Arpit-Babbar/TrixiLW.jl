@@ -32,9 +32,16 @@ include(semi_dir() * "/semidiscretization_hyperbolic_parabolic.jl")
 
 # Specific solvers
 
+
+# Tree mesh
 include(solvers_dir() * "/dgsem_tree/dg_2d.jl")
 include(solvers_dir() * "/dgsem_tree/dg_2d_parabolic.jl")
 include(solvers_dir() * "/dgsem_tree/containers.jl")
+
+# Structured mesh
+include(solvers_dir() * "/dgsem_structured/dg_2d.jl")
+include(solvers_dir() * "/dgsem_structured/containers_2d.jl")
+
 
 export time_discretization
 

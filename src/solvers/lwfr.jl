@@ -142,6 +142,7 @@ function LWIntegrator(lw_update::LWUpdate, sol, callbacks, tolerances,
    @unpack soln_arrays, semi, tspan = lw_update
    @unpack u0_ode, du_ode = soln_arrays # Previous time level solution and residual
    integrator_cache = (du_ode,) # Don't know what else to put here.
+   time_discretization = LW()
    u = sol.u
    iter = 0
    t = first(tspan)
@@ -158,12 +159,12 @@ function LWIntegrator(lw_update::LWUpdate, sol, callbacks, tolerances,
    epsilon = OffsetArray(ones(tType, 3), OffsetArrays.Origin(-1))
    f = (u, v, w, t) -> 0.0 # TODO - What is this supposed to be?
    n_elements = nelements(semi.solver, semi.cache)
-   n_interfaces = ninterfaces(semi.solver, semi.cache)
-   n_boundaries = nboundaries(semi.solver, semi.cache)
+   n_interfaces = ninterfaces(semi.mesh, semi.solver, semi.cache, time_discretization)
+   n_boundaries = nboundaries(semi.mesh, semi.solver, semi.cache, time_discretization)
    n_mortars = 1
    LWIntegrator(semi, sol, u, u0_ode, integrator_cache, iter, t, tspan, dt, f,
       dtpropose, dtcache, stats, epsilon,
-      opts, n_elements, n_interfaces, n_boundaries, n_mortars, LW())
+      opts, n_elements, n_interfaces, n_boundaries, n_mortars, time_discretization)
 end
 
 function compute_dt(semi::SemidiscretizationHyperbolic,
