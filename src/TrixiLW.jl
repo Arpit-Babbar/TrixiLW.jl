@@ -42,6 +42,10 @@ include(solvers_dir() * "/dgsem_tree/containers.jl")
 include(solvers_dir() * "/dgsem_structured/dg_2d.jl")
 include(solvers_dir() * "/dgsem_structured/containers_2d.jl")
 
+# UnstructuredMesh2D
+include(solvers_dir() * "/dgsem_unstructured_2d/dg_2d.jl")
+include(solvers_dir() * "/dgsem_unstructured_2d/containers.jl")
+
 
 export time_discretization
 
