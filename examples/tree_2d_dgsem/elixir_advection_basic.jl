@@ -34,10 +34,6 @@ time_discretization(solver), equations,
 tspan = (0.0, 1.0)
 lw_update = TrixiLW.semidiscretize(semi, time_discretization(solver), tspan);
 
-# At the beginning of the main loop, the SummaryCallback prints a summary of the simulation setup
-# and resets the timers
-summary_callback = SummaryCallback()
-
 # The AnalysisCallback allows to analyse the solution in regular intervals and prints the results
 analysis_callback = AnalysisCallback(semi, interval=1000)
 
@@ -63,12 +59,6 @@ sol, summary = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
                       time_step_computation = TrixiLW.Adaptive()
                      #  time_step_computation = TrixiLW.CFLBased(cfl_number)
                       );
-
-# sol = solve(ode,
-#             Euler(),
-#             # CarpenterKennedy2N54(williamson_condition=false),
-#             dt=1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-#             save_everystep=false, callback=callbacks);
 
 # Print the timer summary
 summary()
