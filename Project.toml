@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [deps]
 DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
+LoopVectorization = "bdcacae8-1622-11e9-2a5c-532679323890"
 MuladdMacro = "46d2c3a1-f734-5fdb-9937-b9b9aeba4221"
 OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
 SimpleUnPack = "ce78b400-467f-4804-87d8-8f486da07d0a"
