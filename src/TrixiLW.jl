@@ -14,6 +14,7 @@ using Trixi: nvariables, eachvariable, AbstractEquations
 
 # Equations
 include(eq_dir() * "/equations.jl")
+include(eq_dir() * "/linear_advection.jl")
 include(eq_dir() * "/numerical_fluxes.jl")
 
 # solver
