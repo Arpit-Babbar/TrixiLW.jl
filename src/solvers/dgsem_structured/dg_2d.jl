@@ -154,34 +154,6 @@ function contravariant_flux(u, Ja, eq::AbstractEquations{2})
    return flux1, flux2, contravariant_flux1, contravariant_flux2
 end
 
-# function calc_volume_integral!(du, u, t, dt, tolerances,
-#    mesh::Union{StructuredMesh{2},UnstructuredMesh2D,P4estMesh{2}},
-#    nonconservative_terms::False, source_terms, equations,
-#    volume_integral, time_discretization::LW,
-#    dg::DGSEM, cache, alpha=true)
-#    @unpack time_discretization = dg
-#    degree = nnodes(dg) - 1 # TODO - Use polydeg instead
-#    if degree == 1
-#       @threaded for element in eachelement(dg, cache)
-#          weak_form_kernel_1!(du, u, t, dt, element, mesh, nonconservative_terms, source_terms, equations, dg, cache, alpha)
-#       end
-#    elseif degree == 2
-#       @threaded for element in eachelement(dg, cache)
-#          weak_form_kernel_2!(du, u, t, dt, element, mesh, nonconservative_terms, source_terms, equations, dg, cache, alpha)
-#       end
-#    elseif degree == 3
-#       @threaded for element in eachelement(dg, cache)
-#          weak_form_kernel_3!(du, u, t, dt, element, mesh, nonconservative_terms, source_terms, equations, dg, cache, alpha)
-#       end
-#    else
-#       @threaded for element in eachelement(dg, cache)
-#          weak_form_kernel_4!(du, u, t, dt, element, mesh, nonconservative_terms, source_terms, equations, dg, cache, alpha)
-#       end
-#    end
-
-#    return nothing
-# end
-
 function weak_form_kernel_1!(du, u, t, dt, tolerances,
    element, mesh::Union{StructuredMesh{2},UnstructuredMesh2D,P4estMesh{2}},
    nonconservative_terms::False, source_terms, equations,
