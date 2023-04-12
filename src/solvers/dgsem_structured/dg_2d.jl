@@ -1314,15 +1314,16 @@ end
 
 function compute_alp(
    u_ll, u_rr, primary_element_index, secondary_element_index, Jl, Jr, dt,
-   fn, Fn, fn_inner_ll, fn_inner_rr, primary_node_index, equations, dg, volume_integral::VolumeIntegralFR, mesh::StructuredMesh)
+   fn, Fn, fn_inner_ll, fn_inner_rr, primary_node_index, equations, dg, volume_integral::VolumeIntegralFR, mesh::Union{StructuredMesh, UnstructuredMesh2D})
    return zero(eltype(u_ll))
 end
 
-function compute_alp(u_ll, u_rr, left_element, right_element, Jl, Jr, alpha, dt, fn, Fn_,
+function compute_alp(u_ll, u_rr, left_element, right_element, Jl, Jr, dt, fn, Fn_,
    fn_inner_ll, fn_inner_rr, i,
    equations, dg, volume_integral::VolumeIntegralFRShockCapturing,
-   mesh::StructuredMesh)
+   mesh::Union{StructuredMesh, UnstructuredMesh2D})
    @unpack weights = dg.basis
+   @unpack alpha = volume_integral.indicator.cache
    alp = 0.5 * (alpha[left_element] + alpha[right_element])
 
    Fn = (1.0 - alp) * Fn_ + alp * fn
@@ -1330,7 +1331,6 @@ function compute_alp(u_ll, u_rr, left_element, right_element, Jl, Jr, alpha, dt,
    # u_ll = get_node_vars(ul, equations, dg, nnodes(dg))
    lower_order_update = u_ll - dt * Jl / (weights[nnodes(dg)] * λx) * (Fn - fn_inner_ll)
    if is_admissible(lower_order_update, equations) == false
-      @assert false
       return 1.0
    end
 
@@ -1338,7 +1338,6 @@ function compute_alp(u_ll, u_rr, left_element, right_element, Jl, Jr, alpha, dt,
    # u_rr = get_node_vars(ur, equations, dg, 1)
    lower_order_update = u_rr - dt * Jr / (weights[1] * λx) * (fn_inner_rr - Fn)
    if is_admissible(lower_order_update, equations) == false
-      @assert false
       return 1.0
    end
    return alp

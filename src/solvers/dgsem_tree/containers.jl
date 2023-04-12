@@ -96,7 +96,7 @@ mutable struct LWBoundariesContainer{uEltype<:Real,D,OuterCache}
    outer_cache::OuterCache
 end
 
-function create_element_cache(::Union{TreeMesh,StructuredMesh,P4estMesh},
+function create_element_cache(::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D,P4estMesh},
    nan_uEltype, NDIMS, n_variables, n_nodes, n_elements)
 
    _U = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
