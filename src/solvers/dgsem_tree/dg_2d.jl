@@ -291,7 +291,8 @@ using MuladdMacro
       # unph_threaded, uf_threaded
       mh_face_arrays,
       uext_threaded = cache
-      @unpack x_subfaces, y_subfaces, fn_low = cache
+      @unpack x_subfaces, y_subfaces = cache
+      @unpack fn_low = cache.element_cache
       @unpack node_coordinates = cache.elements
       @unpack inverse_weights = dg.basis
 
@@ -1815,7 +1816,7 @@ using MuladdMacro
    end
 
    function compute_subcells(::Union{TreeMesh{2},StructuredMesh{2},UnstructuredMesh2D,P4estMesh{2}},
-      dg::DG, RealT)
+      dg::DG, RealT = eltype(dg.basis.weights))
       @unpack nodes, weights = dg.basis
       # subfaces in reference cell
       x_subfaces, y_subfaces = (OffsetArray(Vector{RealT}(undef, nnodes(dg) + 1), OffsetArrays.Origin(0))
@@ -1872,9 +1873,7 @@ using MuladdMacro
                                      OffsetArrays.Origin(1, 1, 0, 0)))
                         for _ in 1:Threads.nthreads()]
 
-      # Wow, even this is not needed
-      x_subfaces, y_subfaces, ξ_extended = compute_subcells(mesh, dg::DG,
-         eltype(dg.basis.weights))
+      x_subfaces, y_subfaces, ξ_extended = compute_subcells(mesh, dg)
 
       return (; cache..., element_ids_dg, element_ids_dgfv,
          fstar1_L_threaded, fstar1_R_threaded, fstar2_L_threaded, fstar2_R_threaded,
