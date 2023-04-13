@@ -51,86 +51,11 @@ initial_condition = initial_condition_mach3_flow
   return flux
 end
 
-
-# Supersonic outflow boundary condition.
-# Calculate the boundary flux entirely from the internal solution state. Analogous to supersonic inflow
-# except all the solution state values are set from the internal solution as everything leaves the domain
-@inline function boundary_condition_outflow(U_inner, f_inner, u_inner,
-  outer_cache,
-  normal_direction::AbstractVector, x, t, dt,
-  surface_flux_function, equations::CompressibleEulerEquations2D,
-  dg, time_discretization)
-
-  # return f_inner
-
-  flux = Trixi.flux(u_inner, normal_direction, equations)
-
-  return flux
-end
-
-@inline function slip_wall_approximate(U_inner, f_inner, u_inner,
-  outer_cache,
-  normal_direction::AbstractVector,
-  x, t, dt,
-  surface_flux_function,
-  equations::CompressibleEulerEquations2D,
-  dg, time_discretization)
-
-  u_outer = TrixiLW.get_reflection(u_inner, normal_direction, equations)
-
-  flux = surface_flux_function(u_inner, u_outer, normal_direction, equations)
-
-  return flux
-
-
-  # TRIXI WAY!
-  # return boundary_condition_slip_wall(u_inner, normal_direction, x, t, surface_flux_function, equations)
-  norm_ = norm(normal_direction)
-  # Normalize the vector without using `normalize` since we need to multiply by the `norm_` later
-  normal = normal_direction / norm_
-
-  # rotate the internal solution state
-  u_local = Trixi.rotate_to_x(u_inner, normal, equations)
-
-  # compute the primitive variables
-  rho_local, v_normal, v_tangent, p_local = cons2prim(u_local, equations)
-
-  # Get the solution of the pressure Riemann problem
-  # See Section 6.3.3 of
-  # Eleuterio F. Toro (2009)
-  # Riemann Solvers and Numerical Methods for Fluid Dynamics: A Pratical Introduction
-  # [DOI: 10.1007/b79761](https://doi.org/10.1007/b79761)
-  if v_normal <= 0.0
-    sound_speed = sqrt(equations.gamma * p_local / rho_local) # local sound speed
-    a_ = 1.0 + 0.5 * (equations.gamma - 1) * v_normal / sound_speed
-    if a_ >= 1e-6
-      p_star = p_local * (a_)^(2.0 * equations.gamma * equations.inv_gamma_minus_one)
-    else
-      u_outer = TrixiLW.get_reflection(u_inner, normal_direction, equations)
-
-      flux = surface_flux_function(u_inner, u_outer, normal_direction, equations)
-
-      return flux
-    end
-  else # v_normal > 0.0
-    # @show v_normal, p_local
-    A = 2.0 / ((equations.gamma + 1) * rho_local)
-    B = p_local * (equations.gamma - 1) / (equations.gamma + 1)
-    p_star = p_local + 0.5 * v_normal / A * (v_normal + sqrt(v_normal^2 + 4.0 * A * (p_local + B)))
-  end
-
-  # For the slip wall we directly set the flux as the normal velocity is zero
-  return SVector(zero(eltype(u_inner)),
-    p_star * normal[1],
-    p_star * normal[2],
-    zero(eltype(u_inner))) * norm_
-end
-
 boundary_conditions = Dict(
-  :Bottom => slip_wall_approximate,
-  :Circle => slip_wall_approximate,
-  :Top    => slip_wall_approximate,
-  :Right  => boundary_condition_outflow,
+  :Bottom => TrixiLW.slip_wall_approximate,
+  :Circle => TrixiLW.slip_wall_approximate,
+  :Top    => TrixiLW.slip_wall_approximate,
+  :Right  => TrixiLW.boundary_condition_outflow,
   :Left   => boundary_condition_supersonic_inflow)
 
 surface_flux = flux_lax_friedrichs
@@ -150,9 +75,6 @@ volume_integral = TrixiLW.VolumeIntegralFRShockCapturing(
   # reconstruction=TrixiLW.MUSCLHancockReconstruction()
 )
 
-# volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
-#                                                  volume_flux_dg=volume_flux,
-#                                                  volume_flux_fv=surface_flux)
 solver = DGSEM(polydeg=polydeg, surface_flux=surface_flux,
   volume_integral=volume_integral)
 

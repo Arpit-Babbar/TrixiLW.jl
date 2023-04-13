@@ -74,9 +74,6 @@ end
 end
 
 function finite_differences(h1, h2, ul, u, ur)
-   if min(h1, h2) < 1e-12
-     return zero(ul), zero(ul), zero(ul)
-   end
    back_diff = (u - ul)/h1
    fwd_diff = (ur - u)/h2
    a, b, c = -( h2/(h1*(h1+h2)) ), (h2-h1)/(h1*h2), ( h1/(h2*(h1+h2)) )
@@ -85,8 +82,8 @@ function finite_differences(h1, h2, ul, u, ur)
 end
 
 function minmod(a, b, c, beta, Mdx2 = 1e-10)
-   if abs(a) < Mdx2
-     return a
+   if abs(b) < Mdx2
+     return b
    end
    slope = min(beta*abs(a),abs(b),beta*abs(c))
    s1, s2, s3 = sign(a), sign(b), sign(c)
@@ -95,8 +92,6 @@ function minmod(a, b, c, beta, Mdx2 = 1e-10)
    else
       slope = s1 * slope
       return slope
-      # slope = s1 * min(abs(a),abs(b),abs(c))
-      # return slope
    end
 end
 
@@ -136,62 +131,16 @@ function limit_variable_slope(eq, variable, slope, u_star_ll, u_star_rr, ue, xl,
 
     # TODO - Avoid this repetition
 
-   #  slope, u_star_ll, u_star_rr = limit_variable_slope(
-   #     eq, Trixi.density, slope, u_star_ll, u_star_rr, ue, xl, xr)
+    slope, u_star_ll, u_star_rr = limit_variable_slope(
+       eq, Trixi.density, slope, u_star_ll, u_star_rr, ue, xl, xr)
 
-   #  slope, u_star_ll, u_star_rr = limit_variable_slope(
-   #     eq, Trixi.pressure, slope, u_star_ll, u_star_rr, ue, xl, xr)
+    slope, u_star_ll, u_star_rr = limit_variable_slope(
+       eq, Trixi.pressure, slope, u_star_ll, u_star_rr, ue, xl, xr)
 
-   #  ufl = ue + slope*xl
-   #  ufr = ue + slope*xr
+    ufl = ue + slope*xl
+    ufr = ue + slope*xr
 
-   #  return ufl, ufr, slope
-
-   ρ_low, ρ_star = Trixi.density(ue, eq), Trixi.density(u_star_ll, eq)
-   eps = 0.1*ρ_low
-   ratio = abs(eps-ρ_low)/(abs(ρ_low-ρ_star)+1e-13)
-   theta = min(ratio, 1.0)
-   if theta < 1.0
-      slope = theta*slope # Limit slope accordingly
-      # Update u_star_ll, u_star_rr with new slope
-      u_star_ll = ue + 2.0*slope*xl
-      u_star_rr = ue + 2.0*slope*xr
-   end
-   p_low, p_star = Trixi.pressure(ue, eq), Trixi.pressure(u_star_ll, eq)
-   eps = 0.1*p_low
-   ratio = abs(eps-p_low)/(abs(p_low-p_star)+1e-13)
-   theta = min(ratio, 1.0)
-   if theta < 1.0
-      slope = theta*slope # Limit slope accordingly
-      # Update u_star_ll, u_star_rr with new slope
-      u_star_ll = ue + 2.0*slope*xl
-      u_star_rr = ue + 2.0*slope*xr
-   end
-
-   ρ_star = Trixi.density(u_star_rr, eq)
-   ratio = abs(eps-ρ_low)/(abs(ρ_low-ρ_star)+1e-13)
-   theta = min(ratio, 1.0)
-   if theta < 1.0
-      slope = theta*slope # Limit slope accordingly
-      # Update u_star_ll, u_star_rr with new slope
-      # u_star_ll = ue + 2.0*slope*xl
-      u_star_rr = ue + 2.0*slope*xr
-   end
-   p_star = Trixi.pressure(u_star_rr, eq)
-   eps = 0.1*p_low
-   ratio = abs(eps-p_low)/(abs(p_low-p_star)+1e-13)
-   theta = min(ratio, 1.0)
-   if theta < 1.0
-      slope = theta*slope # Limit slope accordingly
-      # Update u_star_ll, u_star_rr with new slope
-      # u_star_ll = ue + 2.0*slope*xl
-      u_star_rr = ue + 2.0*slope*xr
-   end
-
-   ufl = ue + slope*xl
-   ufr = ue + slope*xr
-
-   return ufl, ufr
+    return ufl, ufr, slope
 end
 
 
