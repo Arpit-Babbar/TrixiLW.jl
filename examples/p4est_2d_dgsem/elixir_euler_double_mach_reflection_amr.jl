@@ -165,8 +165,3 @@ sol, summary_callback = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tol
   limiters=(; stage_limiter!)
 );
 summary_callback() # print the timer summary
-
-#timesteps:    410 │ Δt: 4.7221e-06 │ sim. time: 1.7686e-03 │ run time: 9.6006e+01 s
-#timesteps:    310 │ Δt: 6.7792e-06 │ sim. time: 1.7619e-03 │ run time: 7.1076e+01 s
-
-#timesteps:    650 │ Δt: 3.0478e-06 │ sim. time: 1.7775e-03 │ run time: 3.1179e+02 s
