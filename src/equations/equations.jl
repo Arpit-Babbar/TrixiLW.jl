@@ -193,3 +193,29 @@ end
    return flux
 end
 
+function limit_variable_slope(eq, variable, slope, u_star_ll, u_star_rr, ue, xl, xr)
+   # The MUSCL-Hancock scheme is guaranteed to be admissibility preserving if
+   # slope is chosen so that
+   # u_star_ll = ue + 2.0*slope*xl, u_star_rr = ue+2.0*slope*xr are admissible
+   # ue is already admissible and we know we can find sequences of thetas
+   # to make theta*u_star_ll+(1-theta)*ue is admissible.
+   # This is equivalent to replacing u_star_ll by
+   # u_star_ll = ue + 2.0*theta*s*xl.
+   # Thus, we simply have to update the slope by multiplying by theta.
+
+   # By Jensen's inequality, we can find theta's directly for the primitives
+
+   var_star_ll, var_star_rr = variable(u_star_ll, eq), variable(u_star_rr, eq)
+   var_low = variable(ue, eq)
+   eps = 1e-10
+   threshold = 0.1*var_low
+   if var_star_ll < eps || var_star_rr < eps
+      ratio_ll = abs(threshold - var_low) / (abs(var_star_ll - var_low) + 1e-13)
+      ratio_rr = abs(threshold - var_low) / (abs(var_star_rr - var_low) + 1e-13)
+      theta = min(min(ratio_ll, ratio_rr), 1.0)
+      slope *= theta
+      u_star_ll = ue + (2.0*theta)*(xl*slope)
+      u_star_rr = ue + (2.0*theta)*(xr*slope)
+   end
+   return slope, u_star_ll, u_star_rr
+end
