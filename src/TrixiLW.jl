@@ -1,10 +1,11 @@
 module TrixiLW
 
-src_dir()     = @__DIR__ # Directory of file
-eq_dir()      = joinpath(src_dir(),"equations")
-semi_dir()    = joinpath(src_dir(),"semidiscretization")
-solvers_dir() = joinpath(src_dir(),"solvers")
-aux_dir()     = joinpath(src_dir(),"auxiliary")
+src_dir()      = @__DIR__ # Directory of file
+eq_dir()       = joinpath(src_dir(),"equations")
+semi_dir()     = joinpath(src_dir(),"semidiscretization")
+solvers_dir()  = joinpath(src_dir(),"solvers")
+aux_dir()      = joinpath(src_dir(),"auxiliary")
+callback_dir() = joinpath(src_dir(),"callbacks")
 
 # Basic types
 include(joinpath(src_dir(), "basic_types.jl"))
@@ -49,6 +50,9 @@ include(solvers_dir() * "/dgsem_unstructured_2d/containers.jl")
 # P4estMesh
 include(solvers_dir() * "/dgsem_p4est/dg_2d.jl")
 include(solvers_dir() * "/dgsem_p4est/containers.jl")
+
+# AMR
+include(callback_dir() * "/amr.jl")
 
 export time_discretization
 
