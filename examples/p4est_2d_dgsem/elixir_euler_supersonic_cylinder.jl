@@ -51,7 +51,6 @@ initial_condition = initial_condition_mach3_flow
   return flux
 end
 
-boundary_condition_inflow = BoundaryConditionDirichlet(initial_condition)
 
 # Supersonic outflow boundary condition.
 # Calculate the boundary flux entirely from the internal solution state. Analogous to supersonic inflow
@@ -61,10 +60,12 @@ boundary_condition_inflow = BoundaryConditionDirichlet(initial_condition)
   normal_direction::AbstractVector, x, t, dt,
   surface_flux_function, equations::CompressibleEulerEquations2D,
   dg, time_discretization)
-  # flux = Trixi.flux(u_inner, normal_direction, equations)
 
-  # return flux
-  return f_inner
+  # return f_inner
+
+  flux = Trixi.flux(u_inner, normal_direction, equations)
+
+  return flux
 end
 
 @inline function slip_wall_approximate(U_inner, f_inner, u_inner,
@@ -75,11 +76,11 @@ end
   equations::CompressibleEulerEquations2D,
   dg, time_discretization)
 
-  # u_outer = Trixi.get_reflection(u_inner, normal_direction, equations)
+  u_outer = TrixiLW.get_reflection(u_inner, normal_direction, equations)
 
-  # flux = surface_flux_function(u_inner, u_outer, normal_direction, equations)
+  flux = surface_flux_function(u_inner, u_outer, normal_direction, equations)
 
-  # return flux
+  return flux
 
 
   # TRIXI WAY!
@@ -102,7 +103,7 @@ end
   if v_normal <= 0.0
     sound_speed = sqrt(equations.gamma * p_local / rho_local) # local sound speed
     a_ = 1.0 + 0.5 * (equations.gamma - 1) * v_normal / sound_speed
-    if a_ >= 0.0
+    if a_ >= 1e-6
       p_star = p_local * (a_)^(2.0 * equations.gamma * equations.inv_gamma_minus_one)
     else
       u_outer = TrixiLW.get_reflection(u_inner, normal_direction, equations)
@@ -125,15 +126,16 @@ end
     zero(eltype(u_inner))) * norm_
 end
 
-boundary_conditions = Dict(:Bottom => slip_wall_approximate,
+boundary_conditions = Dict(
+  :Bottom => slip_wall_approximate,
   :Circle => slip_wall_approximate,
-  :Top => slip_wall_approximate,
-  :Right => boundary_condition_outflow,
-  :Left => boundary_condition_supersonic_inflow)
+  :Top    => slip_wall_approximate,
+  :Right  => boundary_condition_outflow,
+  :Left   => boundary_condition_supersonic_inflow)
 
 surface_flux = flux_lax_friedrichs
 
-polydeg = 3
+polydeg = 4
 basis = LobattoLegendreBasis(polydeg)
 shock_indicator = IndicatorHennemannGassner(equations, basis,
   alpha_max=1.0,
@@ -143,8 +145,8 @@ shock_indicator = IndicatorHennemannGassner(equations, basis,
 volume_integral = TrixiLW.VolumeIntegralFRShockCapturing(
   shock_indicator;
   volume_flux_fv=surface_flux,
-  reconstruction = TrixiLW.FirstOrderReconstruction(),
-  # reconstruction=TrixiLW.MUSCLReconstruction()
+  # reconstruction = TrixiLW.FirstOrderReconstruction(),
+  reconstruction=TrixiLW.MUSCLReconstruction()
   # reconstruction=TrixiLW.MUSCLHancockReconstruction()
 )
 
@@ -162,10 +164,8 @@ mesh_file = default_mesh_file
 
 mesh = P4estMesh{2}(mesh_file, initial_refinement_level=0)
 
-cfl_number = 0.15
 semi = TrixiLW.SemidiscretizationHyperbolic(mesh, time_discretization(solver),
-  equations, initial_condition, solver, boundary_conditions=boundary_conditions,
-  initial_cache=(; cfl_number, dt=zeros(1)))
+  equations, initial_condition, solver, boundary_conditions=boundary_conditions)
 
 ###############################################################################
 # ODE solvers
@@ -188,21 +188,7 @@ save_solution = SaveSolutionCallback(interval=100,
   save_final_solution=true,
   solution_variables=cons2prim)
 
-amr_indicator = IndicatorLöhner(semi, variable=Trixi.density)
-
-amr_controller = ControllerThreeLevel(semi, amr_indicator,
-                                      base_level=0,
-                                      med_level=3, med_threshold=0.05,
-                                      max_level=5, max_threshold=0.1)
-
-amr_callback = AMRCallback(semi, amr_controller,
-                           interval=1,
-                           adapt_initial_condition=true,
-                           adapt_initial_condition_only_refine=true)
-
-callbacks = (; summary_callback, analysis_callback, alive_callback, save_solution,
-              #  amr_callback
-            )
+callbacks = (; analysis_callback, alive_callback, save_solution)
 
 # positivity limiter necessary for this example with strong shocks. Very sensitive
 # to the order of the limiter variables, pressure must come first.
@@ -214,6 +200,7 @@ stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds=(5.0e-7, 1.0e-6)
 time_int_tol = 1e-6
 tolerances = (; abstol=time_int_tol, reltol=time_int_tol);
 dt_initial = 1e-6;
+cfl_number = 0.1
 sol, summary_callback = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
   time_step_computation = TrixiLW.Adaptive(),
   # time_step_computation=TrixiLW.CFLBased(cfl_number),

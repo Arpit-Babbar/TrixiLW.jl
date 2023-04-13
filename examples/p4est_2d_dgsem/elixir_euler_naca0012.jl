@@ -181,8 +181,7 @@ save_solution = SaveSolutionCallback(interval=1000,
 
 stepsize_callback = StepsizeCallback(cfl=0.15)
 
-callbacks = (; summary_callback,
-   # analysis_callback,
+callbacks = (; # analysis_callback,
    alive_callback,
    # save_solution
    )
@@ -203,9 +202,3 @@ sol, summary_callback = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tol
    limiters=(; stage_limiter!)
 );
 summary_callback() # print the timer summary
-
-4.7854e+02/3.9230e+02
-
-#timesteps:   9900 │ Δt: 5.4501e-05 │ sim. time: 5.1071e-01 │ run time: 8.8481e+02 s
-#timesteps:   8100 │ Δt: 6.2649e-05 │ sim. time: 5.1288e-01 │ run time: 7.2178e+02 s
-8.8481e+02/7.2178e+02

@@ -169,7 +169,6 @@ end
       fn, Fn, fn_inner_ll, fn_inner_rr, primary_node_index,
       equations, dg, dg.volume_integral)
 
-
    for v in eachvariable(equations)
       surface_flux_values[v, primary_node_index, primary_direction_index, primary_element_index] = (
          alp * fn[v] + (1.0 - alp) * Fn[v]

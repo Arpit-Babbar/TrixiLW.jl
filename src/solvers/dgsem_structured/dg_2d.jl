@@ -4,7 +4,8 @@ using Trixi: TreeMesh, P4estMesh, BoundaryConditionPeriodic,
    calc_surface_integral!, apply_jacobian!, reset_du!,
    max_dt,
    StructuredMesh, UnstructuredMesh2D,
-   DG, DGSEM, nnodes, nelements, False
+   DG, DGSEM, nnodes, nelements, False,
+   get_node_vars, set_node_vars!
 
 import Trixi: calc_interface_flux!, calc_boundary_flux!
 using MuladdMacro
@@ -72,6 +73,128 @@ end
    return nothing
 end
 
+function finite_differences(h1, h2, ul, u, ur)
+   if min(h1, h2) < 1e-12
+     return zero(ul), zero(ul), zero(ul)
+   end
+   back_diff = (u - ul)/h1
+   fwd_diff = (ur - u)/h2
+   a, b, c = -( h2/(h1*(h1+h2)) ), (h2-h1)/(h1*h2), ( h1/(h2*(h1+h2)) )
+   cent_diff = a*ul + b*u + c*ur
+   return back_diff, cent_diff, fwd_diff
+end
+
+function minmod(a, b, c, beta, Mdx2 = 1e-10)
+   if abs(a) < Mdx2
+     return a
+   end
+   slope = min(beta*abs(a),abs(b),beta*abs(c))
+   s1, s2, s3 = sign(a), sign(b), sign(c)
+   if (s1 != s2) || (s2 != s3)
+      return zero(a)
+   else
+      slope = s1 * slope
+      return slope
+      # slope = s1 * min(abs(a),abs(b),abs(c))
+      # return slope
+   end
+end
+
+function limit_variable_slope(eq, variable, slope, u_star_ll, u_star_rr, ue, xl, xr)
+   # By Jensen's inequality, we can find theta's directly for the primitives
+   var_star_ll, var_star_rr = variable(u_star_ll, eq), variable(u_star_rr, eq)
+   var_low = variable(ue, eq)
+   # threshold = 0.1*var_low
+   eps = 1e-6
+   threshold = 1e-6
+   if var_star_ll < eps || var_star_rr < eps
+      ratio_ll = abs(threshold - var_low) / (abs(var_star_ll - var_low) + 1e-13)
+      ratio_rr = abs(threshold - var_low) / (abs(var_star_rr - var_low) + 1e-13)
+      theta = min(min(ratio_ll, ratio_rr), 1.0)
+      slope *= theta
+      u_star_ll = ue + (2.0*theta)*(xl*slope)
+      u_star_rr = ue + (2.0*theta)*(xr*slope)
+   end
+   return slope, u_star_ll, u_star_rr
+ end
+
+ function limit_slope(eq::CompressibleEulerEquations2D, slope, ufl, u_star_ll,
+                       ufr, u_star_rr, ue, xl, xr)
+    # The MUSCL-Hancock scheme is guaranteed to be admissibility preserving if
+    # slope is chosen so that
+    # u_star_ll = ue + 2.0*slope*xl, u_star_rr = ue+2.0*slope*xr are admissible
+    # ue is already admissible and we know we can find sequences of thetas
+    # to make theta*u_star_ll+(1-theta)*ue is admissible.
+    # This is equivalent to replacing u_star_ll by
+    # u_star_ll = ue + 2.0*theta*s*xl.
+    # Thus, we simply have to update the slope by multiplying by theta.
+
+    # By Jensen's inequality, we can find theta's directly for the primitives
+
+    # First we limit u_star_ll. We keep limiting u_star_rr at the same time
+    # in case it already becomes admissible in the process
+
+    # TODO - Avoid this repetition
+
+   #  slope, u_star_ll, u_star_rr = limit_variable_slope(
+   #     eq, Trixi.density, slope, u_star_ll, u_star_rr, ue, xl, xr)
+
+   #  slope, u_star_ll, u_star_rr = limit_variable_slope(
+   #     eq, Trixi.pressure, slope, u_star_ll, u_star_rr, ue, xl, xr)
+
+   #  ufl = ue + slope*xl
+   #  ufr = ue + slope*xr
+
+   #  return ufl, ufr, slope
+
+   ρ_low, ρ_star = Trixi.density(ue, eq), Trixi.density(u_star_ll, eq)
+   eps = 0.1*ρ_low
+   ratio = abs(eps-ρ_low)/(abs(ρ_low-ρ_star)+1e-13)
+   theta = min(ratio, 1.0)
+   if theta < 1.0
+      slope = theta*slope # Limit slope accordingly
+      # Update u_star_ll, u_star_rr with new slope
+      u_star_ll = ue + 2.0*slope*xl
+      u_star_rr = ue + 2.0*slope*xr
+   end
+   p_low, p_star = Trixi.pressure(ue, eq), Trixi.pressure(u_star_ll, eq)
+   eps = 0.1*p_low
+   ratio = abs(eps-p_low)/(abs(p_low-p_star)+1e-13)
+   theta = min(ratio, 1.0)
+   if theta < 1.0
+      slope = theta*slope # Limit slope accordingly
+      # Update u_star_ll, u_star_rr with new slope
+      u_star_ll = ue + 2.0*slope*xl
+      u_star_rr = ue + 2.0*slope*xr
+   end
+
+   ρ_star = Trixi.density(u_star_rr, eq)
+   ratio = abs(eps-ρ_low)/(abs(ρ_low-ρ_star)+1e-13)
+   theta = min(ratio, 1.0)
+   if theta < 1.0
+      slope = theta*slope # Limit slope accordingly
+      # Update u_star_ll, u_star_rr with new slope
+      # u_star_ll = ue + 2.0*slope*xl
+      u_star_rr = ue + 2.0*slope*xr
+   end
+   p_star = Trixi.pressure(u_star_rr, eq)
+   eps = 0.1*p_low
+   ratio = abs(eps-p_low)/(abs(p_low-p_star)+1e-13)
+   theta = min(ratio, 1.0)
+   if theta < 1.0
+      slope = theta*slope # Limit slope accordingly
+      # Update u_star_ll, u_star_rr with new slope
+      # u_star_ll = ue + 2.0*slope*xl
+      u_star_rr = ue + 2.0*slope*xr
+   end
+
+   ufl = ue + slope*xl
+   ufr = ue + slope*xr
+
+   return ufl, ufr
+end
+
+
 @inline function calc_fn_low!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u,
    mesh::Union{StructuredMesh{2},UnstructuredMesh2D,P4estMesh{2}},
    nonconservative_terms::False, equations,
@@ -136,6 +259,140 @@ end
 
    return nothing
 end
+
+function calcflux_muscl!(fstar1_L, fstar1_R, fstar2_L, fstar2_R,
+   uf, uext, alpha, u, Δt,
+   mesh::Union{StructuredMesh{2},UnstructuredMesh2D,P4estMesh{2}},
+   nonconservative_terms::False, equations,
+   volume_flux_fv, dg::DGSEM, element, cache)
+
+   # TODO - Create a boundary neighbour element and re-use it
+   for boundary in eachboundary(dg, cache)
+      if element in cache.boundaries.neighbor_ids[boundary]
+         calcflux_fv!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u, mesh,
+            nonconservative_terms, equations, volume_flux_fv, dg, element, cache)
+         return nothing
+      end
+   end
+
+   @unpack x_subfaces, y_subfaces, ξ_extended = cache
+   @unpack contravariant_vectors, inverse_jacobian = cache.elements
+   @unpack weights, derivative_matrix = dg.basis
+   nvar = nvariables(equations)
+
+   nd = nnodes(dg)
+   @turbo @views begin
+      uext[:, 1:nd, 1:nd] .= u[:, :, :, element]
+      uext[:, 0,    1:nd] .= uext[:, 1,  1:nd]
+      uext[:, nd+1, 1:nd] .= uext[:, nd, 1:nd]
+      uext[:, 1:nd, 0]    .= uext[:, 1:nd, 1]
+      uext[:, 1:nd, nd+1] .= uext[:, 1:nd, nd]
+   end
+
+   # Loop over subcells to extrapolate to faces
+   for j in eachnode(dg), i in eachnode(dg)
+      u_ = Trixi.get_node_vars(uext, equations, dg, i, j)
+      ul = Trixi.get_node_vars(uext, equations, dg, i - 1, j)
+      ur = Trixi.get_node_vars(uext, equations, dg, i + 1, j)
+      ud = Trixi.get_node_vars(uext, equations, dg, i, j - 1)
+      uu = Trixi.get_node_vars(uext, equations, dg, i, j + 1)
+
+      Δx1, Δx2 = ξ_extended[i] - ξ_extended[i-1], ξ_extended[i+1] - ξ_extended[i]
+      Δy1, Δy2 = ξ_extended[j] - ξ_extended[j-1], ξ_extended[j+1] - ξ_extended[j]
+
+      back_x, cent_x, fwd_x = finite_differences(Δx1, Δx2, ul, u_, ur)
+      back_y, cent_y, fwd_y = finite_differences(Δy1, Δy2, ud, u_, uu)
+
+      beta1, beta2 = 2.0 - alpha, 2.0 - alpha # Unfortunate way to fix type instability
+
+      slope_tuple_x = (minmod(back_x[n], cent_x[n], fwd_x[n], beta1, 0.0)
+                       for n in eachvariable(equations))
+      slope_x = SVector{nvar}(slope_tuple_x)
+
+      slope_tuple_y = (minmod(back_y[n], cent_y[n], fwd_y[n], beta2, 0.0)
+                       for n in eachvariable(equations))
+      slope_y = SVector{nvar}(slope_tuple_y)
+
+      ufl = u_ + slope_x * (x_subfaces[i-1] - ξ_extended[i]) # left face value u_{i-1/2,j}
+      ufr = u_ + slope_x * (x_subfaces[i]   - ξ_extended[i]) # right face value u_{i+1/2,j}
+
+      ufd = u_ + slope_y * (y_subfaces[j-1] - ξ_extended[j]) # lower face value u_{i, j-1/2}
+      ufu = u_ + slope_y * (y_subfaces[j]   - ξ_extended[j]) # upper face value u_{i, j+1/2}
+
+      u_star_ll = u_ + 2.0 * slope_x * (x_subfaces[i-1] - ξ_extended[i]) # left face value u_{i-1/2,j}
+      u_star_rr = u_ + 2.0 * slope_x * (x_subfaces[i]   - ξ_extended[i]) # right face value u_{i+1/2,j}
+
+      u_star_d = u_ + 2.0 * slope_y * (y_subfaces[j-1] - ξ_extended[j]) # lower face value u_{i,j-1/2}
+      u_star_u = u_ + 2.0 * slope_y * (y_subfaces[j]   - ξ_extended[j]) # upper face value u_{i,j+1/2}
+
+      ufl, ufr = limit_slope(equations, slope_x, ufl, u_star_ll, ufr, u_star_rr, u_,
+         x_subfaces[i-1] - ξ_extended[i], x_subfaces[i] - ξ_extended[i])
+
+      ufd, ufu = limit_slope(equations, slope_y, ufd, u_star_d, ufu, u_star_u, u_,
+         y_subfaces[j-1] - ξ_extended[j], y_subfaces[j] - ξ_extended[j])
+
+      @turbo @views begin
+         uf[:, 1, i, j] .= ufl
+         uf[:, 2, i, j] .= ufr
+         uf[:, 3, i, j] .= ufd
+         uf[:, 4, i, j] .= ufu
+      end
+   end
+
+   # Performance improvement if the metric terms of the subcell FV method are only computed
+   # once at the beginning of the simulation, instead of at every Runge-Kutta stage
+   @turbo fstar1_L[:, 1, :] .= zero(eltype(fstar1_L))
+   @turbo fstar1_L[:, nnodes(dg)+1, :] .= zero(eltype(fstar1_L))
+   @turbo fstar1_R[:, 1, :] .= zero(eltype(fstar1_R))
+   @turbo fstar1_R[:, nnodes(dg)+1, :] .= zero(eltype(fstar1_R))
+
+   for j in eachnode(dg)
+      normal_direction = get_contravariant_vector(1, contravariant_vectors, 1, j, element)
+
+      for i in 2:nnodes(dg)
+         u_ll = Trixi.get_node_vars(uf, equations, dg, 2, i - 1, j)
+         u_rr = Trixi.get_node_vars(uf, equations, dg, 1, i,     j)
+
+         for m in 1:nnodes(dg)
+            normal_direction += weights[i-1] * derivative_matrix[i-1, m] * get_contravariant_vector(1, contravariant_vectors, m, j, element)
+         end
+
+         # Compute the contravariant flux
+         contravariant_flux = volume_flux_fv(u_ll, u_rr, normal_direction, equations)
+
+         Trixi.set_node_vars!(fstar1_L, contravariant_flux, equations, dg, i, j)
+         Trixi.set_node_vars!(fstar1_R, contravariant_flux, equations, dg, i, j)
+      end
+   end
+
+   @turbo fstar2_L[:, :, 1] .= zero(eltype(fstar2_L))
+   @turbo fstar2_L[:, :, nnodes(dg)+1] .= zero(eltype(fstar2_L))
+   @turbo fstar2_R[:, :, 1] .= zero(eltype(fstar2_R))
+   @turbo fstar2_R[:, :, nnodes(dg)+1] .= zero(eltype(fstar2_R))
+
+   for i in eachnode(dg)
+      normal_direction = get_contravariant_vector(2, contravariant_vectors, i, 1, element)
+
+      for j in 2:nnodes(dg)
+         u_ll = Trixi.get_node_vars(uf, equations, dg, 4, i, j - 1)
+         u_rr = Trixi.get_node_vars(uf, equations, dg, 3, i, j)
+
+         for m in 1:nnodes(dg)
+            normal_direction += weights[j-1] * derivative_matrix[j-1, m] * get_contravariant_vector(2, contravariant_vectors, i, m, element)
+         end
+
+         # Compute the contravariant flux by taking the scalar product of the
+         # normal vector and the flux vector
+         contravariant_flux = volume_flux_fv(u_ll, u_rr, normal_direction, equations)
+
+         Trixi.set_node_vars!(fstar2_L, contravariant_flux, equations, dg, i, j)
+         Trixi.set_node_vars!(fstar2_R, contravariant_flux, equations, dg, i, j)
+      end
+   end
+
+   return nothing
+end
+
 
 function contravariant_flux(u, i, j, element, contravariant_vectors, eq::AbstractEquations{2})
    Ja11, Ja12 = get_contravariant_vector(1, contravariant_vectors, i, j, element)
