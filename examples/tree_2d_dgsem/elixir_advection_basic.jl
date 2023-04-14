@@ -60,7 +60,7 @@ cfl_number = TrixiLW.trixi2lw(0.71, solver)
 sol, summary = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
                      #  time_step_computation = TrixiLW.Adaptive(),
                       time_step_computation = TrixiLW.CFLBased(cfl_number),
-                     #  stages = TrixiLW.TwoStaged()
+                      stages = TrixiLW.TwoStaged()
                       );
 
 # Print the timer summary

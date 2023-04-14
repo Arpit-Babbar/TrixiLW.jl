@@ -1318,7 +1318,7 @@ using MuladdMacro
 
       refresh!(arr) = fill!(arr, zero(eltype(u)))
 
-      F, G, ut, U, up, um, upp, umm, S = cell_arrays[id]
+      F, G, ut, U, S = cell_arrays[id]
       @unpack u_low = element_cache
       refresh!.((ut,))
       for j in eachnode(dg), i in eachnode(dg)
@@ -1341,10 +1341,6 @@ using MuladdMacro
             Trixi.multiply_add_to_node_vars!(ut, -dt * derivative_matrix[jj, j], flux2, equations, dg, i, jj)
          end
 
-         Trixi.set_node_vars!(um,    u_node, equations, dg, i, j)
-         Trixi.set_node_vars!(up,    u_node, equations, dg, i, j)
-         Trixi.set_node_vars!(umm,   u_node, equations, dg, i, j)
-         Trixi.set_node_vars!(upp,   u_node, equations, dg, i, j)
          Trixi.set_node_vars!(U, 0.5*u_node, equations, dg, i, j)
          Trixi.set_node_vars!(u_low, u_node, equations, dg, i, j, element)
       end
@@ -1369,25 +1365,22 @@ using MuladdMacro
       for j in eachnode(dg), i in eachnode(dg)
          u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
          ut_node = Trixi.get_node_vars(ut, equations, dg, i, j)
-         Trixi.multiply_add_to_node_vars!(up, 1.0, ut_node, equations, dg, i, j)
-         Trixi.multiply_add_to_node_vars!(um, -1.0, ut_node, equations, dg, i, j)
-         Trixi.multiply_add_to_node_vars!(umm, -2.0, ut_node, equations, dg, i, j)
-         Trixi.multiply_add_to_node_vars!(upp, 2.0, ut_node, equations, dg, i, j)
 
-         um_node = Trixi.get_node_vars(um, equations, dg, i, j)
-         up_node = Trixi.get_node_vars(up, equations, dg, i, j)
-         umm_node = Trixi.get_node_vars(umm, equations, dg, i, j)
-         upp_node = Trixi.get_node_vars(upp, equations, dg, i, j)
-         fm, gm = fluxes(um_node, equations)
-         fp, gp = fluxes(up_node, equations)
-         fmm, gmm = fluxes(umm_node, equations)
-         fpp, gpp = fluxes(upp_node, equations)
+         um  = u_node - ut_node
+         up  = u_node + ut_node
+         umm = u_node - 2*ut_node
+         upp = u_node + 2*ut_node
+
+         fm, gm = fluxes(um, equations)
+         fp, gp = fluxes(up, equations)
+         fmm, gmm = fluxes(umm, equations)
+         fpp, gpp = fluxes(upp, equations)
 
          ft = 1.0 / 12.0 * (-fpp + 8.0 * fp - 8.0 * fm + fmm)
          gt = 1.0 / 12.0 * (-gpp + 8.0 * gp - 8.0 * gm + gmm)
 
          x = Trixi.get_node_coords(node_coordinates, equations, dg, i, j, element)
-         st = calc_source_t_N34(u_node, up_node, upp_node, um_node, umm_node, x, t, dt,
+         st = calc_source_t_N34(u_node, up, upp, um, umm, x, t, dt,
                                 source_terms, equations, dg, cache)
 
          f_node = 2.0*get_node_vars(F, equations, dg, i, j)
@@ -1464,7 +1457,7 @@ using MuladdMacro
 
       refresh!(arr) = fill!(arr, zero(eltype(u)))
 
-      F, G, ut, ust, U, up, um, upp, umm, S = cell_arrays[id]
+      F, G, ut, ust, U, S = cell_arrays[id]
       refresh!.((ut, ust))
       for j in eachnode(dg), i in eachnode(dg)
          u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
@@ -1491,11 +1484,7 @@ using MuladdMacro
             Trixi.multiply_add_to_node_vars!(ust, -dt * derivative_matrix[jj, j], flux2_s, equations, dg, i, jj)
          end
 
-         Trixi.set_node_vars!(um,    u_node, equations, dg, i, j)
-         Trixi.set_node_vars!(up,    u_node, equations, dg, i, j)
-         Trixi.set_node_vars!(umm,   u_node, equations, dg, i, j)
-         Trixi.set_node_vars!(upp,   u_node, equations, dg, i, j)
-         Trixi.set_node_vars!(U,     u_node, equations, dg, i, j)
+         Trixi.set_node_vars!(U, u_node, equations, dg, i, j)
       end
 
       # Scale ut
@@ -1521,22 +1510,19 @@ using MuladdMacro
          ut_node  = Trixi.get_node_vars(ut, equations, dg, i, j)
          us_node = Trixi.get_node_vars(us, equations, dg, i, j, element)
          ust_node = Trixi.get_node_vars(ust, equations, dg, i, j)
-         Trixi.multiply_add_to_node_vars!(up, 1.0, ut_node, equations, dg, i, j)
-         Trixi.multiply_add_to_node_vars!(um, -1.0, ut_node, equations, dg, i, j)
-         Trixi.multiply_add_to_node_vars!(umm, -2.0, ut_node, equations, dg, i, j)
-         Trixi.multiply_add_to_node_vars!(upp, 2.0, ut_node, equations, dg, i, j)
+
          x = Trixi.get_node_coords(node_coordinates, equations, dg, i, j, element)
 
-         um_node = Trixi.get_node_vars(um, equations, dg, i, j)
-         up_node = Trixi.get_node_vars(up, equations, dg, i, j)
-         umm_node = Trixi.get_node_vars(umm, equations, dg, i, j)
-         upp_node = Trixi.get_node_vars(upp, equations, dg, i, j)
-         fm, gm = fluxes(um_node, equations)
-         fp, gp = fluxes(up_node, equations)
-         fmm, gmm = fluxes(umm_node, equations)
-         fpp, gpp = fluxes(upp_node, equations)
+         um  = u_node - ut_node
+         up  = u_node + ut_node
+         umm = u_node - 2*ut_node
+         upp = u_node + 2*ut_node
+         fm, gm = fluxes(um, equations)
+         fp, gp = fluxes(up, equations)
+         fmm, gmm = fluxes(umm, equations)
+         fpp, gpp = fluxes(upp, equations)
 
-         st = calc_source_t_N34(u_node, up_node, upp_node, um_node, umm_node, x, t, dt,
+         st = calc_source_t_N34(u_node, up, upp, um, umm, x, t, dt,
                                 source_terms, equations, dg, cache)
 
          um_s  = us_node -   ust_node
