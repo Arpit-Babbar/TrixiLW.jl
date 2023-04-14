@@ -1,7 +1,7 @@
 using Trixi: @trixi_timeit, SemidiscretizationHyperbolic, boundary_condition_periodic,
              digest_boundary_conditions, wrap_array
 
-function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t, tolerances = (;abstol = 0.0, reltol = 0.0))
+function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t, tolerances = (;abstol = 0.0, reltol = 0.0), volume_integral = calc_volume_integral!)
    @unpack mesh, equations, initial_condition, boundary_conditions, source_terms, solver, cache = semi
 
    u  = wrap_array(u_ode,  mesh, equations, solver, cache)
@@ -12,7 +12,7 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t, tolerances =
    @trixi_timeit timer() "rhs!" rhs!(du, u,
    t, mesh, equations, initial_condition, boundary_conditions, source_terms, solver,
    time_discretization(solver),
-   cache, tolerances)
+   cache, tolerances, volume_integral)
    runtime = time_ns() - time_start
    put!(semi.performance_counter, runtime)
 

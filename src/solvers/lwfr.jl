@@ -117,8 +117,7 @@ function apply_callbacks!(callbacks, integrator::LWIntegrator)
    end
 end
 
-function apply_limiters!(limiters, integrator::LWIntegrator)
-   u_ode = integrator.u
+function apply_limiters!(limiters, integrator::LWIntegrator, u_ode = integrator.u)
    semi  = integrator.p
    t     = integrator.t
    for limiter! in limiters
@@ -202,7 +201,7 @@ function compute_dt(semi::SemidiscretizationHyperbolicParabolic,
 end
 
 function perform_step!(integrator, limiters, callbacks, lw_update,
-                       time_step_computation::CFLBased)
+                       time_step_computation::CFLBased, ::SingleStaged)
    semi = integrator.p
    @unpack mesh = semi
    dt = compute_dt(semi, mesh, time_step_computation, integrator)
@@ -222,7 +221,7 @@ end
 # This will allow both LW and FR. For debugging, we rewrite the RKFR from Trixi.
 
 function solve_lwfr(lw_update, callbacks, dt_initial, tolerances;
-   time_step_computation=CFLBased(), limiters=(;))
+   time_step_computation=CFLBased(), limiters=(;), stages::AbstractTimeStagedMethod = SingleStaged())
    @unpack rhs!, soln_arrays, tspan, semi = lw_update
    @unpack du_ode, u0_ode = soln_arrays            # Vectors form for compability with callbacks
    prob = LWProblem(rhs!, u0_ode, semi, tspan)     # Would be an ODE problem in Trixi
@@ -242,7 +241,8 @@ function solve_lwfr(lw_update, callbacks, dt_initial, tolerances;
    apply_limiters!(limiters, integrator)
    apply_callbacks!(callbacks, integrator) # stepsize, analysis callbacks
    while !(isfinished(integrator)) # Check t < final_time
-      perform_step!(integrator, limiters, callbacks, lw_update, time_step_computation)
+      perform_step!(integrator, limiters, callbacks, lw_update, time_step_computation,
+                    stages)
       apply_limiters!(limiters, integrator)
       apply_callbacks!(callbacks, integrator)
    end
@@ -251,3 +251,4 @@ function solve_lwfr(lw_update, callbacks, dt_initial, tolerances;
 end
 
 include(solvers_dir() * "/adaptive.jl")
+include(solvers_dir() * "/mdrk.jl")

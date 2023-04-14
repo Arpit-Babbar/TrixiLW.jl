@@ -66,9 +66,13 @@ end
 
 mutable struct LWElementContainer{uEltype<:Real,NDIMSP2,NDIMSP3}
    U::Array{uEltype,NDIMSP2}      # [variables, i, j, k, element]
+   us::Array{uEltype,NDIMSP2}     # [variables, i, j, k, element]
+   u_low::Array{uEltype, NDIMSP2} # [variables, i, j, k, element]
    F::Array{uEltype,NDIMSP3}      # [variables, coordinate, i, j, k, element]
    fn_low::Array{uEltype,NDIMSP2} # [variable, i, j, left/right/bottom/top, elements]
    _U::Vector{uEltype}
+   _us::Vector{uEltype}           # [variables, i, j, k, element]
+   _u_low::Vector{uEltype}        # [variables, i, j, k, element]
    _F::Vector{uEltype}
    _fn_low::Vector{uEltype}
 end
@@ -99,11 +103,18 @@ end
 function create_element_cache(::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D,P4estMesh},
    nan_uEltype, NDIMS, n_variables, n_nodes, n_elements)
 
+   _us = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
+   _u_low = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
    _U = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
    _F = fill(nan_uEltype, n_variables * NDIMS * n_nodes^NDIMS * n_elements)
    _fn_low = fill(nan_uEltype, n_variables * n_nodes^(NDIMS - 1) * 2^NDIMS * n_elements)
 
    uEltype = typeof(nan_uEltype)
+
+   us = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_us),
+                   (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
+   u_low = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_u_low),
+                   (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
    U = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_U),
                    (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
    F = unsafe_wrap(Array{uEltype,NDIMS + 3}, pointer(_F),
@@ -111,7 +122,7 @@ function create_element_cache(::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D
 
    fn_low = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_fn_low),
                         (n_variables, ntuple(_ -> n_nodes, NDIMS - 1)..., 2^NDIMS, n_elements))
-   return LWElementContainer(U, F, fn_low, _U, _F, _fn_low)
+   return LWElementContainer(U, us, u_low, F, fn_low, _U, _us, _u_low, _F, _fn_low)
 end
 
 mutable struct L2MortarContainer_lw_Tree{uEltype<:Real,Temp} <: AbstractContainer

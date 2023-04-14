@@ -13,9 +13,6 @@ function DiffEqBase.resize!(integrator::LWIntegrator, i::Int)
    n_interfaces = ninterfaces(semi.solver, semi.cache)
    n_boundaries = nboundaries(semi.solver, semi.cache)
 
-   refine_element_array!(u) = Base.resize!(u, Int(length(u) / old_nelements * n_elements))
-   refine_interface_array!(f) = resize!(f, Int(length(f) / old_ninterfaces * n_interfaces))
-
    resize!(cache.temporal_errors, n_elements)
 
    resize_element_cache!(mesh, equations, solver, cache)
@@ -34,19 +31,22 @@ resize_element_cache!(
 
 function resize_element_cache!(mesh::Union{TreeMesh,P4estMesh}, equations, solver, cache)
    @unpack element_cache = cache
-   @unpack _U, _F, _fn_low = element_cache
+   @unpack _us, _U, _F, _fn_low = element_cache
 
    n_variables = nvariables(equations)
    n_nodes = nnodes(solver)
    n_elements = nelements(solver, cache)
    NDIMS = ndims(equations)
 
+   resize!(_us, n_variables * n_nodes^NDIMS * n_elements)
    resize!(_U, n_variables * n_nodes^NDIMS * n_elements)
    resize!(_F, n_variables * NDIMS * n_nodes^NDIMS * n_elements)
    resize!(_fn_low, n_variables * n_nodes^(NDIMS - 1) * 2^NDIMS * n_elements)
 
    element_cache.U = unsafe_wrap(
       Array, pointer(_U), (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
+   element_cache.us = unsafe_wrap(
+      Array, pointer(_us), (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
    element_cache.F = unsafe_wrap(
       Array, pointer(_F), (n_variables, NDIMS, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
    element_cache.fn_low = unsafe_wrap(
