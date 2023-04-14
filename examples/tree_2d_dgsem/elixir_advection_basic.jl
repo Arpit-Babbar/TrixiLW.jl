@@ -31,7 +31,7 @@ time_discretization(solver), equations,
 
 # Create ODE problem with time span from 0.0 to 1.0
 # ode = semidiscretize(semi, (0.0, 1.0));
-tspan = (0.0, 100.0)
+tspan = (0.0, 1.0)
 lw_update = TrixiLW.semidiscretize(semi, time_discretization(solver), tspan);
 
 # The AnalysisCallback allows to analyse the solution in regular intervals and prints the results

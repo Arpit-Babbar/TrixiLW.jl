@@ -1,4 +1,3 @@
-
 # Called in AMR callback
 function DiffEqBase.resize!(integrator::LWIntegrator, i::Int)
    @unpack old_nelements, old_ninterfaces, old_nboundaries, old_nmortars = integrator
@@ -31,18 +30,21 @@ resize_element_cache!(
 
 function resize_element_cache!(mesh::Union{TreeMesh,P4estMesh}, equations, solver, cache)
    @unpack element_cache = cache
-   @unpack _us, _U, _F, _fn_low = element_cache
+   @unpack _us, _u_low, _U, _F, _fn_low = element_cache
 
    n_variables = nvariables(equations)
    n_nodes = nnodes(solver)
    n_elements = nelements(solver, cache)
    NDIMS = ndims(equations)
 
+   resize!(_u_low, n_variables * n_nodes^NDIMS * n_elements)
    resize!(_us, n_variables * n_nodes^NDIMS * n_elements)
    resize!(_U, n_variables * n_nodes^NDIMS * n_elements)
    resize!(_F, n_variables * NDIMS * n_nodes^NDIMS * n_elements)
    resize!(_fn_low, n_variables * n_nodes^(NDIMS - 1) * 2^NDIMS * n_elements)
 
+   element_cache.u_low = unsafe_wrap(
+      Array, pointer(_u_low), (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
    element_cache.U = unsafe_wrap(
       Array, pointer(_U), (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
    element_cache.us = unsafe_wrap(
