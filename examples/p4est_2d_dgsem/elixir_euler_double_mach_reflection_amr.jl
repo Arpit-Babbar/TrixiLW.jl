@@ -148,7 +148,7 @@ amr_callback = AMRCallback(semi, amr_controller,
                            adapt_initial_condition=true,
                            adapt_initial_condition_only_refine=true)
 
-callbacks = (;analysis_callback, alive_callback, save_solution, amr_callback)
+callbacks = (; analysis_callback, alive_callback, save_solution, amr_callback)
 
 # positivity limiter necessary for this example with strong shocks
 stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds=(5.0e-6, 5.0e-6),
@@ -162,6 +162,6 @@ dt_initial = 1e-6;
 sol, summary_callback = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
   time_step_computation = TrixiLW.Adaptive(),
   # time_step_computation=TrixiLW.CFLBased(cfl_number),
-  limiters=(; stage_limiter!)
+  limiters=(; stage_limiter!), stages = TrixiLW.TwoStaged()
 );
 summary_callback() # print the timer summary
