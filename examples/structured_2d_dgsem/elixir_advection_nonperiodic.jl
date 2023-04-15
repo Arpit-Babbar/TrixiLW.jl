@@ -20,7 +20,7 @@ coordinates_max = ( 5.0,  5.0)
 mesh = StructuredMesh((16, 16), coordinates_min, coordinates_max, periodicity=false)
 
 cfl_number = 0.5
-semi = TrixiLW.SemidiscretizationHyperbolic(mesh, time_discretization(solver),
+semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver),
  equations, initial_condition, solver,
  boundary_conditions = boundary_conditions, initial_cache = (;cfl_number, dt = zeros(1)))
 
@@ -30,7 +30,7 @@ semi = TrixiLW.SemidiscretizationHyperbolic(mesh, time_discretization(solver),
 
 tspan = (0.0, 10.0)
 # ode = semidiscretize(semi, tspan);
-lw_update = TrixiLW.semidiscretize(semi, time_discretization(solver), tspan);
+lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 summary_callback = SummaryCallback()
 

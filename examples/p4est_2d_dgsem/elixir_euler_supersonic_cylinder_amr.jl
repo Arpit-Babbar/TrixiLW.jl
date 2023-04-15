@@ -85,7 +85,7 @@ mesh_file = default_mesh_file
 
 mesh = P4estMesh{2}(mesh_file, initial_refinement_level=0)
 
-semi = TrixiLW.SemidiscretizationHyperbolic(mesh, time_discretization(solver),
+semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver),
   equations, initial_condition, solver, boundary_conditions=boundary_conditions)
 
 ###############################################################################
@@ -93,7 +93,7 @@ semi = TrixiLW.SemidiscretizationHyperbolic(mesh, time_discretization(solver),
 
 tspan = (0.0, 2.0)
 # ode = semidiscretize(semi, tspan)
-lw_update = TrixiLW.semidiscretize(semi, time_discretization(solver), tspan);
+lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 # Callbacks
 

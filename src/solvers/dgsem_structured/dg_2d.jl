@@ -17,7 +17,7 @@ using Trixi: @threaded
 function rhs!(du, u, t,
    mesh::StructuredMesh{2}, equations,
    initial_condition, boundary_conditions, source_terms,
-   dg::DG, time_discretization::LW, cache, tolerances::NamedTuple)
+   dg::DG, time_discretization::AbstractLWTimeDiscretization, cache, tolerances::NamedTuple)
    # Reset du
    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
 
@@ -1416,7 +1416,7 @@ end
 function calc_interface_flux!(cache, u, dt,
    mesh::StructuredMesh{2},
    nonconservative_terms, # can be Val{true}/False
-   equations, surface_integral, time_discretization::LW, alpha, dg::DG)
+   equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, alpha, dg::DG)
    @unpack elements = cache
 
    @threaded for element in eachelement(dg, cache)
@@ -1599,13 +1599,13 @@ end
 
 function calc_boundary_flux!(cache, u, t, dt, boundary_condition::BoundaryConditionPeriodic,
    mesh::StructuredMesh{2}, equations, surface_integral,
-   time_discretization::LW, dg::DG)
+   time_discretization::AbstractLWTimeDiscretization, dg::DG)
    @assert Trixi.isperiodic(mesh)
 end
 
 function calc_boundary_flux!(cache, u, t, dt, boundary_conditions::NamedTuple,
    mesh::StructuredMesh{2}, equations, surface_integral,
-   time_discretization::LW, dg::DG)
+   time_discretization::AbstractLWTimeDiscretization, dg::DG)
    @unpack surface_flux_values = cache.elements
    linear_indices = LinearIndices(size(mesh))
 
@@ -1661,7 +1661,7 @@ end
 @inline function calc_boundary_flux_by_direction!(surface_flux_values, u, t, dt, orientation,
    boundary_condition,
    mesh::StructuredMesh, equations,
-   surface_integral, time_discretization::LW,
+   surface_integral, time_discretization::AbstractLWTimeDiscretization,
    dg::DG, cache,
    direction, node_indices, surface_node_indices, element)
    @unpack boundary_cache, elements = cache

@@ -32,7 +32,7 @@ mutable struct L2MortarContainer_lw_P4est{RealT,uEltype<:Real,NDIMS,NDIMSP3,Temp
    tmp::Temp
 end
 
-function create_mortar_cache(mesh::P4estMesh, equations, dg, uEltype, RealT, cache, time_discretization::LW)
+function create_mortar_cache(mesh::P4estMesh, equations, dg, uEltype, RealT, cache, time_discretization::AbstractLWTimeDiscretization)
    @unpack mortars, u_threaded = cache
 
    # Create arrays of sizes (leftright, n_variables, updown, n_nodes, n_mortars)

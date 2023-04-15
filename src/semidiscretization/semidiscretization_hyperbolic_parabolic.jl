@@ -6,7 +6,7 @@ import Trixi: SemidiscretizationHyperbolicParabolic
 
 # This name is terrible!
 function semidiscretize(semi::SemidiscretizationHyperbolicParabolic,
-  time_discretization::LW,
+  time_discretization::AbstractLWTimeDiscretization,
   tspan)
   # Create copies of u_ode here!!
   u0_ode  = compute_coefficients(first(tspan), semi)
@@ -32,7 +32,7 @@ function rhs!(du_ode, u_ode,
     initial_condition, boundary_conditions,
     boundary_conditions_parabolic, source_terms, solver,
     solver_parabolic,
-    time_discretization(solver), cache,
+    get_time_discretization(solver), cache,
     cache_parabolic,
     tolerances)
   runtime = time_ns() - time_start
@@ -46,7 +46,7 @@ function rhs!(du_ode, u_ode,
   return nothing
 end
 
-function SemidiscretizationHyperbolicParabolic(mesh, time_discretization::LW,
+function SemidiscretizationHyperbolicParabolic(mesh, time_discretization::AbstractLWTimeDiscretization,
   equations::Tuple,
   initial_condition, solver;
   solver_parabolic=default_parabolic_solver(),
@@ -70,7 +70,7 @@ function SemidiscretizationHyperbolicParabolic(mesh, time_discretization::LW,
     initial_cache_parabolic=initial_cache_parabolic)
 end
 
-function SemidiscretizationHyperbolicParabolic(mesh, time_discretization::LW,
+function SemidiscretizationHyperbolicParabolic(mesh, time_discretization::AbstractLWTimeDiscretization,
                                                equations, equations_parabolic, initial_condition,
                                                solver;
                                                solver_parabolic=default_parabolic_solver(),

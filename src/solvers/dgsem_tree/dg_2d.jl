@@ -28,7 +28,7 @@ using MuladdMacro
    function rhs!(du, u,
       t, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
       initial_condition, boundary_conditions, source_terms, dg::DG,
-      time_discretization::LW, cache, tolerances::NamedTuple, calc_volume_integral! = calc_volume_integral!)
+      time_discretization::AbstractLWTimeDiscretization, cache, tolerances::NamedTuple, calc_volume_integral! = calc_volume_integral!)
       # Reset du
       @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
 
@@ -183,7 +183,7 @@ using MuladdMacro
       mesh::Union{TreeMesh{2},StructuredMesh{2},UnstructuredMesh2D,P4estMesh{2}},
       nonconservative_terms, source_terms, equations,
       volume_integral::VolumeIntegralFR,
-      time_discretization::LW,
+      time_discretization::AbstractLWTimeDiscretization,
       dg::DGSEM, cache)
 
       degree = polydeg(dg)
@@ -224,7 +224,7 @@ using MuladdMacro
       mesh::Union{TreeMesh{2},StructuredMesh{2},UnstructuredMesh2D,P4estMesh{2}},
       nonconservative_terms, source_terms, equations,
       volume_integral::VolumeIntegralFR,
-      time_discretization::LW,
+      time_discretization::AbstractLWTimeDiscretization,
       dg::DGSEM, cache)
       @threaded for element in eachelement(dg, cache)
          mdrk_kernel_1!(du, u,
@@ -240,7 +240,7 @@ using MuladdMacro
       mesh::Union{TreeMesh{2},StructuredMesh{2},UnstructuredMesh2D,P4estMesh{2}},
       nonconservative_terms, source_terms, equations,
       volume_integral::VolumeIntegralFR,
-      time_discretization::LW,
+      time_discretization::AbstractLWTimeDiscretization,
       dg::DGSEM, cache)
       @threaded for element in eachelement(dg, cache)
          mdrk_kernel_2!(du, u,
@@ -1319,7 +1319,7 @@ using MuladdMacro
       refresh!(arr) = fill!(arr, zero(eltype(u)))
 
       F, G, ut, U, S = cell_arrays[id]
-      @unpack u_low = element_cache
+      @unpack u_low = element_cache.mdrk_cache
       refresh!.((ut,))
       for j in eachnode(dg), i in eachnode(dg)
          u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
@@ -1453,7 +1453,7 @@ using MuladdMacro
 
       id = Threads.threadid()
 
-      @unpack us = element_cache
+      @unpack us = element_cache.mdrk_cache
 
       refresh!(arr) = fill!(arr, zero(eltype(u)))
 
@@ -1586,7 +1586,7 @@ using MuladdMacro
    end
 
    function prolong2interfaces!(cache, u,
-      mesh::TreeMesh{2}, equations, surface_integral, time_discretization::LW, dg::DG)
+      mesh::TreeMesh{2}, equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
 
       @unpack interfaces, interface_cache, element_cache = cache
       @unpack orientations = interfaces
@@ -1645,7 +1645,7 @@ using MuladdMacro
    end
 
    function prolong2boundaries!(cache, u,
-      mesh::TreeMesh{2}, equations, surface_integral, time_discretization::LW, dg::DG)
+      mesh::TreeMesh{2}, equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
       @unpack boundaries, boundary_cache = cache
       @unpack orientations, neighbor_sides = boundaries
       @unpack U, F = cache.element_cache
@@ -1695,14 +1695,14 @@ using MuladdMacro
 
    # TODO: Taal dimension agnostic
    function calc_boundary_flux!(cache, t, boundary_condition::BoundaryConditionPeriodic,
-      mesh::TreeMesh{2}, equations, surface_integral, time_discretization::LW,
+      mesh::TreeMesh{2}, equations, surface_integral, time_discretization::AbstractLWTimeDiscretization,
       dg::DG)
       @assert isempty(eachboundary(dg, cache))
    end
 
    function calc_boundary_flux!(cache, t, boundary_conditions::NamedTuple,
       ::TreeMesh{2}, equations, surface_integral,
-      time_discretization::LW, dg::DG)
+      time_discretization::AbstractLWTimeDiscretization, dg::DG)
       @unpack surface_flux_values = cache.elements
       @unpack n_boundaries_per_direction = cache.boundaries
 
@@ -1727,7 +1727,7 @@ using MuladdMacro
 
    function calc_adv_boundary_flux_by_direction!(surface_flux_values::AbstractArray{<:Any,4}, t,
       boundary_condition, equations,
-      surface_integral, ::LW, dg::DG, cache,
+      surface_integral, ::AbstractLWTimeDiscretization, dg::DG, cache,
       direction, first_boundary, last_boundary)
 
       @unpack surface_flux = surface_integral
@@ -1755,7 +1755,7 @@ using MuladdMacro
             x = Trixi.get_node_coords(node_coordinates, equations, dg, i, boundary)
             flux = boundary_condition(U_inner, F_inner, u_inner, outer_cache, orientations[boundary],
                direction, x, t, cache.dt[1], surface_flux, equations, dg,
-               time_discretization(dg))
+               get_time_discretization(dg))
 
             # flux = boundary_condition(u_inner, orientations[boundary], direction, x, t, surface_flux,
             #                           equations)
@@ -1772,7 +1772,7 @@ using MuladdMacro
 
    function prolong2mortars!(cache, u,
       mesh::TreeMesh{2}, equations,
-      mortar_l2::LobattoLegendreMortarL2, surface_integral, time_discretization::LW, dg::DGSEM)
+      mortar_l2::LobattoLegendreMortarL2, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DGSEM)
 
       @unpack lw_mortars = cache
       @unpack U, F = cache.element_cache
@@ -1894,7 +1894,7 @@ using MuladdMacro
 
    @inline function element_solutions_to_mortars!(mortars, lw_mortars, mortar_l2::LobattoLegendreMortarL2, leftright, mortar,
       u_large::AbstractArray{<:Any,2}, U_large::AbstractArray{<:Any,2}, F_large::AbstractArray{<:Any,2},
-      time_discretization::LW)
+      time_discretization::AbstractLWTimeDiscretization)
       multiply_dimensionwise!(view(mortars.u_upper, leftright, :, :, mortar),
          mortar_l2.forward_upper, u_large)
       multiply_dimensionwise!(view(mortars.u_lower, leftright, :, :, mortar),
@@ -1917,7 +1917,7 @@ using MuladdMacro
       mesh::TreeMesh{2},
       nonconservative_terms::False, equations,
       mortar_l2::LobattoLegendreMortarL2,
-      surface_integral, time_discretization::LW, dg::DG, cache)
+      surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache)
       @unpack surface_flux = surface_integral
       @unpack u_lower, u_upper, orientations = cache.mortars
       @unpack U_lower, U_upper, F_lower, F_upper = cache.lw_mortars
@@ -1944,7 +1944,7 @@ using MuladdMacro
    end
 
    @inline function calc_fstar!(destination::AbstractArray{<:Any,2}, equations,
-      surface_flux, time_discretization::LW, dg::DGSEM,
+      surface_flux, time_discretization::AbstractLWTimeDiscretization, dg::DGSEM,
       u_interfaces, F_interfaces, U_interfaces, interface, orientation)
 
       for i in eachnode(dg)
@@ -1971,7 +1971,7 @@ using MuladdMacro
       },
       nonconservative_terms, source_terms, equations,
       volume_integral::VolumeIntegralFRShockCapturing,
-      ::LW,
+      ::AbstractLWTimeDiscretization,
       dg::DGSEM, cache)
 
       @unpack element_ids_dg, element_ids_dgfv = cache
@@ -2208,7 +2208,7 @@ using MuladdMacro
    function calc_interface_flux!(surface_flux_values, mesh::TreeMesh{2},
       nonconservative_terms::False,
       equations,
-      surface_integral, time_discretization::LW, dg::DG, cache)
+      surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache)
       @unpack surface_flux = surface_integral
       @unpack u, neighbor_ids, orientations = cache.interfaces
       @unpack U, f, fn_low = cache.interface_cache

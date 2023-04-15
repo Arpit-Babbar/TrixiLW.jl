@@ -1,10 +1,9 @@
 abstract type AbstractTimeDiscretization end
 abstract type AbstractTimeStagedMethod end
 
-struct LW <: AbstractTimeDiscretization end
-
-struct SingleStaged <: AbstractTimeStagedMethod end
-struct TwoStaged <: AbstractTimeStagedMethod end
+abstract type AbstractLWTimeDiscretization <: AbstractTimeDiscretization end
+struct LW   <: AbstractLWTimeDiscretization end
+struct MDRK <: AbstractLWTimeDiscretization end
 
 struct RK <: AbstractTimeDiscretization end
 

@@ -48,7 +48,7 @@ cfl_number = 0.98
 
 # A semidiscretization collects data structures and functions for the spatial discretization
 semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
-                                                time_discretization(solver),
+                                                get_time_discretization(solver),
                                                 (equations, equations_parabolic),
                                                 initial_condition, solver,
                                                 boundary_conditions=(boundary_conditions,
@@ -61,8 +61,8 @@ semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
 
 # Create ODE problem with time span from 0.0 to 1.5
 tspan = (0.0, 1.0)
-ode = TrixiLW.semidiscretize(semi, time_discretization(solver), tspan);
-lw_update = TrixiLW.semidiscretize(semi, time_discretization(solver), tspan);
+ode = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
+lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 # At the beginning of the main loop, the SummaryCallback prints a summary of the simulation setup
 # and resets the timers

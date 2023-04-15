@@ -54,6 +54,6 @@ include(solvers_dir() * "/dgsem_p4est/containers.jl")
 # AMR
 include(callback_dir() * "/amr.jl")
 
-export time_discretization
+export get_time_discretization
 
 end # module

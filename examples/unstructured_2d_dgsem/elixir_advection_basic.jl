@@ -28,7 +28,7 @@ mesh = UnstructuredMesh2D(mesh_file, periodicity=true)
 # create the semi discretization object
 cfl_number = 0.5
 semi = SemidiscretizationHyperbolic(mesh,
-                                    time_discretization(solver),
+                                    get_time_discretization(solver),
                                     equations,
                                     initial_condition_convergence_test,
                                     solver)
@@ -39,7 +39,7 @@ semi = SemidiscretizationHyperbolic(mesh,
 # Create ODE problem with time span from 0.0 to 1.0
 tspan = (0.0, 1.0)
 # ode = semidiscretize(semi, (0.0, 1.0));
-lw_update = TrixiLW.semidiscretize(semi, time_discretization(solver), tspan);
+lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 # At the beginning of the main loop, the SummaryCallback prints a summary of the simulation setup
 # and resets the timers

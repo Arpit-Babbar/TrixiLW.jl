@@ -227,7 +227,7 @@ boundary_conditions_parabolic = (; x_neg=boundary_condition_periodic,
 cfl_number = 0.98
 
 semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
-  time_discretization(solver),
+  get_time_discretization(solver),
   (equations, equations_parabolic), initial_condition, solver;
   boundary_conditions=(boundary_conditions, boundary_conditions_parabolic),
   source_terms=source_terms_navier_stokes_convergence_test,
@@ -238,8 +238,8 @@ semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
 
 # Create ODE problem with time span `tspan`
 tspan = (0.0, 0.5)
-ode = TrixiLW.semidiscretize(semi, time_discretization(solver), tspan);
-lw_update = TrixiLW.semidiscretize(semi, time_discretization(solver), tspan);
+ode = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
+lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 summary_callback = SummaryCallback()
 analysis_interval = 100

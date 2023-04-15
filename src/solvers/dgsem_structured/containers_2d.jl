@@ -41,6 +41,6 @@ function create_boundary_cache(mesh::Union{StructuredMesh{2}}, equations, dg,
 end
 
 function create_mortar_cache(mesh::Union{StructuredMesh,UnstructuredMesh2D}, equations, dg,
-   uEltype, RealT, cache, time_discretization::LW)
+   uEltype, RealT, cache, time_discretization::AbstractLWTimeDiscretization)
    return nothing
 end

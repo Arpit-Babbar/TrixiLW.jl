@@ -1,5 +1,5 @@
 function perform_step!(integrator, limiters, callbacks, lw_update,
-                       time_step_computation::CFLBased, ::TwoStaged)
+                       time_step_computation::CFLBased, ::MDRK)
    semi = integrator.p
    @unpack mesh, cache = semi
    dummy_tolerances = integrator.opts.tolerances
@@ -11,11 +11,11 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
    @.. uprev = u
 
    # First stage
-   @unpack _us = cache.element_cache
+   @unpack _us = cache.element_cache.mdrk_cache
    # Compute du = u^{n+1/2}-0.5*dt*u^n
    rhs!(du_ode, u, semi, integrator.t, dummy_tolerances, calc_volume_integral_mdrk1!)
    update_soln!(integrator, _us, uprev, du_ode) # us = uprev + dt * du
-   @unpack _u_low = cache.element_cache
+   @unpack _u_low = cache.element_cache.mdrk_cache
    apply_limiters!(limiters, integrator)
 
 

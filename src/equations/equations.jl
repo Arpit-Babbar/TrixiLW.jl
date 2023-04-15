@@ -5,7 +5,7 @@ using SimpleUnPack
 # Dirichlet-type boundary condition for use with TreeMesh or StructuredMesh
 @inline function (boundary_condition::BoundaryConditionDirichlet)(U_inner, F_inner, u_inner,
    outer_cache, orientation_or_normal, direction, x, t, dt, surface_flux_function, equations, dg,
-   time_discretization::LW)
+   time_discretization::AbstractLWTimeDiscretization)
    @unpack nodes, weights = dg.basis
    U_outer, F_outer = outer_cache[Threads.threadid()]
    fill!(U_outer, zero(eltype(U_outer)))
@@ -40,7 +40,7 @@ end
    normal_direction::AbstractVector,
    x, t, dt,
    surface_flux_function, equations, dg,
-   time_discretization::LW)
+   time_discretization::AbstractLWTimeDiscretization)
    @unpack nodes, weights = dg.basis
    U_outer, F_outer = outer_cache[Threads.threadid()]
    for i in eachnode(dg) # Loop over intermediary time levels
@@ -64,7 +64,7 @@ end
    x, t, dt,
    surface_flux_function,
    equations::CompressibleEulerEquations2D,
-   dg, time_discretization::LW)
+   dg, time_discretization::AbstractLWTimeDiscretization)
 
    F_outer = SVector(-F_inner[1], F_inner[2], -F_inner[3], -F_inner[4])
    U_outer = SVector(U_inner[1], -U_inner[2], U_inner[3], U_inner[4])
@@ -87,7 +87,7 @@ end
    x, t, dt,
    surface_flux_function,
    equations::CompressibleEulerEquations2D,
-   dg, time_discretization::LW)
+   dg, time_discretization::AbstractLWTimeDiscretization)
 
    F_outer = SVector(-F_inner[1], -F_inner[2], F_inner[3], -F_inner[4])
    U_outer = SVector(U_inner[1], U_inner[2], -U_inner[3], U_inner[4])
