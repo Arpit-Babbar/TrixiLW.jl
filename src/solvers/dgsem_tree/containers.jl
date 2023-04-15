@@ -3,7 +3,7 @@ using StaticArrays
 
 # Called within the create_cache function of dg_2d.jl
 function create_cache(mesh::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D,P4estMesh},
-   equations::AbstractEquations, time_discretization::LW,
+   equations::AbstractEquations, time_discretization::AbstractLWTimeDiscretization,
    dg, RealT, uEltype, cache)
 
    nan_RealT   = convert(RealT, NaN)
@@ -20,7 +20,7 @@ function create_cache(mesh::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D,P4e
    # TODO - Put U, F, fn_low in cell_cache named tuple
    # TODO - Don't pass so many things, only pass cache, equations etc.
    element_cache = create_element_cache(mesh, nan_uEltype, NDIMS, n_variables,
-      n_nodes, n_elements)
+      n_nodes, n_elements, time_discretization)
 
    interface_cache = create_interface_cache(mesh, equations, dg, uEltype, RealT,
       cache, time_discretization)
@@ -64,17 +64,14 @@ function create_cache(mesh::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D,P4e
    return cache
 end
 
-mutable struct LWElementContainer{uEltype<:Real,NDIMSP2,NDIMSP3}
+mutable struct LWElementContainer{uEltype<:Real, NDIMSP2, NDIMSP3, MDRKCache}
    U::Array{uEltype,NDIMSP2}      # [variables, i, j, k, element]
-   us::Array{uEltype,NDIMSP2}     # [variables, i, j, k, element]
-   u_low::Array{uEltype, NDIMSP2} # [variables, i, j, k, element]
    F::Array{uEltype,NDIMSP3}      # [variables, coordinate, i, j, k, element]
    fn_low::Array{uEltype,NDIMSP2} # [variable, i, j, left/right/bottom/top, elements]
    _U::Vector{uEltype}
-   _us::Vector{uEltype}           # [variables, i, j, k, element]
-   _u_low::Vector{uEltype}        # [variables, i, j, k, element]
    _F::Vector{uEltype}
    _fn_low::Vector{uEltype}
+   mdrk_cache::MDRKCache
 end
 
 mutable struct LWInterfaceContainer{RealT,uEltype,NDIMS,NDIMSP2}
@@ -101,12 +98,14 @@ mutable struct LWBoundariesContainer{uEltype<:Real,D,OuterCache}
 end
 
 function create_element_cache(::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D,P4estMesh},
-   nan_uEltype, NDIMS, n_variables, n_nodes, n_elements)
+   nan_uEltype, NDIMS, n_variables, n_nodes, n_elements,
+   time_discretization::AbstractLWTimeDiscretization)
 
    _us = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
    _u_low = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
    _U = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
    _F = fill(nan_uEltype, n_variables * NDIMS * n_nodes^NDIMS * n_elements)
+   _F2 = fill(nan_uEltype, n_variables * NDIMS * n_nodes^NDIMS * n_elements)
    _fn_low = fill(nan_uEltype, n_variables * n_nodes^(NDIMS - 1) * 2^NDIMS * n_elements)
 
    uEltype = typeof(nan_uEltype)
@@ -119,10 +118,18 @@ function create_element_cache(::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D
                    (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
    F = unsafe_wrap(Array{uEltype,NDIMS + 3}, pointer(_F),
                    (n_variables, NDIMS, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
+   F2 = unsafe_wrap(Array{uEltype,NDIMS + 3}, pointer(_F2),
+                   (n_variables, NDIMS, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
 
+
+   if isa(time_discretization, MDRK)
+      mdrk_cache = (; _F1 = _F, F1 = F, _us, us, _u_low, u_low, _F2, F2 )
+   else
+      mdrk_cache = (;)
+   end
    fn_low = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_fn_low),
                         (n_variables, ntuple(_ -> n_nodes, NDIMS - 1)..., 2^NDIMS, n_elements))
-   return LWElementContainer(U, us, u_low, F, fn_low, _U, _us, _u_low, _F, _fn_low)
+   return LWElementContainer(U, F, fn_low, _U, _F, _fn_low, mdrk_cache)
 end
 
 mutable struct L2MortarContainer_lw_Tree{uEltype<:Real,Temp} <: AbstractContainer
@@ -142,7 +149,7 @@ mutable struct L2MortarContainer_lw_Tree{uEltype<:Real,Temp} <: AbstractContaine
 end
 
 function create_mortar_cache(mesh::TreeMesh, equations, dg, uEltype, RealT,
-   cache, time_discretization::LW)
+   cache, time_discretization::AbstractLWTimeDiscretization)
    @unpack mortars = cache
 
    # Create arrays of sizes (2, n_variables, n_nodes, n_mortars)
@@ -162,11 +169,11 @@ function create_mortar_cache(mesh::TreeMesh, equations, dg, uEltype, RealT,
       (;))
 end
 
-function ninterfaces(mesh::Union{TreeMesh,UnstructuredMesh2D,P4estMesh}, dg, cache, ::Union{LW}) # Add RK Type here
+function ninterfaces(mesh::Union{TreeMesh,UnstructuredMesh2D,P4estMesh}, dg, cache, ::AbstractTimeDiscretization) # Add RK Type here
    return ninterfaces(dg, cache)
 end
 
-function nboundaries(mesh::Union{TreeMesh,UnstructuredMesh2D,P4estMesh}, dg, cache, ::Union{LW}) # Add RK Type here
+function nboundaries(mesh::Union{TreeMesh,UnstructuredMesh2D,P4estMesh}, dg, cache, ::AbstractTimeDiscretization) # Add RK Type here
    return nboundaries(dg, cache)
 end
 

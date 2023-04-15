@@ -63,7 +63,7 @@ boundary_conditions_parabolic = (; x_neg = boundary_condition_cavity,
 cfl_number = 0.98
 
 semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
-                                                  time_discretization(solver),
+                                                  get_time_discretization(solver),
                                              (equations, equations_parabolic), initial_condition, solver;
                                              boundary_conditions=(boundary_conditions, boundary_conditions_parabolic))
 
@@ -73,7 +73,7 @@ semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
 # Create ODE problem with time span `tspan`
 tspan = (0.0, 25.0)
 lw_update = TrixiLW.semidiscretize(semi,
-                                   time_discretization(solver),
+                                   get_time_discretization(solver),
                                    tspan);
 
 summary_callback = SummaryCallback()

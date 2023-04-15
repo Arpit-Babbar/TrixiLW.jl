@@ -22,7 +22,7 @@ mesh = TreeMesh(coordinates_min, coordinates_max,
 
 # A semidiscretization collects data structures and functions for the spatial discretization
 semi = TrixiLW.SemidiscretizationHyperbolic(mesh,
-time_discretization(solver), equations,
+get_time_discretization(solver), equations,
  initial_condition_convergence_test, solver)
 
 
@@ -32,7 +32,7 @@ time_discretization(solver), equations,
 # Create ODE problem with time span from 0.0 to 1.0
 # ode = semidiscretize(semi, (0.0, 1.0));
 tspan = (0.0, 1.0)
-lw_update = TrixiLW.semidiscretize(semi, time_discretization(solver), tspan);
+lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 # The AnalysisCallback allows to analyse the solution in regular intervals and prints the results
 analysis_callback = AnalysisCallback(semi, interval=1000)

@@ -113,7 +113,7 @@ mesh_file = default_mesh_file
 mesh = P4estMesh{2}(mesh_file, initial_refinement_level = 3)
 
 cfl_number = 0.1
-semi = TrixiLW.SemidiscretizationHyperbolic(mesh, time_discretization(solver),
+semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver),
   equations, initial_condition, solver, boundary_conditions=boundary_conditions)
 
 ###############################################################################
@@ -121,7 +121,7 @@ semi = TrixiLW.SemidiscretizationHyperbolic(mesh, time_discretization(solver),
 
 tspan = (0.0, 0.2)
 # ode = semidiscretize(semi, tspan)
-lw_update = TrixiLW.semidiscretize(semi, time_discretization(solver), tspan);
+lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 summary_callback = SummaryCallback()
 
@@ -162,6 +162,6 @@ dt_initial = 1e-6;
 sol, summary_callback = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
   time_step_computation = TrixiLW.Adaptive(),
   # time_step_computation=TrixiLW.CFLBased(cfl_number),
-  limiters=(; stage_limiter!), stages = TrixiLW.TwoStaged()
+  limiters=(; stage_limiter!), time_discretization = TrixiLW.MDRK()
 );
 summary_callback() # print the timer summary

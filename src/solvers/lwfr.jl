@@ -136,12 +136,11 @@ function isfinished(integrator::LWIntegrator)
    return integrator.t ≈ last(integrator.tspan)
 end
 
-function LWIntegrator(lw_update::LWUpdate, sol, callbacks, tolerances,
+function LWIntegrator(lw_update::LWUpdate, time_discretization, sol, callbacks, tolerances,
    ; time_step_computation, tType=Float64)
    @unpack soln_arrays, semi, tspan = lw_update
    @unpack u0_ode, du_ode = soln_arrays # Previous time level solution and residual
    integrator_cache = (du_ode,) # Don't know what else to put here.
-   time_discretization = LW()
    u = sol.u
    iter = 0
    t = first(tspan)
@@ -161,6 +160,7 @@ function LWIntegrator(lw_update::LWUpdate, sol, callbacks, tolerances,
    n_interfaces = ninterfaces(semi.mesh, semi.solver, semi.cache, time_discretization)
    n_boundaries = nboundaries(semi.mesh, semi.solver, semi.cache, time_discretization)
    n_mortars = 1
+   @show time_discretization
    LWIntegrator(semi, sol, u, u0_ode, integrator_cache, iter, t, tspan, dt, f,
       dtpropose, dtcache, stats, epsilon,
       opts, n_elements, n_interfaces, n_boundaries, n_mortars, time_discretization)
@@ -201,7 +201,7 @@ function compute_dt(semi::SemidiscretizationHyperbolicParabolic,
 end
 
 function perform_step!(integrator, limiters, callbacks, lw_update,
-                       time_step_computation::CFLBased, ::SingleStaged)
+                       time_step_computation::CFLBased, ::LW)
    semi = integrator.p
    @unpack mesh = semi
    dt = compute_dt(semi, mesh, time_step_computation, integrator)
@@ -221,13 +221,15 @@ end
 # This will allow both LW and FR. For debugging, we rewrite the RKFR from Trixi.
 
 function solve_lwfr(lw_update, callbacks, dt_initial, tolerances;
-   time_step_computation=CFLBased(), limiters=(;), stages::AbstractTimeStagedMethod = SingleStaged())
+   time_step_computation=CFLBased(), limiters=(;))
    @unpack rhs!, soln_arrays, tspan, semi = lw_update
    @unpack du_ode, u0_ode = soln_arrays            # Vectors form for compability with callbacks
    prob = LWProblem(rhs!, u0_ode, semi, tspan)     # Would be an ODE problem in Trixi
    u = compute_coefficients(first(tspan), semi)    # u satisfying initial condition
    sol = LWSolution(u, prob, 0.0)
-   integrator = LWIntegrator(lw_update, sol, callbacks, tolerances,
+   @unpack solver = semi
+   time_discretization = get_time_discretization(solver)
+   integrator = LWIntegrator(lw_update, time_discretization, sol, callbacks, tolerances,
       time_step_computation=time_step_computation)
 
    # Initialize callbacks. e.g. resetting summary_callback
@@ -242,7 +244,7 @@ function solve_lwfr(lw_update, callbacks, dt_initial, tolerances;
    apply_callbacks!(callbacks, integrator) # stepsize, analysis callbacks
    while !(isfinished(integrator)) # Check t < final_time
       perform_step!(integrator, limiters, callbacks, lw_update, time_step_computation,
-                    stages)
+                    time_discretization)
       apply_limiters!(limiters, integrator)
       apply_callbacks!(callbacks, integrator)
    end

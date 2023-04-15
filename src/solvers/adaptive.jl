@@ -102,7 +102,7 @@ function dt_factor(epsilon, k, controller)
 end
 
 function perform_step!(integrator, limiters, callbacks, lw_update,
-   time_step_computation::Adaptive, stages::SingleStaged, redo=false)
+   time_step_computation::Adaptive, time_discretization::LW, redo=false)
    semi = integrator.p
    @unpack tolerances, controller = integrator.opts
    @unpack u, uprev, epsilon = integrator
@@ -155,7 +155,7 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
       @.. u = uprev
       # Go back to beginning of function
       perform_step!(integrator, limiters, callbacks, lw_update, time_step_computation,
-         stages, redo)
+         time_discretization, redo)
       return nothing
    end
 
@@ -171,14 +171,14 @@ end
 
 
 function perform_step!(integrator, limiters, callbacks, lw_update,
-                       time_step_computation::Adaptive, stages::TwoStaged, redo=false)
+                       time_step_computation::Adaptive, time_discretization::MDRK, redo=false)
    semi = integrator.p
    @unpack mesh, cache = semi
    @unpack tolerances, controller = integrator.opts
    @unpack u, uprev, epsilon = integrator
    @unpack rhs!, soln_arrays = lw_update
    @unpack du_ode, u0_ode = soln_arrays         # Vectors form for compability with callbacks
-   @unpack _us = cache.element_cache
+   @unpack _us = cache.element_cache.mdrk_cache
    @.. uprev = u
 
    domain_valid = true # Checks for domain errors
@@ -223,7 +223,7 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
    domain_valid = min(domain_valid, test_updated_solution(u, semi))
 
    # put appropriate temporal errors in epsilon
-   @unpack _u_low = cache.element_cache
+   @unpack _u_low = cache.element_cache.mdrk_cache
    epsilon = compute_and_load_temporal_errors!(u, _u_low, semi, epsilon, Trixi.ndofs(semi), tolerances, redo)
 
    # Use epsilon to compute dt_factor
@@ -243,7 +243,7 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
       @.. u = uprev
       # Go back to beginning of function
       perform_step!(integrator, limiters, callbacks, lw_update, time_step_computation,
-         stages, redo)
+         time_discretization, redo)
       return nothing
    end
 

@@ -28,7 +28,7 @@ mesh = P4estMesh(trees_per_dimension, polydeg=polydeg,
 
 # A semidiscretization collects data structures and functions for the spatial discretization
 semi = SemidiscretizationHyperbolic(mesh,
-   time_discretization(solver),
+   get_time_discretization(solver),
    equations,
    initial_condition_convergence_test,
    solver)
@@ -40,7 +40,7 @@ semi = SemidiscretizationHyperbolic(mesh,
 # Create ODE problem with time span from 0.0 to 1.0
 tspan = (0.0, 5.0)
 # ode = semidiscretize(semi, (0.0, 1.0));
-lw_update = TrixiLW.semidiscretize(semi, time_discretization(solver), tspan);
+lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 # The AnalysisCallback allows to analyse the solution in regular intervals and prints the results
 analysis_interval = 100

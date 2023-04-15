@@ -16,12 +16,13 @@ struct VolumeIntegralFR{TimeDiscretization<:AbstractTimeDiscretization} <: Abstr
    time_discretization::TimeDiscretization
 end
 
-time_discretization(volume_integral::VolumeIntegralFR) = volume_integral.time_discretization
+get_time_discretization(volume_integral::VolumeIntegralFR) = volume_integral.time_discretization
 
 # TODO - When is this called again?
 create_cache(mesh, equations, ::VolumeIntegralFR, dg, uEltype) = (;)
 
 Base.show(io::IO, ::LW) = print(io, "Lax-Wendroff")
+Base.show(io::IO, ::MDRK) = print(io, "Multi-Derivative Runge-Kutta")
 Base.show(io::IO, ::RK) = print(io, "Runge-Kutta")
 
 function Base.show(io::IO, dg::DG{<:Any,<:Any,<:Any,<:VolumeIntegralFR})
@@ -32,7 +33,7 @@ function Base.show(io::IO, dg::DG{<:Any,<:Any,<:Any,<:VolumeIntegralFR})
    print(io, ", ", dg.mortar)
    print(io, ", ", dg.surface_integral)
    print(io, ", ", dg.volume_integral)
-   print(io, ", ", time_discretization(dg))
+   print(io, ", ", get_time_discretization(dg))
    print(io, ")")
 end
 
@@ -49,7 +50,7 @@ function Base.show(io::IO, mime::MIME"text/plain", dg::DG{<:Any,<:Any,<:Any,<:Vo
       summary_line(io, "surface integral", dg.surface_integral |> typeof |> nameof)
       show(increment_indent(io), mime, dg.surface_integral)
       summary_line(io, "volume integral", dg.volume_integral |> typeof |> nameof)
-      summary_line(io, "time discretization", time_discretization(dg))
+      summary_line(io, "time discretization", get_time_discretization(dg))
       summary_footer(io)
    end
 end
@@ -62,10 +63,12 @@ struct VolumeIntegralFRShockCapturing{TimeDiscretization,VolumeFluxFV,Indicator,
    reconstruction::Reconstruction                          # First Order / MUSCL-Hancock
 end
 
-time_discretization(volume_integral::VolumeIntegralFRShockCapturing) =
+
+
+get_time_discretization(volume_integral::VolumeIntegralFRShockCapturing) =
    volume_integral.volume_integralFR.time_discretization
 
-time_discretization(solver::DG) = time_discretization(solver.volume_integral)
+get_time_discretization(solver::DG) = get_time_discretization(solver.volume_integral)
 
 # Reconstruction types
 struct FirstOrderReconstruction end
@@ -77,7 +80,7 @@ function VolumeIntegralFRShockCapturing(indicator; volume_integralFR=VolumeInteg
    reconstruction=FirstOrderReconstruction())
 
    return VolumeIntegralFRShockCapturing{
-      typeof(time_discretization(volume_integralFR)), typeof(volume_flux_fv),
+      typeof(get_time_discretization(volume_integralFR)), typeof(volume_flux_fv),
       typeof(indicator), typeof(reconstruction)}(
       volume_integralFR, volume_flux_fv, indicator, reconstruction)
 end

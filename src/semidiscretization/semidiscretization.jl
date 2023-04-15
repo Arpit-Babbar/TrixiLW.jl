@@ -2,7 +2,7 @@ using Trixi: SemidiscretizationHyperbolic, SemidiscretizationHyperbolicParabolic
 using Trixi: compute_coefficients
 
 function semidiscretize(semi::Union{SemidiscretizationHyperbolic, SemidiscretizationHyperbolicParabolic},
-   time_discretization::LW,
+   time_discretization::AbstractLWTimeDiscretization,
    tspan)
 
    # Create copies of u_ode here!!

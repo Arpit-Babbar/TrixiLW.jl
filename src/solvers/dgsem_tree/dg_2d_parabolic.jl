@@ -15,7 +15,7 @@ using MuladdMacro
 function rhs!(du, u, t, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
    equations_parabolic::AbstractEquationsParabolic, initial_condition,
    boundary_conditions, boundary_conditions_parabolic, source_terms,
-   dg::DG, parabolic_scheme, time_discretization::LW, cache,
+   dg::DG, parabolic_scheme, time_discretization::AbstractLWTimeDiscretization, cache,
    cache_parabolic, tolerances::NamedTuple)
 
    # Reset du
@@ -97,7 +97,7 @@ end
 # Parabolic cache
 # TODO - Merge with hyperbolic cache
 function create_cache(mesh::TreeMesh{2}, equations::AbstractEquationsParabolic,
-   time_discretization::LW, dg, RealT, uEltype, cache)
+   time_discretization::AbstractLWTimeDiscretization, dg, RealT, uEltype, cache)
    nan_RealT = convert(RealT, NaN)
    nan_uEltype = convert(uEltype, NaN)
 
@@ -164,7 +164,7 @@ function calc_volume_integral!(
    mesh::TreeMesh{2},
    have_nonconservative_terms, source_terms,
    equations, equations_parabolic::AbstractEquationsParabolic,
-   volume_integral::VolumeIntegralFR, time_discretization::LW,
+   volume_integral::VolumeIntegralFR, time_discretization::AbstractLWTimeDiscretization,
    dg::DGSEM, cache, cache_parabolic)
 
    degree = polydeg(dg)
@@ -220,7 +220,7 @@ function weak_form_kernel_1!(
    tolerances, mesh::TreeMesh{2},
    have_nonconservative_terms, source_terms,
    equations, equations_parabolic::AbstractEquationsParabolic,
-   volume_integral::VolumeIntegralFR, time_discretization::LW,
+   volume_integral::VolumeIntegralFR, time_discretization::AbstractLWTimeDiscretization,
    dg::DGSEM, cache, cache_parabolic, element)
 
    gradients_x, gradients_y = gradients
@@ -419,7 +419,7 @@ function weak_form_kernel_2!(
    tolerances, mesh::TreeMesh{2},
    have_nonconservative_terms, source_terms,
    equations, equations_parabolic::AbstractEquationsParabolic,
-   volume_integral::VolumeIntegralFR, time_discretization::LW,
+   volume_integral::VolumeIntegralFR, time_discretization::AbstractLWTimeDiscretization,
    dg::DGSEM, cache, cache_parabolic, element)
 
    gradients_x, gradients_y = gradients
@@ -731,7 +731,7 @@ function weak_form_kernel_3!(
    tolerances, mesh::TreeMesh{2},
    have_nonconservative_terms, source_terms,
    equations, equations_parabolic::AbstractEquationsParabolic,
-   volume_integral::VolumeIntegralFR, time_discretization::LW,
+   volume_integral::VolumeIntegralFR, time_discretization::AbstractLWTimeDiscretization,
    dg::DGSEM, cache, cache_parabolic, element)
 
    gradients_x, gradients_y = gradients
@@ -1193,7 +1193,7 @@ function weak_form_kernel_4!(
    tolerances, mesh::TreeMesh{2},
    have_nonconservative_terms, source_terms,
    equations, equations_parabolic::AbstractEquationsParabolic,
-   volume_integral::VolumeIntegralFR, time_discretization::LW,
+   volume_integral::VolumeIntegralFR, time_discretization::AbstractLWTimeDiscretization,
    dg::DGSEM, cache, cache_parabolic, element)
 
    gradients_x, gradients_y = gradients
@@ -1202,7 +1202,7 @@ function weak_form_kernel_4!(
    @unpack derivative_dhat, derivative_matrix = dg.basis
    @unpack node_coordinates = cache.elements
 
-   @unpack lw_res_cache = cache
+   @unpack lw_res_cache, element_cache = cache
    @unpack cell_arrays = lw_res_cache
 
    inv_jacobian = cache.elements.inverse_jacobian[element]
@@ -1815,15 +1815,13 @@ function weak_form_kernel_4!(
       # Give u1_ or U depending on dissipation model
       U_node = Trixi.get_node_vars(U, equations, dg, i, j)
 
-      Trixi.set_node_vars!(cache.element_cache.F, Fa_node, equations, dg, 1, i, j, element)
-      Trixi.set_node_vars!(cache_parabolic.Fv, Fv_node, equations, dg, 1, i, j, element)
+      set_node_vars!(cache.element_cache.F, Fa_node, equations, dg, 1, i, j, element)
+      set_node_vars!(cache_parabolic.Fv, Fv_node, equations, dg, 1, i, j, element)
 
-      Trixi.set_node_vars!(cache.element_cache.F, Ga_node, equations, dg, 2, i, j, element)
-      Trixi.set_node_vars!(cache_parabolic.Fv, Gv_node, equations, dg, 2, i, j, element)
+      set_node_vars!(cache.element_cache.F, Ga_node, equations, dg, 2, i, j, element)
+      set_node_vars!(cache_parabolic.Fv, Gv_node, equations, dg, 2, i, j, element)
 
-      # Ub = UT * V
-      # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
-      Trixi.set_node_vars!(cache.element_cache.U, U_node, equations, dg, i, j, element)
+      set_node_vars!(element_cache.U, U_node, equations, dg, i, j, element)
 
       S_node = Trixi.get_node_vars(S, equations, dg, i, j)
       # inv_jacobian = inverse_jacobian[i, j, element]
@@ -2067,5 +2065,7 @@ function calc_boundary_flux_by_direction_divergence_lw!(surface_flux_values::Abs
 
    return nothing
 end
+
+
 
 end # muladd macro

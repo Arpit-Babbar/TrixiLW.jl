@@ -7,7 +7,7 @@ import Trixi: prolong2interfaces!, calc_interface_flux!, calc_boundary_flux!,
 
 function prolong2interfaces!(cache, u,
    mesh::P4estMesh{2},
-   equations, surface_integral, time_discretization::LW, dg::DG)
+   equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
    @unpack interfaces, elements, interface_cache, element_cache = cache
    @unpack U, F, fn_low = element_cache
    @unpack contravariant_vectors = elements
@@ -81,7 +81,7 @@ end
 function calc_interface_flux!(surface_flux_values,
    mesh::P4estMesh{2},
    nonconservative_terms,
-   equations, surface_integral, time_discretization::LW, dg::DG, cache)
+   equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache)
    @unpack neighbor_ids, node_indices = cache.interfaces
    @unpack contravariant_vectors = cache.elements
    index_range = eachnode(dg)
@@ -144,7 +144,7 @@ end
 @inline function calc_interface_flux!(surface_flux_values,
    mesh::P4estMesh{2},
    nonconservative_terms::False, equations,
-   surface_integral, time_discretization::LW, dg::DG, cache,
+   surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache,
    interface_index, normal_direction,
    primary_node_index, primary_direction_index, primary_element_index,
    secondary_node_index, secondary_direction_index, secondary_element_index)
@@ -214,7 +214,7 @@ end
 
 function prolong2boundaries!(cache, u,
    mesh::P4estMesh{2},
-   equations, surface_integral, time_discretization::LW, dg::DG)
+   equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
    @unpack boundaries, boundary_cache, elements, element_cache = cache
    @unpack U, F = element_cache
    @unpack contravariant_vectors = elements
@@ -252,7 +252,7 @@ end
 
 function calc_boundary_flux!(cache, t, boundary_condition, boundary_indexing::Vector,
    mesh::P4estMesh{2},
-   equations, surface_integral, time_discretization::LW, dg::DG)
+   equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
    @unpack boundaries = cache
    @unpack surface_flux_values = cache.elements
    index_range = eachnode(dg)
@@ -290,7 +290,7 @@ end
 @inline function calc_boundary_flux!(surface_flux_values, t, boundary_condition,
    mesh::P4estMesh{2},
    nonconservative_terms::False, equations,
-   surface_integral, time_discretization::LW, dg::DG, cache,
+   surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache,
    i_index, j_index,
    node_index, direction_index, element_index, boundary_index)
    @unpack boundaries, boundary_cache = cache
@@ -325,7 +325,7 @@ end
 function prolong2mortars!(cache, u,
    mesh::P4estMesh{2}, equations,
    mortar_l2::LobattoLegendreMortarL2,
-   surface_integral, time_discretization::LW, dg::DGSEM)
+   surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DGSEM)
    @unpack neighbor_ids, node_indices = cache.mortars
    @unpack U, F, fn_low = cache.element_cache
    @unpack contravariant_vectors = cache.elements
@@ -441,7 +441,7 @@ function calc_mortar_flux!(surface_flux_values,
    mesh::P4estMesh{2},
    nonconservative_terms, equations,
    mortar_l2::LobattoLegendreMortarL2,
-   surface_integral, time_discretization::LW, dg::DG, cache)
+   surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache)
    @unpack neighbor_ids, node_indices = cache.mortars
    @unpack contravariant_vectors = cache.elements
    @unpack fstar_upper_threaded, fstar_lower_threaded = cache
@@ -499,7 +499,7 @@ end
 @inline function calc_mortar_flux!(fstar,
    mesh::P4estMesh{2},
    nonconservative_terms::False, equations,
-   surface_integral, time_discretization::LW, dg::DG, cache,
+   surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache,
    mortar_index, position_index, element_small, element_large,
    normal_direction, node_index)
    @unpack u = cache.mortars

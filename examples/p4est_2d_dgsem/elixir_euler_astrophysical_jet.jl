@@ -88,7 +88,7 @@ mesh = P4estMesh{2}(mesh_file, initial_refinement_level = 0)
 
 # A semidiscretization collects data structures and functions for the spatial discretization
 cfl_number = 0.1
-semi = TrixiLW.SemidiscretizationHyperbolic(mesh, time_discretization(solver),
+semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver),
   equations, initial_condition, solver, boundary_conditions=boundary_conditions,
   initial_cache=(; cfl_number, dt=zeros(1)))
 
@@ -97,7 +97,7 @@ semi = TrixiLW.SemidiscretizationHyperbolic(mesh, time_discretization(solver),
 
 # Create ODE problem with time span from 0.0 to 0.001
 tspan =(0.0, 0.001)
-lw_update = TrixiLW.semidiscretize(semi, time_discretization(solver), tspan);
+lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 # At the beginning of the main loop, the SummaryCallback prints a summary of the simulation setup
 # and resets the timers

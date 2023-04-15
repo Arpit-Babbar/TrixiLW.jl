@@ -30,7 +30,7 @@ mesh = TreeMesh(coordinates_min, coordinates_max,
 
 
 cfl_number = 0.3
-semi = SemidiscretizationHyperbolic(mesh, time_discretization(solver),
+semi = SemidiscretizationHyperbolic(mesh, get_time_discretization(solver),
                                     equations, initial_condition, solver,
                                     source_terms=source_terms_convergence_test,
                                     boundary_conditions=boundary_conditions)
@@ -40,7 +40,7 @@ semi = SemidiscretizationHyperbolic(mesh, time_discretization(solver),
 # ODE solvers, callbacks etc.
 
 tspan = (0.0, 2.0)
-lw_update = TrixiLW.semidiscretize(semi, time_discretization(solver), tspan);
+lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 summary_callback = SummaryCallback()
 

@@ -14,7 +14,7 @@ using MuladdMacro
 function rhs!(du, u, t,
    mesh::UnstructuredMesh2D, equations,
    initial_condition, boundary_conditions, source_terms,
-   dg::DG, time_discretization::LW, cache, tolerances::NamedTuple)
+   dg::DG, time_discretization::AbstractLWTimeDiscretization, cache, tolerances::NamedTuple)
    # Reset du
    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
 
@@ -61,7 +61,7 @@ end
 
 function prolong2interfaces!(cache, u,
    mesh::UnstructuredMesh2D,
-   equations, surface_integral, time_discretization::LW, dg::DG)
+   equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
    @unpack interfaces, interface_cache = cache
    @unpack U, F, fn_low = cache.element_cache
    @unpack start_index, index_increment = interfaces
@@ -213,7 +213,7 @@ end
 function calc_interface_flux!(surface_flux_values, dt,
    mesh::UnstructuredMesh2D,
    nonconservative_terms::False, equations,
-   surface_integral, time_discretization::LW, alpha, dg::DG, cache)
+   surface_integral, time_discretization::AbstractLWTimeDiscretization, alpha, dg::DG, cache)
    @unpack surface_flux = surface_integral
    @unpack interface_cache = cache
    @unpack u, U, f, fn_low = interface_cache
@@ -283,7 +283,7 @@ end
 # move the approximate solution onto physical boundaries within a "right-handed" element
 function prolong2boundaries!(cache, u,
    mesh::UnstructuredMesh2D,
-   equations, surface_integral, time_discretization::LW, dg::DG)
+   equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
    @unpack boundaries = cache
    @unpack normal_directions = cache.elements
    @unpack U, F = cache.element_cache
@@ -353,7 +353,7 @@ end
 # TODO: Taal dimension agnostic
 function calc_boundary_flux!(cache, t, boundary_condition::BoundaryConditionPeriodic,
    mesh::Union{UnstructuredMesh2D,P4estMesh},
-   equations, surface_integral, time_discretization::LW, dg::DG)
+   equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
    @assert isempty(eachboundary(dg, cache))
 end
 
@@ -361,7 +361,7 @@ end
 # Function barrier for type stability
 function calc_boundary_flux!(cache, t, boundary_conditions,
    mesh::Union{UnstructuredMesh2D,P4estMesh},
-   equations, surface_integral, time_discretization::LW, dg::DG)
+   equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
    @unpack boundary_condition_types, boundary_indices = boundary_conditions
 
    calc_boundary_flux_by_type!(cache, t, boundary_condition_types, boundary_indices,
@@ -375,7 +375,7 @@ end
 function calc_boundary_flux_by_type!(cache, t, BCs::NTuple{N,Any},
    BC_indices::NTuple{N,Vector{Int}},
    mesh::Union{UnstructuredMesh2D,P4estMesh},
-   equations, surface_integral, time_discretization::LW, dg::DG) where {N}
+   equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG) where {N}
    # Extract the boundary condition type and index vector
    boundary_condition = first(BCs)
    boundary_condition_indices = first(BC_indices)
@@ -398,14 +398,14 @@ end
 # terminate the type-stable iteration over tuples
 function calc_boundary_flux_by_type!(cache, t, BCs::Tuple{}, BC_indices::Tuple{},
    mesh::Union{UnstructuredMesh2D,P4estMesh},
-   equations, surface_integral, time_discretization::LW, dg::DG)
+   equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
    nothing
 end
 
 
 function calc_boundary_flux!(cache, t, boundary_condition, boundary_indexing,
    mesh::UnstructuredMesh2D, equations,
-   surface_integral, time_discretization::LW, dg::DG)
+   surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
    @unpack surface_flux_values = cache.elements
    @unpack element_id, element_side_id = cache.boundaries
 
@@ -432,7 +432,7 @@ end
 @inline function calc_boundary_flux!(surface_flux_values, t, boundary_condition,
    mesh::UnstructuredMesh2D,
    nonconservative_terms::False, equations,
-   surface_integral, time_discretization::LW, dg::DG, cache,
+   surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache,
    node_index, side_index, element_index, boundary_index)
    dt = cache.dt[1]
    @unpack normal_directions = cache.elements

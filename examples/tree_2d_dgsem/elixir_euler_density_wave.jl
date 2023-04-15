@@ -20,7 +20,7 @@ mesh = TreeMesh(coordinates_min, coordinates_max,
 
 cfl_number = 0.5
 semi = TrixiLW.SemidiscretizationHyperbolic(mesh,
-                                            time_discretization(solver),
+                                            get_time_discretization(solver),
                                             equations, initial_condition,
                                             solver)
 
@@ -30,7 +30,7 @@ semi = TrixiLW.SemidiscretizationHyperbolic(mesh,
 
 tspan = (0.0, 0.1)
 # ode = semidiscretize(semi, tspan)
-lw_update = TrixiLW.semidiscretize(semi, time_discretization(solver), tspan);
+lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 summary_callback = SummaryCallback()
 
