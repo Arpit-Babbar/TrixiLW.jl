@@ -6,19 +6,19 @@ using TrixiLW
 
 advection_velocity = (1.5, 1.0)
 equations = LinearScalarAdvectionEquation2D(advection_velocity)
-diffusivity() = 1.0e-6
+diffusivity() = 1e-6
 equations_parabolic = LaplaceDiffusion2D(diffusivity(), equations)
 
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
-solver = DGSEM(polydeg=4, surface_flux=flux_lax_friedrichs,
-               volume_integral = TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
+solver = DGSEM(polydeg=3, surface_flux=flux_lax_friedrichs,
+               volume_integral = TrixiLW.VolumeIntegralFR(TrixiLW.MDRK()))
 
 coordinates_min = (-1.0, -1.0) # minimum coordinates (min(x), min(y))
 coordinates_max = ( 1.0,  1.0) # maximum coordinates (max(x), max(y))
 
 # Create a uniformly refined mesh with periodic boundaries
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level=4,
+                initial_refinement_level=5,
                 periodicity=true,
                 n_cells_max=30_000) # set maximum capacity of tree data structure
 
@@ -43,7 +43,7 @@ initial_condition = initial_condition_diffusive_convergence_test
 boundary_conditions = boundary_condition_periodic
 boundary_conditions_parabolic = boundary_condition_periodic
 
-cfl_number = 0.98
+cfl_number = 0.9
 
 # A semidiscretization collects data structures and functions for the spatial discretization
 semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
@@ -85,7 +85,7 @@ callbacks = (
 # run the simulation
 
 # OrdinaryDiffEq's `solve` method evolves the solution in time and executes the passed callbacks
-time_int_tol = 1e-11
+time_int_tol = 1e-6
 tolerances   = (;abstol = time_int_tol, reltol = time_int_tol)
 dt_initial   = 1.0
 sol, summary_callback = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,

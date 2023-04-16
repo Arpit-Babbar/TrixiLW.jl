@@ -1,10 +1,9 @@
 using Trixi: get_node_vars
 
-@inline function test_rhs!(du_ode, u_ode, semi, t, integrator, tolerances,
-                           volume_integral = calc_volume_integral!)
+@inline function test_rhs!(du_ode, u_ode, semi, t, integrator, tolerances, rhs! = rhs!)
    # TODO - Does this try catch block cause a performance issue?
    try
-      rhs!(du_ode, u_ode, semi, t, tolerances, volume_integral) # Compute du = u^{n+1}-dt*u^n
+      rhs!(du_ode, u_ode, semi, t, tolerances) # Compute du = u^{n+1}-dt*u^n
    catch e
       if isa(e, DomainError) || isa(e, TaskFailedException) # Second exception is for multithreading. TODO - Get a more specific second exception
 
@@ -191,7 +190,7 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
    # Compute du_ode and check for domain_error
    domain_valid = min(domain_valid,
                       test_rhs!(du_ode, u, semi, t, integrator, tolerances,
-                                calc_volume_integral_mdrk1!)
+                                rhs_mdrk1!)
                      )
 
    # Update to us
@@ -209,7 +208,7 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
    # Compute du_ode and check for domain_error
    domain_valid = min(domain_valid,
                       test_rhs!(du_ode, u, semi, t, integrator, tolerances,
-                                calc_volume_integral_mdrk2!)
+                                 rhs_mdrk2!)
                      )
 
    # Update the solution with obtained RHS

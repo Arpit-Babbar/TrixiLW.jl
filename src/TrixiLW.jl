@@ -33,11 +33,12 @@ include(semi_dir() * "/semidiscretization_hyperbolic_parabolic.jl")
 
 # Specific solvers
 
-
 # Tree mesh
 include(solvers_dir() * "/dgsem_tree/dg_2d.jl")
 include(solvers_dir() * "/dgsem_tree/dg_2d_parabolic.jl")
 include(solvers_dir() * "/dgsem_tree/containers.jl")
+include(solvers_dir() * "/dgsem_tree/multi_derivative_2d.jl")
+include(solvers_dir() * "/dgsem_tree/multi_derivative_2d_parabolic.jl")
 
 # Structured mesh
 include(solvers_dir() * "/dgsem_structured/dg_2d.jl")

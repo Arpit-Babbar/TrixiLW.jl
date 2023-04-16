@@ -10,7 +10,7 @@ equations = LinearScalarAdvectionEquation2D(advection_velocity)
 polydeg = 3
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
 solver = DGSEM(polydeg=polydeg, surface_flux=flux_lax_friedrichs,
-               volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
+               volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.MDRK()))
 
 coordinates_min = (-1.0, -1.0) # minimum coordinates (min(x), min(y))
 coordinates_max = ( 1.0,  1.0) # maximum coordinates (max(x), max(y))
@@ -58,10 +58,11 @@ dt_initial = 1e-3;
 # 0.9 works for 2-staged
 cfl_number = TrixiLW.trixi2lw(0.71, solver)
 sol, summary = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
-                      time_step_computation = TrixiLW.Adaptive(),
-                     #  time_step_computation = TrixiLW.CFLBased(cfl_number),
-                      stages = TrixiLW.TwoStaged()
+                     #  time_step_computation = TrixiLW.Adaptive(),
+                      time_step_computation = TrixiLW.CFLBased(cfl_number),
                       );
 
 # Print the timer summary
 summary()
+
+l2_errors = (;cfl = 4.96050384e-07, adaptive = 2.56661020e-06)

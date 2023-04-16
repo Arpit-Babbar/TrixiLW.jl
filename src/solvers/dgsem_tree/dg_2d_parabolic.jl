@@ -87,10 +87,6 @@ function rhs!(du, u, t, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
    @trixi_timeit timer() "Jacobian" apply_jacobian!(
       du, mesh, equations, dg, cache)
 
-   # Calculate source terms (not needed as that contribution is already added)
-   # @trixi_timeit timer() "source terms" calc_sources!(
-   #   du, u, t, source_terms, equations, dg, cache)
-
    return nothing
 end
 
@@ -141,19 +137,25 @@ function create_cache(mesh::TreeMesh{2}, equations::AbstractEquationsParabolic,
       SVector{nt}([alloc(constructor, cache_size) for _ in Base.OneTo(nt)])
    end
 
-   MArr = MArray{Tuple{n_variables,n_nodes,n_nodes},Float64}
+   MArr = MArray{Tuple{n_variables, n_nodes, n_nodes}, Float64}
    cell_arrays = alloc_for_threads(MArr, cell_array_size)
 
-   MEval = MArray{Tuple{n_variables,n_nodes},Float64}
+   MEval = MArray{Tuple{n_variables, n_nodes},Float64}
    eval_data_big = alloc_for_threads(MEval, big_eval_data_size)
 
-   MEval_small = MArray{Tuple{n_variables,1},Float64}
+   MEval_small = MArray{Tuple{n_variables, 1}, Float64}
    eval_data_small = alloc_for_threads(MEval_small, small_eval_data_size)
 
    eval_data = (; eval_data_big, eval_data_small)
    lw_res_cache = (; cell_arrays, eval_data)
+   if isa(get_time_discretization(dg), MDRK)
+      Fv2 = copy(Fv)
+      mdrk_cache = (; Fv1 = Fv, Fv2)
+   else
+      mdrk_cache = (;)
+   end
 
-   cache = (; lw_res_cache, Fv, Fb)
+   cache = (; lw_res_cache, Fv, Fb, mdrk_cache)
 end
 
 fluxes(u, grad_u::Tuple{<:Any,<:Any}, equations_parabolic::AbstractEquationsParabolic{2}) = (
@@ -248,43 +250,43 @@ function weak_form_kernel_1!(
    # Calculate volume terms in one element
 
    for j in eachnode(dg), i in eachnode(dg)
-      u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+      u_node = get_node_vars(u, equations, dg, i, j, element)
 
       flux_adv_1, flux_adv_2 = fluxes(u_node, equations)
-      flux_visc_1 = Trixi.get_node_vars(flux_viscous_x, equations_parabolic, dg, i, j, element)
-      flux_visc_2 = Trixi.get_node_vars(flux_viscous_y, equations_parabolic, dg, i, j, element)
+      flux_visc_1 = get_node_vars(flux_viscous_x, equations_parabolic, dg, i, j, element)
+      flux_visc_2 = get_node_vars(flux_viscous_y, equations_parabolic, dg, i, j, element)
       flux1 = flux_adv_1 - flux_visc_1
       flux2 = flux_adv_2 - flux_visc_2
 
       for ii in eachnode(dg)
          # ut              += -lam * D * f for each variable
          # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-         Trixi.multiply_add_to_node_vars!(ut, -dt * derivative_matrix[ii, i], flux1, equations, dg, ii, j)
+         multiply_add_to_node_vars!(ut, -dt * derivative_matrix[ii, i], flux1, equations, dg, ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(ut, -dt * derivative_matrix[jj, j], flux2, equations, dg, i, jj)
+         multiply_add_to_node_vars!(ut, -dt * derivative_matrix[jj, j], flux2, equations, dg, i, jj)
       end
 
-      Trixi.set_node_vars!(Fa, flux_adv_1, equations, dg, i, j)
-      Trixi.set_node_vars!(Ga, flux_adv_2, equations, dg, i, j)
-      Trixi.set_node_vars!(Fv, flux_visc_1, equations, dg, i, j)
-      Trixi.set_node_vars!(Gv, flux_visc_2, equations, dg, i, j)
+      set_node_vars!(Fa, flux_adv_1, equations, dg, i, j)
+      set_node_vars!(Ga, flux_adv_2, equations, dg, i, j)
+      set_node_vars!(Fv, flux_visc_1, equations, dg, i, j)
+      set_node_vars!(Gv, flux_visc_2, equations, dg, i, j)
 
-      Trixi.set_node_vars!(um, u_node, equations, dg, i, j)
-      Trixi.set_node_vars!(up, u_node, equations, dg, i, j)
+      set_node_vars!(um, u_node, equations, dg, i, j)
+      set_node_vars!(up, u_node, equations, dg, i, j)
 
-      ux_node = Trixi.get_node_vars(gradients_x, equations, dg, i, j, element)
-      Trixi.set_node_vars!(upx, ux_node, equations, dg, i, j)
-      Trixi.set_node_vars!(umx, ux_node, equations, dg, i, j)
+      ux_node = get_node_vars(gradients_x, equations, dg, i, j, element)
+      set_node_vars!(upx, ux_node, equations, dg, i, j)
+      set_node_vars!(umx, ux_node, equations, dg, i, j)
 
-      uy_node = Trixi.get_node_vars(gradients_y, equations, dg, i, j, element)
-      Trixi.set_node_vars!(upy, uy_node, equations, dg, i, j)
-      Trixi.set_node_vars!(umy, uy_node, equations, dg, i, j)
+      uy_node = get_node_vars(gradients_y, equations, dg, i, j, element)
+      set_node_vars!(upy, uy_node, equations, dg, i, j)
+      set_node_vars!(umy, uy_node, equations, dg, i, j)
 
-      Trixi.set_node_vars!(U, u_node, equations, dg, i, j)
+      set_node_vars!(U, u_node, equations, dg, i, j)
    end
 
    # Scale ut
@@ -299,27 +301,27 @@ function weak_form_kernel_1!(
    for j in eachnode(dg), i in eachnode(dg)
       # Add source term contribution to ut
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
-      u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+      u_node = get_node_vars(u, equations, dg, i, j, element)
       s_node = calc_source(u_node, x, t, source_terms, equations, dg, cache)
-      Trixi.set_node_vars!(S, s_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(ut, dt, s_node, equations, dg, i, j) # has no jacobian factor
+      set_node_vars!(S, s_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(ut, dt, s_node, equations, dg, i, j) # has no jacobian factor
    end
 
    # Compute ∇u_t
    for j in eachnode(dg), i in eachnode(dg)
-      ut_node = Trixi.get_node_vars(ut, equations, dg, i, j)
+      ut_node = get_node_vars(ut, equations, dg, i, j)
 
       for ii in eachnode(dg)
          # ut              += -lam * D * f for each variable
          # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-         Trixi.multiply_add_to_node_vars!(utx, derivative_matrix[ii, i], ut_node, equations, dg,
+         multiply_add_to_node_vars!(utx, derivative_matrix[ii, i], ut_node, equations, dg,
             ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(uty, derivative_matrix[jj, j], ut_node, equations, dg,
+         multiply_add_to_node_vars!(uty, derivative_matrix[jj, j], ut_node, equations, dg,
             i, jj)
       end
    end
@@ -334,81 +336,81 @@ function weak_form_kernel_1!(
    end
 
    for j in eachnode(dg), i in eachnode(dg)
-      ut_node = Trixi.get_node_vars(ut, equations, dg, i, j)
-      utx_node = Trixi.get_node_vars(utx, equations, dg, i, j)
-      uty_node = Trixi.get_node_vars(uty, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(U, 0.5, ut_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(up, 1.0, ut_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(um, -1.0, ut_node, equations, dg, i, j)
+      ut_node = get_node_vars(ut, equations, dg, i, j)
+      utx_node = get_node_vars(utx, equations, dg, i, j)
+      uty_node = get_node_vars(uty, equations, dg, i, j)
+      multiply_add_to_node_vars!(U, 0.5, ut_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(up, 1.0, ut_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(um, -1.0, ut_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(upx, 1.0, utx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umx, -1.0, utx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(upy, 1.0, uty_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umy, -1.0, uty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upx, 1.0, utx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umx, -1.0, utx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upy, 1.0, uty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umy, -1.0, uty_node, equations, dg, i, j)
 
-      um_node = Trixi.get_node_vars(um, equations, dg, i, j)
-      up_node = Trixi.get_node_vars(up, equations, dg, i, j)
-      umx_node = Trixi.get_node_vars(umx, equations, dg, i, j)
-      upx_node = Trixi.get_node_vars(upx, equations, dg, i, j)
-      umy_node = Trixi.get_node_vars(umy, equations, dg, i, j)
-      upy_node = Trixi.get_node_vars(upy, equations, dg, i, j)
+      um_node = get_node_vars(um, equations, dg, i, j)
+      up_node = get_node_vars(up, equations, dg, i, j)
+      umx_node = get_node_vars(umx, equations, dg, i, j)
+      upx_node = get_node_vars(upx, equations, dg, i, j)
+      umy_node = get_node_vars(umy, equations, dg, i, j)
+      upy_node = get_node_vars(upy, equations, dg, i, j)
 
       (fma, gma), (fmv, gmv) = fluxes(um_node, (umx_node, umy_node), equations, equations_parabolic)
       (fpa, gpa), (fpv, gpv) = fluxes(up_node, (upx_node, upy_node), equations, equations_parabolic)
 
       fta = 0.5 * (fpa - fma)
       gta = 0.5 * (gpa - gma)
-      Trixi.multiply_add_to_node_vars!(Fa, 0.5, fta, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(Ga, 0.5, gta, equations, dg, i, j)
+      multiply_add_to_node_vars!(Fa, 0.5, fta, equations, dg, i, j)
+      multiply_add_to_node_vars!(Ga, 0.5, gta, equations, dg, i, j)
 
       ftv = 0.5 * (fpv - fmv)
       gtv = 0.5 * (gpv - gmv)
-      Trixi.multiply_add_to_node_vars!(Fv, 0.5, ftv, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(Gv, 0.5, gtv, equations, dg, i, j)
+      multiply_add_to_node_vars!(Fv, 0.5, ftv, equations, dg, i, j)
+      multiply_add_to_node_vars!(Gv, 0.5, gtv, equations, dg, i, j)
 
-      Fa_node = Trixi.get_node_vars(Fa, equations, dg, i, j)
-      Fv_node = Trixi.get_node_vars(Fv, equations, dg, i, j)
+      Fa_node = get_node_vars(Fa, equations, dg, i, j)
+      Fv_node = get_node_vars(Fv, equations, dg, i, j)
 
       F = Fa_node - Fv_node
 
-      Ga_node = Trixi.get_node_vars(Ga, equations, dg, i, j)
-      Gv_node = Trixi.get_node_vars(Gv, equations, dg, i, j)
+      Ga_node = get_node_vars(Ga, equations, dg, i, j)
+      Gv_node = get_node_vars(Gv, equations, dg, i, j)
 
       G = Ga_node - Gv_node
       for ii in eachnode(dg)
          # res              += -lam * D * F for each variable
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-         Trixi.multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F, equations,
+         multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F, equations,
             dg, ii, j, element)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G, equations,
+         multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G, equations,
             dg, i, jj, element)
       end
 
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       st = calc_source_t_N12(up_node, um_node, x, t, dt, source_terms, equations,
          dg, cache)
-      Trixi.multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
+      multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
 
       # TODO - update to v1.8 and call with @inline
       # Give u1_ or U depending on dissipation model
-      U_node = Trixi.get_node_vars(U, equations, dg, i, j)
+      U_node = get_node_vars(U, equations, dg, i, j)
 
       # Ub = UT * V
       # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
-      Trixi.set_node_vars!(cache.U, U_node, equations, dg, i, j, element)
-      Trixi.set_node_vars!(cache.F, Fa_node, equations, dg, 1, i, j, element)
-      Trixi.set_node_vars!(cache_parabolic.Fv, Fv_node, equations, dg, 1, i, j, element)
-      Trixi.set_node_vars!(cache.F, Ga_node, equations, dg, 2, i, j, element)
-      Trixi.set_node_vars!(cache_parabolic.Fv, Gv_node, equations, dg, 2, i, j, element)
+      set_node_vars!(cache.U, U_node, equations, dg, i, j, element)
+      set_node_vars!(cache.F, Fa_node, equations, dg, 1, i, j, element)
+      set_node_vars!(cache_parabolic.Fv, Fv_node, equations, dg, 1, i, j, element)
+      set_node_vars!(cache.F, Ga_node, equations, dg, 2, i, j, element)
+      set_node_vars!(cache_parabolic.Fv, Gv_node, equations, dg, 2, i, j, element)
 
-      S_node = Trixi.get_node_vars(S, equations, dg, i, j)
+      S_node = get_node_vars(S, equations, dg, i, j)
       # inv_jacobian = inverse_jacobian[i, j, element]
-      Trixi.multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg, i, j, element)
+      multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg, i, j, element)
    end
 
    return nothing
@@ -447,49 +449,49 @@ function weak_form_kernel_2!(
    # Calculate volume terms in one element
 
    for j in eachnode(dg), i in eachnode(dg)
-      u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+      u_node = get_node_vars(u, equations, dg, i, j, element)
 
       flux_adv_1, flux_adv_2 = fluxes(u_node, equations)
-      flux_visc_1 = Trixi.get_node_vars(flux_viscous_x, equations_parabolic, dg, i, j, element)
-      flux_visc_2 = Trixi.get_node_vars(flux_viscous_y, equations_parabolic, dg, i, j, element)
+      flux_visc_1 = get_node_vars(flux_viscous_x, equations_parabolic, dg, i, j, element)
+      flux_visc_2 = get_node_vars(flux_viscous_y, equations_parabolic, dg, i, j, element)
       flux1 = flux_adv_1 - flux_visc_1
       flux2 = flux_adv_2 - flux_visc_2
 
       for ii in eachnode(dg)
          # ut              += -lam * D * f for each variable
          # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-         Trixi.multiply_add_to_node_vars!(ut, -dt * derivative_matrix[ii, i], flux1, equations, dg, ii, j)
+         multiply_add_to_node_vars!(ut, -dt * derivative_matrix[ii, i], flux1, equations, dg, ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(ut, -dt * derivative_matrix[jj, j], flux2, equations, dg, i, jj)
+         multiply_add_to_node_vars!(ut, -dt * derivative_matrix[jj, j], flux2, equations, dg, i, jj)
       end
 
-      Trixi.set_node_vars!(fa, flux_adv_1, equations, dg, i, j)
-      Trixi.set_node_vars!(ga, flux_adv_2, equations, dg, i, j)
+      set_node_vars!(fa, flux_adv_1, equations, dg, i, j)
+      set_node_vars!(ga, flux_adv_2, equations, dg, i, j)
 
-      Trixi.set_node_vars!(fv, flux_visc_1, equations, dg, i, j)
-      Trixi.set_node_vars!(gv, flux_visc_2, equations, dg, i, j)
+      set_node_vars!(fv, flux_visc_1, equations, dg, i, j)
+      set_node_vars!(gv, flux_visc_2, equations, dg, i, j)
 
-      Trixi.set_node_vars!(Fa, flux_adv_1, equations, dg, i, j)
-      Trixi.set_node_vars!(Ga, flux_adv_2, equations, dg, i, j)
-      Trixi.set_node_vars!(Fv, flux_visc_1, equations, dg, i, j)
-      Trixi.set_node_vars!(Gv, flux_visc_2, equations, dg, i, j)
+      set_node_vars!(Fa, flux_adv_1, equations, dg, i, j)
+      set_node_vars!(Ga, flux_adv_2, equations, dg, i, j)
+      set_node_vars!(Fv, flux_visc_1, equations, dg, i, j)
+      set_node_vars!(Gv, flux_visc_2, equations, dg, i, j)
 
-      Trixi.set_node_vars!(um, u_node, equations, dg, i, j)
-      Trixi.set_node_vars!(up, u_node, equations, dg, i, j)
+      set_node_vars!(um, u_node, equations, dg, i, j)
+      set_node_vars!(up, u_node, equations, dg, i, j)
 
-      ux_node = Trixi.get_node_vars(gradients_x, equations, dg, i, j, element)
-      Trixi.set_node_vars!(upx, ux_node, equations, dg, i, j)
-      Trixi.set_node_vars!(umx, ux_node, equations, dg, i, j)
+      ux_node = get_node_vars(gradients_x, equations, dg, i, j, element)
+      set_node_vars!(upx, ux_node, equations, dg, i, j)
+      set_node_vars!(umx, ux_node, equations, dg, i, j)
 
-      uy_node = Trixi.get_node_vars(gradients_y, equations, dg, i, j, element)
-      Trixi.set_node_vars!(upy, uy_node, equations, dg, i, j)
-      Trixi.set_node_vars!(umy, uy_node, equations, dg, i, j)
+      uy_node = get_node_vars(gradients_y, equations, dg, i, j, element)
+      set_node_vars!(upy, uy_node, equations, dg, i, j)
+      set_node_vars!(umy, uy_node, equations, dg, i, j)
 
-      Trixi.set_node_vars!(U, u_node, equations, dg, i, j)
+      set_node_vars!(U, u_node, equations, dg, i, j)
    end
 
    # Scale ut
@@ -504,27 +506,27 @@ function weak_form_kernel_2!(
    for j in eachnode(dg), i in eachnode(dg)
       # Add source term contribution to ut
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
-      u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+      u_node = get_node_vars(u, equations, dg, i, j, element)
       s_node = calc_source(u_node, x, t, source_terms, equations, dg, cache)
-      Trixi.set_node_vars!(S, s_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(ut, dt, s_node, equations, dg, i, j) # has no jacobian factor
+      set_node_vars!(S, s_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(ut, dt, s_node, equations, dg, i, j) # has no jacobian factor
    end
 
    # Compute ∇u_t
    for j in eachnode(dg), i in eachnode(dg)
-      ut_node = Trixi.get_node_vars(ut, equations, dg, i, j)
+      ut_node = get_node_vars(ut, equations, dg, i, j)
 
       for ii in eachnode(dg)
          # ut              += -lam * D * f for each variable
          # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-         Trixi.multiply_add_to_node_vars!(utx, derivative_matrix[ii, i], ut_node, equations, dg,
+         multiply_add_to_node_vars!(utx, derivative_matrix[ii, i], ut_node, equations, dg,
             ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(uty, derivative_matrix[jj, j], ut_node, equations, dg,
+         multiply_add_to_node_vars!(uty, derivative_matrix[jj, j], ut_node, equations, dg,
             i, jj)
       end
    end
@@ -539,37 +541,37 @@ function weak_form_kernel_2!(
    end
 
    for j in eachnode(dg), i in eachnode(dg)
-      ut_node = Trixi.get_node_vars(ut, equations, dg, i, j)
-      utx_node = Trixi.get_node_vars(utx, equations, dg, i, j)
-      uty_node = Trixi.get_node_vars(uty, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(U, 0.5, ut_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(up, 1.0, ut_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(um, -1.0, ut_node, equations, dg, i, j)
+      ut_node = get_node_vars(ut, equations, dg, i, j)
+      utx_node = get_node_vars(utx, equations, dg, i, j)
+      uty_node = get_node_vars(uty, equations, dg, i, j)
+      multiply_add_to_node_vars!(U, 0.5, ut_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(up, 1.0, ut_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(um, -1.0, ut_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(upx, 1.0, utx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umx, -1.0, utx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(upy, 1.0, uty_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umy, -1.0, uty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upx, 1.0, utx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umx, -1.0, utx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upy, 1.0, uty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umy, -1.0, uty_node, equations, dg, i, j)
 
-      um_node = Trixi.get_node_vars(um, equations, dg, i, j)
-      up_node = Trixi.get_node_vars(up, equations, dg, i, j)
-      umx_node = Trixi.get_node_vars(umx, equations, dg, i, j)
-      upx_node = Trixi.get_node_vars(upx, equations, dg, i, j)
-      umy_node = Trixi.get_node_vars(umy, equations, dg, i, j)
-      upy_node = Trixi.get_node_vars(upy, equations, dg, i, j)
+      um_node = get_node_vars(um, equations, dg, i, j)
+      up_node = get_node_vars(up, equations, dg, i, j)
+      umx_node = get_node_vars(umx, equations, dg, i, j)
+      upx_node = get_node_vars(upx, equations, dg, i, j)
+      umy_node = get_node_vars(umy, equations, dg, i, j)
+      upy_node = get_node_vars(upy, equations, dg, i, j)
 
       (fma, gma), (fmv, gmv) = fluxes(um_node, (umx_node, umy_node), equations, equations_parabolic)
       (fpa, gpa), (fpv, gpv) = fluxes(up_node, (upx_node, upy_node), equations, equations_parabolic)
 
       fta = 0.5 * (fpa - fma)
       gta = 0.5 * (gpa - gma)
-      Trixi.multiply_add_to_node_vars!(Fa, 0.5, fta, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(Ga, 0.5, gta, equations, dg, i, j)
+      multiply_add_to_node_vars!(Fa, 0.5, fta, equations, dg, i, j)
+      multiply_add_to_node_vars!(Ga, 0.5, gta, equations, dg, i, j)
 
       ftv = 0.5 * (fpv - fmv)
       gtv = 0.5 * (gpv - gmv)
-      Trixi.multiply_add_to_node_vars!(Fv, 0.5, ftv, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(Gv, 0.5, gtv, equations, dg, i, j)
+      multiply_add_to_node_vars!(Fv, 0.5, ftv, equations, dg, i, j)
+      multiply_add_to_node_vars!(Gv, 0.5, gtv, equations, dg, i, j)
 
       ft = fta - ftv
       gt = gta - gtv
@@ -577,14 +579,14 @@ function weak_form_kernel_2!(
       for ii in eachnode(dg)
          # res              += -lam * D * F for each variable
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-         Trixi.multiply_add_to_node_vars!(utt, derivative_matrix[ii, i], ft, equations,
+         multiply_add_to_node_vars!(utt, derivative_matrix[ii, i], ft, equations,
             dg, ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(utt, derivative_matrix[jj, j], gt, equations,
+         multiply_add_to_node_vars!(utt, derivative_matrix[jj, j], gt, equations,
             dg, i, jj)
       end
    end
@@ -600,30 +602,30 @@ function weak_form_kernel_2!(
    # Add source term contribution to utt and some to S
    for j in eachnode(dg), i in eachnode(dg)
       # Add source term contribution to ut
-      um_node = Trixi.get_node_vars(um, equations, dg, i, j)
-      up_node = Trixi.get_node_vars(up, equations, dg, i, j)
+      um_node = get_node_vars(um, equations, dg, i, j)
+      up_node = get_node_vars(up, equations, dg, i, j)
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       st = calc_source_t_N12(up_node, um_node, x, t, dt, source_terms,
          equations, dg, cache)
-      Trixi.multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(utt, dt, st, equations, dg, i, j) # has no jacobian factor
+      multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
+      multiply_add_to_node_vars!(utt, dt, st, equations, dg, i, j) # has no jacobian factor
    end
 
    # Compute ∇u_tt
    for j in eachnode(dg), i in eachnode(dg)
-      utt_node = Trixi.get_node_vars(utt, equations, dg, i, j)
+      utt_node = get_node_vars(utt, equations, dg, i, j)
 
       for ii in eachnode(dg)
          # ut              += -lam * D * f for each variable
          # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-         Trixi.multiply_add_to_node_vars!(uttx, derivative_matrix[ii, i], utt_node, equations, dg,
+         multiply_add_to_node_vars!(uttx, derivative_matrix[ii, i], utt_node, equations, dg,
             ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(utty, derivative_matrix[jj, j], utt_node, equations, dg,
+         multiply_add_to_node_vars!(utty, derivative_matrix[jj, j], utt_node, equations, dg,
             i, jj)
       end
    end
@@ -638,89 +640,89 @@ function weak_form_kernel_2!(
    end
 
    for j in eachnode(dg), i in eachnode(dg)
-      utt_node = Trixi.get_node_vars(utt, equations, dg, i, j)
-      uttx_node = Trixi.get_node_vars(uttx, equations, dg, i, j)
-      utty_node = Trixi.get_node_vars(utty, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(U, 1.0 / 6.0, utt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(up, 0.5, utt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(um, 0.5, utt_node, equations, dg, i, j)
+      utt_node = get_node_vars(utt, equations, dg, i, j)
+      uttx_node = get_node_vars(uttx, equations, dg, i, j)
+      utty_node = get_node_vars(utty, equations, dg, i, j)
+      multiply_add_to_node_vars!(U, 1.0 / 6.0, utt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(up, 0.5, utt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(um, 0.5, utt_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(upx, 0.5, uttx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umx, 0.5, uttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upx, 0.5, uttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umx, 0.5, uttx_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(upy, 0.5, utty_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umy, 0.5, utty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upy, 0.5, utty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umy, 0.5, utty_node, equations, dg, i, j)
 
-      fa_node = Trixi.get_node_vars(fa, equations, dg, i, j)
-      ga_node = Trixi.get_node_vars(ga, equations, dg, i, j)
-      fv_node = Trixi.get_node_vars(fv, equations, dg, i, j)
-      gv_node = Trixi.get_node_vars(gv, equations, dg, i, j)
-      u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+      fa_node = get_node_vars(fa, equations, dg, i, j)
+      ga_node = get_node_vars(ga, equations, dg, i, j)
+      fv_node = get_node_vars(fv, equations, dg, i, j)
+      gv_node = get_node_vars(gv, equations, dg, i, j)
+      u_node = get_node_vars(u, equations, dg, i, j, element)
 
-      um_node = Trixi.get_node_vars(um, equations, dg, i, j)
-      up_node = Trixi.get_node_vars(up, equations, dg, i, j)
+      um_node = get_node_vars(um, equations, dg, i, j)
+      up_node = get_node_vars(up, equations, dg, i, j)
 
-      umx_node = Trixi.get_node_vars(umx, equations, dg, i, j)
-      upx_node = Trixi.get_node_vars(upx, equations, dg, i, j)
-      umy_node = Trixi.get_node_vars(umy, equations, dg, i, j)
-      upy_node = Trixi.get_node_vars(upy, equations, dg, i, j)
+      umx_node = get_node_vars(umx, equations, dg, i, j)
+      upx_node = get_node_vars(upx, equations, dg, i, j)
+      umy_node = get_node_vars(umy, equations, dg, i, j)
+      upy_node = get_node_vars(upy, equations, dg, i, j)
 
       (fma, gma), (fmv, gmv) = fluxes(um_node, (umx_node, umy_node), equations, equations_parabolic)
       (fpa, gpa), (fpv, gpv) = fluxes(up_node, (upx_node, upy_node), equations, equations_parabolic)
       ftta, gtta = fpa - 2.0 * fa_node + fma, gpa - 2.0 * ga_node + gma
       fttv, gttv = fpv - 2.0 * fv_node + fmv, gpv - 2.0 * gv_node + gmv
 
-      Trixi.multiply_add_to_node_vars!(Fa, 1.0 / 6.0, ftta, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(Fv, 1.0 / 6.0, fttv, equations, dg, i, j)
+      multiply_add_to_node_vars!(Fa, 1.0 / 6.0, ftta, equations, dg, i, j)
+      multiply_add_to_node_vars!(Fv, 1.0 / 6.0, fttv, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(Ga, 1.0 / 6.0, gtta, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(Gv, 1.0 / 6.0, gttv, equations, dg, i, j)
+      multiply_add_to_node_vars!(Ga, 1.0 / 6.0, gtta, equations, dg, i, j)
+      multiply_add_to_node_vars!(Gv, 1.0 / 6.0, gttv, equations, dg, i, j)
 
-      Fa_node = Trixi.get_node_vars(Fa, equations, dg, i, j)
-      Fv_node = Trixi.get_node_vars(Fv, equations, dg, i, j)
+      Fa_node = get_node_vars(Fa, equations, dg, i, j)
+      Fv_node = get_node_vars(Fv, equations, dg, i, j)
 
       F = Fa_node - Fv_node
 
-      Ga_node = Trixi.get_node_vars(Ga, equations, dg, i, j)
-      Gv_node = Trixi.get_node_vars(Gv, equations, dg, i, j)
+      Ga_node = get_node_vars(Ga, equations, dg, i, j)
+      Gv_node = get_node_vars(Gv, equations, dg, i, j)
 
       G = Ga_node - Gv_node
       for ii in eachnode(dg)
          # res              += -lam * D * F for each variable
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-         Trixi.multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F, equations,
+         multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F, equations,
             dg, ii, j, element)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G, equations,
+         multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G, equations,
             dg, i, jj, element)
       end
 
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       stt = calc_source_tt_N23(u_node, up_node, um_node, x, t, dt, source_terms,
          equations, dg, cache)
-      Trixi.multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, equations, dg, i, j)
+      multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, equations, dg, i, j)
 
       # TODO - update to v1.8 and call with @inline
       # Give u1_ or U depending on dissipation model
-      U_node = Trixi.get_node_vars(U, equations, dg, i, j)
+      U_node = get_node_vars(U, equations, dg, i, j)
 
       # Ub = UT * V
       # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
-      Trixi.set_node_vars!(cache.U, U_node, equations, dg, i, j, element)
+      set_node_vars!(cache.U, U_node, equations, dg, i, j, element)
 
-      Trixi.set_node_vars!(cache.F, Fa_node, equations, dg, 1, i, j, element)
-      Trixi.set_node_vars!(cache_parabolic.Fv, Fv_node, equations, dg, 1, i, j, element)
+      set_node_vars!(cache.F, Fa_node, equations, dg, 1, i, j, element)
+      set_node_vars!(cache_parabolic.Fv, Fv_node, equations, dg, 1, i, j, element)
 
-      Trixi.set_node_vars!(cache.F, Ga_node, equations, dg, 2, i, j, element)
-      Trixi.set_node_vars!(cache_parabolic.Fv, Gv_node, equations, dg, 2, i, j, element)
+      set_node_vars!(cache.F, Ga_node, equations, dg, 2, i, j, element)
+      set_node_vars!(cache_parabolic.Fv, Gv_node, equations, dg, 2, i, j, element)
 
-      S_node = Trixi.get_node_vars(S, equations, dg, i, j)
+      S_node = get_node_vars(S, equations, dg, i, j)
       # inv_jacobian = inverse_jacobian[i, j, element]
-      Trixi.multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg, i, j, element)
+      multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg, i, j, element)
    end
 
    return nothing
@@ -759,55 +761,55 @@ function weak_form_kernel_3!(
    # Calculate volume terms in one element
 
    for j in eachnode(dg), i in eachnode(dg)
-      u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+      u_node = get_node_vars(u, equations, dg, i, j, element)
 
       flux_adv_1, flux_adv_2 = fluxes(u_node, equations)
-      flux_visc_1 = Trixi.get_node_vars(flux_viscous_x, equations_parabolic, dg, i, j, element)
-      flux_visc_2 = Trixi.get_node_vars(flux_viscous_y, equations_parabolic, dg, i, j, element)
+      flux_visc_1 = get_node_vars(flux_viscous_x, equations_parabolic, dg, i, j, element)
+      flux_visc_2 = get_node_vars(flux_viscous_y, equations_parabolic, dg, i, j, element)
       flux1 = flux_adv_1 - flux_visc_1
       flux2 = flux_adv_2 - flux_visc_2
 
       for ii in eachnode(dg)
          # ut              += -lam * D * f for each variable
          # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-         Trixi.multiply_add_to_node_vars!(ut, -dt * derivative_matrix[ii, i], flux1, equations, dg, ii, j)
+         multiply_add_to_node_vars!(ut, -dt * derivative_matrix[ii, i], flux1, equations, dg, ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(ut, -dt * derivative_matrix[jj, j], flux2, equations, dg, i, jj)
+         multiply_add_to_node_vars!(ut, -dt * derivative_matrix[jj, j], flux2, equations, dg, i, jj)
       end
 
-      Trixi.set_node_vars!(fa, flux_adv_1, equations, dg, i, j)
-      Trixi.set_node_vars!(ga, flux_adv_2, equations, dg, i, j)
+      set_node_vars!(fa, flux_adv_1, equations, dg, i, j)
+      set_node_vars!(ga, flux_adv_2, equations, dg, i, j)
 
-      Trixi.set_node_vars!(fv, flux_visc_1, equations, dg, i, j)
-      Trixi.set_node_vars!(gv, flux_visc_2, equations, dg, i, j)
+      set_node_vars!(fv, flux_visc_1, equations, dg, i, j)
+      set_node_vars!(gv, flux_visc_2, equations, dg, i, j)
 
-      Trixi.set_node_vars!(Fa, flux_adv_1, equations, dg, i, j)
-      Trixi.set_node_vars!(Ga, flux_adv_2, equations, dg, i, j)
-      Trixi.set_node_vars!(Fv, flux_visc_1, equations, dg, i, j)
-      Trixi.set_node_vars!(Gv, flux_visc_2, equations, dg, i, j)
+      set_node_vars!(Fa, flux_adv_1, equations, dg, i, j)
+      set_node_vars!(Ga, flux_adv_2, equations, dg, i, j)
+      set_node_vars!(Fv, flux_visc_1, equations, dg, i, j)
+      set_node_vars!(Gv, flux_visc_2, equations, dg, i, j)
 
-      Trixi.set_node_vars!(um, u_node, equations, dg, i, j)
-      Trixi.set_node_vars!(up, u_node, equations, dg, i, j)
-      Trixi.set_node_vars!(umm, u_node, equations, dg, i, j)
-      Trixi.set_node_vars!(upp, u_node, equations, dg, i, j)
+      set_node_vars!(um, u_node, equations, dg, i, j)
+      set_node_vars!(up, u_node, equations, dg, i, j)
+      set_node_vars!(umm, u_node, equations, dg, i, j)
+      set_node_vars!(upp, u_node, equations, dg, i, j)
 
-      ux_node = Trixi.get_node_vars(gradients_x, equations, dg, i, j, element)
-      Trixi.set_node_vars!(upx, ux_node, equations, dg, i, j)
-      Trixi.set_node_vars!(umx, ux_node, equations, dg, i, j)
-      Trixi.set_node_vars!(uppx, ux_node, equations, dg, i, j)
-      Trixi.set_node_vars!(ummx, ux_node, equations, dg, i, j)
+      ux_node = get_node_vars(gradients_x, equations, dg, i, j, element)
+      set_node_vars!(upx, ux_node, equations, dg, i, j)
+      set_node_vars!(umx, ux_node, equations, dg, i, j)
+      set_node_vars!(uppx, ux_node, equations, dg, i, j)
+      set_node_vars!(ummx, ux_node, equations, dg, i, j)
 
-      uy_node = Trixi.get_node_vars(gradients_y, equations, dg, i, j, element)
-      Trixi.set_node_vars!(upy, uy_node, equations, dg, i, j)
-      Trixi.set_node_vars!(umy, uy_node, equations, dg, i, j)
-      Trixi.set_node_vars!(uppy, uy_node, equations, dg, i, j)
-      Trixi.set_node_vars!(ummy, uy_node, equations, dg, i, j)
+      uy_node = get_node_vars(gradients_y, equations, dg, i, j, element)
+      set_node_vars!(upy, uy_node, equations, dg, i, j)
+      set_node_vars!(umy, uy_node, equations, dg, i, j)
+      set_node_vars!(uppy, uy_node, equations, dg, i, j)
+      set_node_vars!(ummy, uy_node, equations, dg, i, j)
 
-      Trixi.set_node_vars!(U, u_node, equations, dg, i, j)
+      set_node_vars!(U, u_node, equations, dg, i, j)
    end
 
    # Scale ut
@@ -822,27 +824,27 @@ function weak_form_kernel_3!(
    for j in eachnode(dg), i in eachnode(dg)
       # Add source term contribution to ut
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
-      u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+      u_node = get_node_vars(u, equations, dg, i, j, element)
       s_node = calc_source(u_node, x, t, source_terms, equations, dg, cache)
-      Trixi.set_node_vars!(S, s_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(ut, dt, s_node, equations, dg, i, j) # has no jacobian factor
+      set_node_vars!(S, s_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(ut, dt, s_node, equations, dg, i, j) # has no jacobian factor
    end
 
    # Compute ∇u_t
    for j in eachnode(dg), i in eachnode(dg)
-      ut_node = Trixi.get_node_vars(ut, equations, dg, i, j)
+      ut_node = get_node_vars(ut, equations, dg, i, j)
 
       for ii in eachnode(dg)
          # ut              += -lam * D * f for each variable
          # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-         Trixi.multiply_add_to_node_vars!(utx, derivative_matrix[ii, i], ut_node, equations, dg,
+         multiply_add_to_node_vars!(utx, derivative_matrix[ii, i], ut_node, equations, dg,
             ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(uty, derivative_matrix[jj, j], ut_node, equations, dg,
+         multiply_add_to_node_vars!(uty, derivative_matrix[jj, j], ut_node, equations, dg,
             i, jj)
       end
    end
@@ -857,39 +859,39 @@ function weak_form_kernel_3!(
    end
 
    for j in eachnode(dg), i in eachnode(dg)
-      ut_node = Trixi.get_node_vars(ut, equations, dg, i, j)
-      utx_node = Trixi.get_node_vars(utx, equations, dg, i, j)
-      uty_node = Trixi.get_node_vars(uty, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(U, 0.5, ut_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(up, 1.0, ut_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(um, -1.0, ut_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umm, -2.0, ut_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(upp, 2.0, ut_node, equations, dg, i, j)
+      ut_node = get_node_vars(ut, equations, dg, i, j)
+      utx_node = get_node_vars(utx, equations, dg, i, j)
+      uty_node = get_node_vars(uty, equations, dg, i, j)
+      multiply_add_to_node_vars!(U, 0.5, ut_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(up, 1.0, ut_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(um, -1.0, ut_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umm, -2.0, ut_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upp, 2.0, ut_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(upx, 1.0, utx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umx, -1.0, utx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(upy, 1.0, uty_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umy, -1.0, uty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upx, 1.0, utx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umx, -1.0, utx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upy, 1.0, uty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umy, -1.0, uty_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(ummx, -2.0, utx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(uppx, 2.0, utx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(ummy, -2.0, uty_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(uppy, 2.0, uty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(ummx, -2.0, utx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(uppx, 2.0, utx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(ummy, -2.0, uty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(uppy, 2.0, uty_node, equations, dg, i, j)
 
-      um_node = Trixi.get_node_vars(um, equations, dg, i, j)
-      up_node = Trixi.get_node_vars(up, equations, dg, i, j)
-      umm_node = Trixi.get_node_vars(umm, equations, dg, i, j)
-      upp_node = Trixi.get_node_vars(upp, equations, dg, i, j)
+      um_node = get_node_vars(um, equations, dg, i, j)
+      up_node = get_node_vars(up, equations, dg, i, j)
+      umm_node = get_node_vars(umm, equations, dg, i, j)
+      upp_node = get_node_vars(upp, equations, dg, i, j)
 
-      umx_node = Trixi.get_node_vars(umx, equations, dg, i, j)
-      upx_node = Trixi.get_node_vars(upx, equations, dg, i, j)
-      umy_node = Trixi.get_node_vars(umy, equations, dg, i, j)
-      upy_node = Trixi.get_node_vars(upy, equations, dg, i, j)
+      umx_node = get_node_vars(umx, equations, dg, i, j)
+      upx_node = get_node_vars(upx, equations, dg, i, j)
+      umy_node = get_node_vars(umy, equations, dg, i, j)
+      upy_node = get_node_vars(upy, equations, dg, i, j)
 
-      ummx_node = Trixi.get_node_vars(ummx, equations, dg, i, j)
-      uppx_node = Trixi.get_node_vars(uppx, equations, dg, i, j)
-      ummy_node = Trixi.get_node_vars(ummy, equations, dg, i, j)
-      uppy_node = Trixi.get_node_vars(uppy, equations, dg, i, j)
+      ummx_node = get_node_vars(ummx, equations, dg, i, j)
+      uppx_node = get_node_vars(uppx, equations, dg, i, j)
+      ummy_node = get_node_vars(ummy, equations, dg, i, j)
+      uppy_node = get_node_vars(uppy, equations, dg, i, j)
 
       (fma, gma), (fmv, gmv) = fluxes(um_node, (umx_node, umy_node), equations, equations_parabolic)
       (fpa, gpa), (fpv, gpv) = fluxes(up_node, (upx_node, upy_node), equations, equations_parabolic)
@@ -899,13 +901,13 @@ function weak_form_kernel_3!(
 
       fta = 1.0 / 12.0 * (-fppa + 8.0 * fpa - 8.0 * fma + fmma)
       gta = 1.0 / 12.0 * (-gppa + 8.0 * gpa - 8.0 * gma + gmma)
-      Trixi.multiply_add_to_node_vars!(Fa, 0.5, fta, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(Ga, 0.5, gta, equations, dg, i, j)
+      multiply_add_to_node_vars!(Fa, 0.5, fta, equations, dg, i, j)
+      multiply_add_to_node_vars!(Ga, 0.5, gta, equations, dg, i, j)
 
       ftv = 1.0 / 12.0 * (-fppv + 8.0 * fpv - 8.0 * fmv + fmmv)
       gtv = 1.0 / 12.0 * (-gppv + 8.0 * gpv - 8.0 * gmv + gmmv)
-      Trixi.multiply_add_to_node_vars!(Fv, 0.5, ftv, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(Gv, 0.5, gtv, equations, dg, i, j)
+      multiply_add_to_node_vars!(Fv, 0.5, ftv, equations, dg, i, j)
+      multiply_add_to_node_vars!(Gv, 0.5, gtv, equations, dg, i, j)
 
       ft = fta - ftv
       gt = gta - gtv
@@ -913,14 +915,14 @@ function weak_form_kernel_3!(
       for ii in eachnode(dg)
          # res              += -lam * D * F for each variable
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-         Trixi.multiply_add_to_node_vars!(utt, derivative_matrix[ii, i], ft, equations,
+         multiply_add_to_node_vars!(utt, derivative_matrix[ii, i], ft, equations,
             dg, ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(utt, derivative_matrix[jj, j], gt, equations,
+         multiply_add_to_node_vars!(utt, derivative_matrix[jj, j], gt, equations,
             dg, i, jj)
       end
    end
@@ -936,30 +938,30 @@ function weak_form_kernel_3!(
    # Add source term contribution to utt and some to S
    for j in eachnode(dg), i in eachnode(dg)
       # Add source term contribution to ut
-      um_node = Trixi.get_node_vars(um, equations, dg, i, j)
-      up_node = Trixi.get_node_vars(up, equations, dg, i, j)
+      um_node = get_node_vars(um, equations, dg, i, j)
+      up_node = get_node_vars(up, equations, dg, i, j)
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       st = calc_source_t_N12(up_node, um_node, x, t, dt, source_terms,
          equations, dg, cache)
-      Trixi.multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(utt, dt, st, equations, dg, i, j) # has no jacobian factor
+      multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
+      multiply_add_to_node_vars!(utt, dt, st, equations, dg, i, j) # has no jacobian factor
    end
 
    # Compute ∇u_tt
    for j in eachnode(dg), i in eachnode(dg)
-      utt_node = Trixi.get_node_vars(utt, equations, dg, i, j)
+      utt_node = get_node_vars(utt, equations, dg, i, j)
 
       for ii in eachnode(dg)
          # ut              += -lam * D * f for each variable
          # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-         Trixi.multiply_add_to_node_vars!(uttx, derivative_matrix[ii, i], utt_node, equations, dg,
+         multiply_add_to_node_vars!(uttx, derivative_matrix[ii, i], utt_node, equations, dg,
             ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(utty, derivative_matrix[jj, j], utt_node, equations, dg,
+         multiply_add_to_node_vars!(utty, derivative_matrix[jj, j], utt_node, equations, dg,
             i, jj)
       end
    end
@@ -974,50 +976,50 @@ function weak_form_kernel_3!(
    end
 
    for j in eachnode(dg), i in eachnode(dg)
-      utt_node = Trixi.get_node_vars(utt, equations, dg, i, j)
-      uttx_node = Trixi.get_node_vars(uttx, equations, dg, i, j)
-      utty_node = Trixi.get_node_vars(utty, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(U, 1.0 / 6.0, utt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(up, 0.5, utt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(um, 0.5, utt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(upp, 2.0, utt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umm, 2.0, utt_node, equations, dg, i, j)
+      utt_node = get_node_vars(utt, equations, dg, i, j)
+      uttx_node = get_node_vars(uttx, equations, dg, i, j)
+      utty_node = get_node_vars(utty, equations, dg, i, j)
+      multiply_add_to_node_vars!(U, 1.0 / 6.0, utt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(up, 0.5, utt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(um, 0.5, utt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upp, 2.0, utt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umm, 2.0, utt_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(upx, 0.5, uttx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umx, 0.5, uttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upx, 0.5, uttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umx, 0.5, uttx_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(upy, 0.5, utty_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umy, 0.5, utty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upy, 0.5, utty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umy, 0.5, utty_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(uppx, 2.0, uttx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(ummx, 2.0, uttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(uppx, 2.0, uttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(ummx, 2.0, uttx_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(uppy, 2.0, utty_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(ummy, 2.0, utty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(uppy, 2.0, utty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(ummy, 2.0, utty_node, equations, dg, i, j)
 
-      fa_node = Trixi.get_node_vars(fa, equations, dg, i, j)
-      ga_node = Trixi.get_node_vars(ga, equations, dg, i, j)
-      fv_node = Trixi.get_node_vars(fv, equations, dg, i, j)
-      gv_node = Trixi.get_node_vars(gv, equations, dg, i, j)
+      fa_node = get_node_vars(fa, equations, dg, i, j)
+      ga_node = get_node_vars(ga, equations, dg, i, j)
+      fv_node = get_node_vars(fv, equations, dg, i, j)
+      gv_node = get_node_vars(gv, equations, dg, i, j)
 
-      um_node = Trixi.get_node_vars(um, equations, dg, i, j)
-      up_node = Trixi.get_node_vars(up, equations, dg, i, j)
+      um_node = get_node_vars(um, equations, dg, i, j)
+      up_node = get_node_vars(up, equations, dg, i, j)
 
-      umx_node = Trixi.get_node_vars(umx, equations, dg, i, j)
-      upx_node = Trixi.get_node_vars(upx, equations, dg, i, j)
-      umy_node = Trixi.get_node_vars(umy, equations, dg, i, j)
-      upy_node = Trixi.get_node_vars(upy, equations, dg, i, j)
+      umx_node = get_node_vars(umx, equations, dg, i, j)
+      upx_node = get_node_vars(upx, equations, dg, i, j)
+      umy_node = get_node_vars(umy, equations, dg, i, j)
+      upy_node = get_node_vars(upy, equations, dg, i, j)
 
       (fma, gma), (fmv, gmv) = fluxes(um_node, (umx_node, umy_node), equations, equations_parabolic)
       (fpa, gpa), (fpv, gpv) = fluxes(up_node, (upx_node, upy_node), equations, equations_parabolic)
       ftta, gtta = fpa - 2.0 * fa_node + fma, gpa - 2.0 * ga_node + gma
       fttv, gttv = fpv - 2.0 * fv_node + fmv, gpv - 2.0 * gv_node + gmv
 
-      Trixi.multiply_add_to_node_vars!(Fa, 1.0 / 6.0, ftta, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(Fv, 1.0 / 6.0, fttv, equations, dg, i, j)
+      multiply_add_to_node_vars!(Fa, 1.0 / 6.0, ftta, equations, dg, i, j)
+      multiply_add_to_node_vars!(Fv, 1.0 / 6.0, fttv, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(Ga, 1.0 / 6.0, gtta, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(Gv, 1.0 / 6.0, gttv, equations, dg, i, j)
+      multiply_add_to_node_vars!(Ga, 1.0 / 6.0, gtta, equations, dg, i, j)
+      multiply_add_to_node_vars!(Gv, 1.0 / 6.0, gttv, equations, dg, i, j)
 
       ftt = ftta - fttv
       gtt = gtta - gttv
@@ -1025,14 +1027,14 @@ function weak_form_kernel_3!(
       for ii in eachnode(dg)
          # res              += -lam * D * F for each variable
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-         Trixi.multiply_add_to_node_vars!(uttt, -dt * derivative_matrix[ii, i], ftt, equations,
+         multiply_add_to_node_vars!(uttt, -dt * derivative_matrix[ii, i], ftt, equations,
             dg, ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(uttt, -dt * derivative_matrix[jj, j], gtt, equations,
+         multiply_add_to_node_vars!(uttt, -dt * derivative_matrix[jj, j], gtt, equations,
             dg, i, jj)
       end
    end
@@ -1048,31 +1050,31 @@ function weak_form_kernel_3!(
    # Add source term contribution to uttt and some to S
    for j in eachnode(dg), i in eachnode(dg)
       # Add source term contribution to ut
-      u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
-      um_node = Trixi.get_node_vars(um, equations, dg, i, j)
-      up_node = Trixi.get_node_vars(up, equations, dg, i, j)
+      u_node = get_node_vars(u, equations, dg, i, j, element)
+      um_node = get_node_vars(um, equations, dg, i, j)
+      up_node = get_node_vars(up, equations, dg, i, j)
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       stt = calc_source_tt_N23(u_node, up_node, um_node, x, t, dt, source_terms,
          equations, dg, cache)
-      Trixi.multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(uttt, dt, stt, equations, dg, i, j) # has no jacobian factor
+      multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, equations, dg, i, j)
+      multiply_add_to_node_vars!(uttt, dt, stt, equations, dg, i, j) # has no jacobian factor
    end
 
    # Compute ∇u_ttt
    for j in eachnode(dg), i in eachnode(dg)
-      uttt_node = Trixi.get_node_vars(uttt, equations, dg, i, j)
+      uttt_node = get_node_vars(uttt, equations, dg, i, j)
 
       for ii in eachnode(dg)
          # ut              += -lam * D * f for each variable
          # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-         Trixi.multiply_add_to_node_vars!(utttx, derivative_matrix[ii, i], uttt_node, equations, dg,
+         multiply_add_to_node_vars!(utttx, derivative_matrix[ii, i], uttt_node, equations, dg,
             ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(uttty, derivative_matrix[jj, j], uttt_node, equations, dg,
+         multiply_add_to_node_vars!(uttty, derivative_matrix[jj, j], uttt_node, equations, dg,
             i, jj)
       end
    end
@@ -1087,39 +1089,39 @@ function weak_form_kernel_3!(
    end
 
    for j in eachnode(dg), i in eachnode(dg)
-      uttt_node = Trixi.get_node_vars(uttt, equations, dg, i, j)
-      utttx_node = Trixi.get_node_vars(utttx, equations, dg, i, j)
-      uttty_node = Trixi.get_node_vars(uttty, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(U, 1.0 / 24.0, uttt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(um, -1.0 / 6.0, uttt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(up, 1.0 / 6.0, uttt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umm, -4.0 / 3.0, uttt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(upp, 4.0 / 3.0, uttt_node, equations, dg, i, j)
+      uttt_node = get_node_vars(uttt, equations, dg, i, j)
+      utttx_node = get_node_vars(utttx, equations, dg, i, j)
+      uttty_node = get_node_vars(uttty, equations, dg, i, j)
+      multiply_add_to_node_vars!(U, 1.0 / 24.0, uttt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(um, -1.0 / 6.0, uttt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(up, 1.0 / 6.0, uttt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umm, -4.0 / 3.0, uttt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upp, 4.0 / 3.0, uttt_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(umx, -1.0 / 6.0, utttx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(upx, 1.0 / 6.0, utttx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(ummx, -4.0 / 3.0, utttx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(uppx, 4.0 / 3.0, utttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umx, -1.0 / 6.0, utttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upx, 1.0 / 6.0, utttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(ummx, -4.0 / 3.0, utttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(uppx, 4.0 / 3.0, utttx_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(umy, -1.0 / 6.0, uttty_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(upy, 1.0 / 6.0, uttty_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(ummy, -4.0 / 3.0, uttty_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(uppy, 4.0 / 3.0, uttty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umy, -1.0 / 6.0, uttty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upy, 1.0 / 6.0, uttty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(ummy, -4.0 / 3.0, uttty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(uppy, 4.0 / 3.0, uttty_node, equations, dg, i, j)
 
-      um_node = Trixi.get_node_vars(um, equations, dg, i, j)
-      up_node = Trixi.get_node_vars(up, equations, dg, i, j)
-      umm_node = Trixi.get_node_vars(umm, equations, dg, i, j)
-      upp_node = Trixi.get_node_vars(upp, equations, dg, i, j)
+      um_node = get_node_vars(um, equations, dg, i, j)
+      up_node = get_node_vars(up, equations, dg, i, j)
+      umm_node = get_node_vars(umm, equations, dg, i, j)
+      upp_node = get_node_vars(upp, equations, dg, i, j)
 
-      umx_node = Trixi.get_node_vars(umx, equations, dg, i, j)
-      upx_node = Trixi.get_node_vars(upx, equations, dg, i, j)
-      ummx_node = Trixi.get_node_vars(ummx, equations, dg, i, j)
-      uppx_node = Trixi.get_node_vars(uppx, equations, dg, i, j)
+      umx_node = get_node_vars(umx, equations, dg, i, j)
+      upx_node = get_node_vars(upx, equations, dg, i, j)
+      ummx_node = get_node_vars(ummx, equations, dg, i, j)
+      uppx_node = get_node_vars(uppx, equations, dg, i, j)
 
-      umy_node = Trixi.get_node_vars(umy, equations, dg, i, j)
-      upy_node = Trixi.get_node_vars(upy, equations, dg, i, j)
-      ummy_node = Trixi.get_node_vars(ummy, equations, dg, i, j)
-      uppy_node = Trixi.get_node_vars(uppy, equations, dg, i, j)
+      umy_node = get_node_vars(umy, equations, dg, i, j)
+      upy_node = get_node_vars(upy, equations, dg, i, j)
+      ummy_node = get_node_vars(ummy, equations, dg, i, j)
+      uppy_node = get_node_vars(uppy, equations, dg, i, j)
 
       (fma, gma), (fmv, gmv) = fluxes(um_node, (umx_node, umy_node), equations, equations_parabolic)
       (fpa, gpa), (fpv, gpv) = fluxes(up_node, (upx_node, upy_node), equations, equations_parabolic)
@@ -1128,60 +1130,60 @@ function weak_form_kernel_3!(
       (fppa, gppa), (fppv, gppv) = fluxes(upp_node, (uppx_node, uppy_node), equations, equations_parabolic)
 
       fttta = 0.5 * (fppa - 2.0 * fpa + 2.0 * fma - fmma)
-      Trixi.multiply_add_to_node_vars!(Fa, 1.0 / 24.0, fttta, equations, dg, i, j)
+      multiply_add_to_node_vars!(Fa, 1.0 / 24.0, fttta, equations, dg, i, j)
       ftttv = 0.5 * (fppv - 2.0 * fpv + 2.0 * fmv - fmmv)
-      Trixi.multiply_add_to_node_vars!(Fv, 1.0 / 24.0, ftttv, equations, dg, i, j)
+      multiply_add_to_node_vars!(Fv, 1.0 / 24.0, ftttv, equations, dg, i, j)
 
       gttta = 0.5 * (gppa - 2.0 * gpa + 2.0 * gma - gmma)
-      Trixi.multiply_add_to_node_vars!(Ga, 1.0 / 24.0, gttta, equations, dg, i, j)
+      multiply_add_to_node_vars!(Ga, 1.0 / 24.0, gttta, equations, dg, i, j)
       gtttv = 0.5 * (gppv - 2.0 * gpv + 2.0 * gmv - gmmv)
-      Trixi.multiply_add_to_node_vars!(Gv, 1.0 / 24.0, gtttv, equations, dg, i, j)
+      multiply_add_to_node_vars!(Gv, 1.0 / 24.0, gtttv, equations, dg, i, j)
 
-      Fa_node = Trixi.get_node_vars(Fa, equations, dg, i, j)
-      Fv_node = Trixi.get_node_vars(Fv, equations, dg, i, j)
+      Fa_node = get_node_vars(Fa, equations, dg, i, j)
+      Fv_node = get_node_vars(Fv, equations, dg, i, j)
 
       F = Fa_node - Fv_node
 
-      Ga_node = Trixi.get_node_vars(Ga, equations, dg, i, j)
-      Gv_node = Trixi.get_node_vars(Gv, equations, dg, i, j)
+      Ga_node = get_node_vars(Ga, equations, dg, i, j)
+      Gv_node = get_node_vars(Gv, equations, dg, i, j)
 
       G = Ga_node - Gv_node
       for ii in eachnode(dg)
          # res              += -lam * D * F for each variable
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-         Trixi.multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F, equations, dg, ii, j, element)
+         multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F, equations, dg, ii, j, element)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G, equations, dg, i, jj, element)
+         multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G, equations, dg, i, jj, element)
       end
 
-      u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+      u_node = get_node_vars(u, equations, dg, i, j, element)
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       sttt = calc_source_ttt_N34(u_node, up_node, um_node, upp_node, umm_node,
          x, t, dt, source_terms,
          equations, dg, cache)
-      Trixi.multiply_add_to_node_vars!(S, 1.0 / 24.0, sttt, equations, dg, i, j)
+      multiply_add_to_node_vars!(S, 1.0 / 24.0, sttt, equations, dg, i, j)
 
       # TODO - update to v1.8 and call with @inline
       # Give u1_ or U depending on dissipation model
-      U_node = Trixi.get_node_vars(U, equations, dg, i, j)
+      U_node = get_node_vars(U, equations, dg, i, j)
 
       # Ub = UT * V
       # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
-      Trixi.set_node_vars!(cache.U, U_node, equations, dg, i, j, element)
+      set_node_vars!(cache.U, U_node, equations, dg, i, j, element)
 
-      Trixi.set_node_vars!(cache.F, Fa_node, equations, dg, 1, i, j, element)
-      Trixi.set_node_vars!(cache_parabolic.Fv, Fv_node, equations, dg, 1, i, j, element)
+      set_node_vars!(cache.F, Fa_node, equations, dg, 1, i, j, element)
+      set_node_vars!(cache_parabolic.Fv, Fv_node, equations, dg, 1, i, j, element)
 
-      Trixi.set_node_vars!(cache.F, Ga_node, equations, dg, 2, i, j, element)
-      Trixi.set_node_vars!(cache_parabolic.Fv, Gv_node, equations, dg, 2, i, j, element)
+      set_node_vars!(cache.F, Ga_node, equations, dg, 2, i, j, element)
+      set_node_vars!(cache_parabolic.Fv, Gv_node, equations, dg, 2, i, j, element)
 
-      S_node = Trixi.get_node_vars(S, equations, dg, i, j)
+      S_node = get_node_vars(S, equations, dg, i, j)
       # inv_jacobian = inverse_jacobian[i, j, element]
-      Trixi.multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg,
+      multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg,
          i, j, element)
    end
 
@@ -1191,7 +1193,7 @@ end
 function weak_form_kernel_4!(
    du, flux_viscous, gradients, u_transformed, u, t, dt,
    tolerances, mesh::TreeMesh{2},
-   have_nonconservative_terms, source_terms,
+   have_nonconservative_terms::False, source_terms,
    equations, equations_parabolic::AbstractEquationsParabolic,
    volume_integral::VolumeIntegralFR, time_discretization::AbstractLWTimeDiscretization,
    dg::DGSEM, cache, cache_parabolic, element)
@@ -1221,58 +1223,58 @@ function weak_form_kernel_4!(
    # Calculate volume terms in one element
 
    for j in eachnode(dg), i in eachnode(dg)
-      u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+      u_node = get_node_vars(u, equations, dg, i, j, element)
 
       flux_adv_1, flux_adv_2 = fluxes(u_node, equations)
-      flux_visc_1 = Trixi.get_node_vars(flux_viscous_x, equations_parabolic, dg, i, j, element)
-      flux_visc_2 = Trixi.get_node_vars(flux_viscous_y, equations_parabolic, dg, i, j, element)
+      flux_visc_1 = get_node_vars(flux_viscous_x, equations_parabolic, dg, i, j, element)
+      flux_visc_2 = get_node_vars(flux_viscous_y, equations_parabolic, dg, i, j, element)
       flux1 = flux_adv_1 - flux_visc_1
       flux2 = flux_adv_2 - flux_visc_2
 
       for ii in eachnode(dg)
          # ut              += -lam * D * f for each variable
          # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-         Trixi.multiply_add_to_node_vars!(ut, -dt * derivative_matrix[ii, i], flux1, equations, dg, ii, j)
+         multiply_add_to_node_vars!(ut, -dt * derivative_matrix[ii, i], flux1, equations, dg, ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(ut, -dt * derivative_matrix[jj, j], flux2, equations, dg, i, jj)
+         multiply_add_to_node_vars!(ut, -dt * derivative_matrix[jj, j], flux2, equations, dg, i, jj)
       end
 
-      Trixi.set_node_vars!(fa, flux_adv_1, equations, dg, i, j)
-      Trixi.set_node_vars!(ga, flux_adv_2, equations, dg, i, j)
+      set_node_vars!(fa, flux_adv_1, equations, dg, i, j)
+      set_node_vars!(ga, flux_adv_2, equations, dg, i, j)
 
-      Trixi.set_node_vars!(fv, flux_visc_1, equations, dg, i, j)
-      Trixi.set_node_vars!(gv, flux_visc_2, equations, dg, i, j)
+      set_node_vars!(fv, flux_visc_1, equations, dg, i, j)
+      set_node_vars!(gv, flux_visc_2, equations, dg, i, j)
 
-      Trixi.set_node_vars!(Fa, flux_adv_1, equations, dg, i, j)
-      Trixi.set_node_vars!(Ga, flux_adv_2, equations, dg, i, j)
-      Trixi.set_node_vars!(Fv, flux_visc_1, equations, dg, i, j)
-      Trixi.set_node_vars!(Gv, flux_visc_2, equations, dg, i, j)
+      set_node_vars!(Fa, flux_adv_1, equations, dg, i, j)
+      set_node_vars!(Ga, flux_adv_2, equations, dg, i, j)
+      set_node_vars!(Fv, flux_visc_1, equations, dg, i, j)
+      set_node_vars!(Gv, flux_visc_2, equations, dg, i, j)
 
-      Trixi.set_node_vars!(u_np1, u_node, equations, dg, i, j)
-      Trixi.set_node_vars!(u_np1_low, u_node, equations, dg, i, j)
+      set_node_vars!(u_np1, u_node, equations, dg, i, j)
+      set_node_vars!(u_np1_low, u_node, equations, dg, i, j)
 
-      Trixi.set_node_vars!(um, u_node, equations, dg, i, j)
-      Trixi.set_node_vars!(up, u_node, equations, dg, i, j)
-      Trixi.set_node_vars!(umm, u_node, equations, dg, i, j)
-      Trixi.set_node_vars!(upp, u_node, equations, dg, i, j)
+      set_node_vars!(um, u_node, equations, dg, i, j)
+      set_node_vars!(up, u_node, equations, dg, i, j)
+      set_node_vars!(umm, u_node, equations, dg, i, j)
+      set_node_vars!(upp, u_node, equations, dg, i, j)
 
-      ux_node = Trixi.get_node_vars(gradients_x, equations, dg, i, j, element)
-      Trixi.set_node_vars!(upx, ux_node, equations, dg, i, j)
-      Trixi.set_node_vars!(umx, ux_node, equations, dg, i, j)
-      Trixi.set_node_vars!(uppx, ux_node, equations, dg, i, j)
-      Trixi.set_node_vars!(ummx, ux_node, equations, dg, i, j)
+      ux_node = get_node_vars(gradients_x, equations, dg, i, j, element)
+      set_node_vars!(upx, ux_node, equations, dg, i, j)
+      set_node_vars!(umx, ux_node, equations, dg, i, j)
+      set_node_vars!(uppx, ux_node, equations, dg, i, j)
+      set_node_vars!(ummx, ux_node, equations, dg, i, j)
 
-      uy_node = Trixi.get_node_vars(gradients_y, equations, dg, i, j, element)
-      Trixi.set_node_vars!(upy, uy_node, equations, dg, i, j)
-      Trixi.set_node_vars!(umy, uy_node, equations, dg, i, j)
-      Trixi.set_node_vars!(uppy, uy_node, equations, dg, i, j)
-      Trixi.set_node_vars!(ummy, uy_node, equations, dg, i, j)
+      uy_node = get_node_vars(gradients_y, equations, dg, i, j, element)
+      set_node_vars!(upy, uy_node, equations, dg, i, j)
+      set_node_vars!(umy, uy_node, equations, dg, i, j)
+      set_node_vars!(uppy, uy_node, equations, dg, i, j)
+      set_node_vars!(ummy, uy_node, equations, dg, i, j)
 
-      Trixi.set_node_vars!(U, u_node, equations, dg, i, j)
+      set_node_vars!(U, u_node, equations, dg, i, j)
    end
 
    # Scale ut
@@ -1287,27 +1289,27 @@ function weak_form_kernel_4!(
    for j in eachnode(dg), i in eachnode(dg)
       # Add source term contribution to ut
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
-      u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+      u_node = get_node_vars(u, equations, dg, i, j, element)
       s_node = calc_source(u_node, x, t, source_terms, equations, dg, cache)
-      Trixi.set_node_vars!(S, s_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(ut, dt, s_node, equations, dg, i, j) # has no jacobian factor
+      set_node_vars!(S, s_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(ut, dt, s_node, equations, dg, i, j) # has no jacobian factor
    end
 
    # Compute ∇u_t
    for j in eachnode(dg), i in eachnode(dg)
-      ut_node = Trixi.get_node_vars(ut, equations, dg, i, j)
+      ut_node = get_node_vars(ut, equations, dg, i, j)
 
       for ii in eachnode(dg)
          # ut              += -lam * D * f for each variable
          # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-         Trixi.multiply_add_to_node_vars!(utx, derivative_matrix[ii, i], ut_node, equations, dg,
+         multiply_add_to_node_vars!(utx, derivative_matrix[ii, i], ut_node, equations, dg,
             ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(uty, derivative_matrix[jj, j], ut_node, equations, dg,
+         multiply_add_to_node_vars!(uty, derivative_matrix[jj, j], ut_node, equations, dg,
             i, jj)
       end
    end
@@ -1322,39 +1324,39 @@ function weak_form_kernel_4!(
    end
 
    for j in eachnode(dg), i in eachnode(dg)
-      ut_node  = Trixi.get_node_vars(ut,  equations, dg, i, j)
-      utx_node = Trixi.get_node_vars(utx, equations, dg, i, j)
-      uty_node = Trixi.get_node_vars(uty, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(U, 0.5, ut_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(up, 1.0, ut_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(um, -1.0, ut_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umm, -2.0, ut_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(upp, 2.0, ut_node, equations, dg, i, j)
+      ut_node  = get_node_vars(ut,  equations, dg, i, j)
+      utx_node = get_node_vars(utx, equations, dg, i, j)
+      uty_node = get_node_vars(uty, equations, dg, i, j)
+      multiply_add_to_node_vars!(U, 0.5, ut_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(up, 1.0, ut_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(um, -1.0, ut_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umm, -2.0, ut_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upp, 2.0, ut_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(upx, 1.0, utx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umx, -1.0, utx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(upy, 1.0, uty_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umy, -1.0, uty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upx, 1.0, utx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umx, -1.0, utx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upy, 1.0, uty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umy, -1.0, uty_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(ummx, -2.0, utx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(uppx, 2.0, utx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(ummy, -2.0, uty_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(uppy, 2.0, uty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(ummx, -2.0, utx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(uppx, 2.0, utx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(ummy, -2.0, uty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(uppy, 2.0, uty_node, equations, dg, i, j)
 
-      um_node = Trixi.get_node_vars(um, equations, dg, i, j)
-      up_node = Trixi.get_node_vars(up, equations, dg, i, j)
-      umm_node = Trixi.get_node_vars(umm, equations, dg, i, j)
-      upp_node = Trixi.get_node_vars(upp, equations, dg, i, j)
+      um_node = get_node_vars(um, equations, dg, i, j)
+      up_node = get_node_vars(up, equations, dg, i, j)
+      umm_node = get_node_vars(umm, equations, dg, i, j)
+      upp_node = get_node_vars(upp, equations, dg, i, j)
 
-      umx_node = Trixi.get_node_vars(umx, equations, dg, i, j)
-      upx_node = Trixi.get_node_vars(upx, equations, dg, i, j)
-      umy_node = Trixi.get_node_vars(umy, equations, dg, i, j)
-      upy_node = Trixi.get_node_vars(upy, equations, dg, i, j)
+      umx_node = get_node_vars(umx, equations, dg, i, j)
+      upx_node = get_node_vars(upx, equations, dg, i, j)
+      umy_node = get_node_vars(umy, equations, dg, i, j)
+      upy_node = get_node_vars(upy, equations, dg, i, j)
 
-      ummx_node = Trixi.get_node_vars(ummx, equations, dg, i, j)
-      uppx_node = Trixi.get_node_vars(uppx, equations, dg, i, j)
-      ummy_node = Trixi.get_node_vars(ummy, equations, dg, i, j)
-      uppy_node = Trixi.get_node_vars(uppy, equations, dg, i, j)
+      ummx_node = get_node_vars(ummx, equations, dg, i, j)
+      uppx_node = get_node_vars(uppx, equations, dg, i, j)
+      ummy_node = get_node_vars(ummy, equations, dg, i, j)
+      uppy_node = get_node_vars(uppy, equations, dg, i, j)
 
       (fma, gma), (fmv, gmv) = fluxes(um_node, (umx_node, umy_node), equations, equations_parabolic)
       (fpa, gpa), (fpv, gpv) = fluxes(up_node, (upx_node, upy_node), equations, equations_parabolic)
@@ -1363,14 +1365,14 @@ function weak_form_kernel_4!(
       (fppa, gppa), (fppv, gppv) = fluxes(upp_node, (uppx_node, uppy_node), equations, equations_parabolic)
 
       fta = 1.0 / 12.0 * (-fppa + 8.0 * fpa - 8.0 * fma + fmma)
-      Trixi.multiply_add_to_node_vars!(Fa, 0.5, fta, equations, dg, i, j)
+      multiply_add_to_node_vars!(Fa, 0.5, fta, equations, dg, i, j)
       gta = 1.0 / 12.0 * (-gppa + 8.0 * gpa - 8.0 * gma + gmma)
-      Trixi.multiply_add_to_node_vars!(Ga, 0.5, gta, equations, dg, i, j)
+      multiply_add_to_node_vars!(Ga, 0.5, gta, equations, dg, i, j)
 
       ftv = 1.0 / 12.0 * (-fppv + 8.0 * fpv - 8.0 * fmv + fmmv)
-      Trixi.multiply_add_to_node_vars!(Fv, 0.5, ftv, equations, dg, i, j)
+      multiply_add_to_node_vars!(Fv, 0.5, ftv, equations, dg, i, j)
       gtv = 1.0 / 12.0 * (-gppv + 8.0 * gpv - 8.0 * gmv + gmmv)
-      Trixi.multiply_add_to_node_vars!(Gv, 0.5, gtv, equations, dg, i, j)
+      multiply_add_to_node_vars!(Gv, 0.5, gtv, equations, dg, i, j)
 
       ft = fta - ftv
       gt = gta - gtv
@@ -1378,14 +1380,14 @@ function weak_form_kernel_4!(
       for ii in eachnode(dg)
          # res              += -lam * D * F for each variable
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-         Trixi.multiply_add_to_node_vars!(utt, derivative_matrix[ii, i], ft, equations,
+         multiply_add_to_node_vars!(utt, derivative_matrix[ii, i], ft, equations,
             dg, ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(utt, derivative_matrix[jj, j], gt, equations,
+         multiply_add_to_node_vars!(utt, derivative_matrix[jj, j], gt, equations,
             dg, i, jj)
       end
    end
@@ -1401,30 +1403,30 @@ function weak_form_kernel_4!(
    # Add source term contribution to utt and some to S
    for j in eachnode(dg), i in eachnode(dg)
       # Add source term contribution to ut
-      um_node = Trixi.get_node_vars(um, equations, dg, i, j)
-      up_node = Trixi.get_node_vars(up, equations, dg, i, j)
+      um_node = get_node_vars(um, equations, dg, i, j)
+      up_node = get_node_vars(up, equations, dg, i, j)
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       st = calc_source_t_N12(up_node, um_node, x, t, dt, source_terms,
          equations, dg, cache)
-      Trixi.multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(utt, dt, st, equations, dg, i, j) # has no jacobian factor
+      multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
+      multiply_add_to_node_vars!(utt, dt, st, equations, dg, i, j) # has no jacobian factor
    end
 
    # Compute ∇u_tt
    for j in eachnode(dg), i in eachnode(dg)
-      utt_node = Trixi.get_node_vars(utt, equations, dg, i, j)
+      utt_node = get_node_vars(utt, equations, dg, i, j)
 
       for ii in eachnode(dg)
          # ut              += -lam * D * f for each variable
          # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-         Trixi.multiply_add_to_node_vars!(uttx, derivative_matrix[ii, i], utt_node, equations, dg,
+         multiply_add_to_node_vars!(uttx, derivative_matrix[ii, i], utt_node, equations, dg,
             ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(utty, derivative_matrix[jj, j], utt_node, equations, dg,
+         multiply_add_to_node_vars!(utty, derivative_matrix[jj, j], utt_node, equations, dg,
             i, jj)
       end
    end
@@ -1439,47 +1441,47 @@ function weak_form_kernel_4!(
    end
 
    for j in eachnode(dg), i in eachnode(dg)
-      utt_node = Trixi.get_node_vars(utt, equations, dg, i, j)
-      uttx_node = Trixi.get_node_vars(uttx, equations, dg, i, j)
-      utty_node = Trixi.get_node_vars(utty, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(U, 1.0 / 6.0, utt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(up, 0.5, utt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(um, 0.5, utt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(upp, 2.0, utt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umm, 2.0, utt_node, equations, dg, i, j)
+      utt_node = get_node_vars(utt, equations, dg, i, j)
+      uttx_node = get_node_vars(uttx, equations, dg, i, j)
+      utty_node = get_node_vars(utty, equations, dg, i, j)
+      multiply_add_to_node_vars!(U, 1.0 / 6.0, utt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(up, 0.5, utt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(um, 0.5, utt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upp, 2.0, utt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umm, 2.0, utt_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(upx, 0.5, uttx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umx, 0.5, uttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upx, 0.5, uttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umx, 0.5, uttx_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(upy, 0.5, utty_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umy, 0.5, utty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upy, 0.5, utty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umy, 0.5, utty_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(uppx, 2.0, uttx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(ummx, 2.0, uttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(uppx, 2.0, uttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(ummx, 2.0, uttx_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(uppy, 2.0, utty_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(ummy, 2.0, utty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(uppy, 2.0, utty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(ummy, 2.0, utty_node, equations, dg, i, j)
 
-      fa_node = Trixi.get_node_vars(fa, equations, dg, i, j)
-      ga_node = Trixi.get_node_vars(ga, equations, dg, i, j)
-      fv_node = Trixi.get_node_vars(fv, equations, dg, i, j)
-      gv_node = Trixi.get_node_vars(gv, equations, dg, i, j)
-      u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+      fa_node = get_node_vars(fa, equations, dg, i, j)
+      ga_node = get_node_vars(ga, equations, dg, i, j)
+      fv_node = get_node_vars(fv, equations, dg, i, j)
+      gv_node = get_node_vars(gv, equations, dg, i, j)
+      u_node = get_node_vars(u, equations, dg, i, j, element)
 
-      um_node = Trixi.get_node_vars(um, equations, dg, i, j)
-      up_node = Trixi.get_node_vars(up, equations, dg, i, j)
-      umm_node = Trixi.get_node_vars(umm, equations, dg, i, j)
-      upp_node = Trixi.get_node_vars(upp, equations, dg, i, j)
+      um_node = get_node_vars(um, equations, dg, i, j)
+      up_node = get_node_vars(up, equations, dg, i, j)
+      umm_node = get_node_vars(umm, equations, dg, i, j)
+      upp_node = get_node_vars(upp, equations, dg, i, j)
 
-      umx_node = Trixi.get_node_vars(umx, equations, dg, i, j)
-      upx_node = Trixi.get_node_vars(upx, equations, dg, i, j)
-      umy_node = Trixi.get_node_vars(umy, equations, dg, i, j)
-      upy_node = Trixi.get_node_vars(upy, equations, dg, i, j)
+      umx_node = get_node_vars(umx, equations, dg, i, j)
+      upx_node = get_node_vars(upx, equations, dg, i, j)
+      umy_node = get_node_vars(umy, equations, dg, i, j)
+      upy_node = get_node_vars(upy, equations, dg, i, j)
 
-      ummx_node = Trixi.get_node_vars(ummx, equations, dg, i, j)
-      uppx_node = Trixi.get_node_vars(uppx, equations, dg, i, j)
-      ummy_node = Trixi.get_node_vars(ummy, equations, dg, i, j)
-      uppy_node = Trixi.get_node_vars(uppy, equations, dg, i, j)
+      ummx_node = get_node_vars(ummx, equations, dg, i, j)
+      uppx_node = get_node_vars(uppx, equations, dg, i, j)
+      ummy_node = get_node_vars(ummy, equations, dg, i, j)
+      uppy_node = get_node_vars(uppy, equations, dg, i, j)
 
       (fma, gma), (fmv, gmv) = fluxes(um_node, (umx_node, umy_node), equations, equations_parabolic)
       (fpa, gpa), (fpv, gpv) = fluxes(up_node, (upx_node, upy_node), equations, equations_parabolic)
@@ -1493,11 +1495,11 @@ function weak_form_kernel_4!(
       gtta = (1.0 / 12.0) * (-gppa + 16.0 * gpa - 30.0 * ga_node + 16.0 * gma - gmma)
       gttv = (1.0 / 12.0) * (-gppv + 16.0 * gpv - 30.0 * gv_node + 16.0 * gmv - gmmv)
 
-      Trixi.multiply_add_to_node_vars!(Fa, 1.0 / 6.0, ftta, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(Fv, 1.0 / 6.0, fttv, equations, dg, i, j)
+      multiply_add_to_node_vars!(Fa, 1.0 / 6.0, ftta, equations, dg, i, j)
+      multiply_add_to_node_vars!(Fv, 1.0 / 6.0, fttv, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(Ga, 1.0 / 6.0, gtta, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(Gv, 1.0 / 6.0, gttv, equations, dg, i, j)
+      multiply_add_to_node_vars!(Ga, 1.0 / 6.0, gtta, equations, dg, i, j)
+      multiply_add_to_node_vars!(Gv, 1.0 / 6.0, gttv, equations, dg, i, j)
 
       ftt = ftta - fttv
       gtt = gtta - gttv
@@ -1505,14 +1507,14 @@ function weak_form_kernel_4!(
       for ii in eachnode(dg)
          # res              += -lam * D * F for each variable
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-         Trixi.multiply_add_to_node_vars!(uttt, -dt * derivative_matrix[ii, i], ftt, equations,
+         multiply_add_to_node_vars!(uttt, -dt * derivative_matrix[ii, i], ftt, equations,
             dg, ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(uttt, -dt * derivative_matrix[jj, j], gtt, equations,
+         multiply_add_to_node_vars!(uttt, -dt * derivative_matrix[jj, j], gtt, equations,
             dg, i, jj)
       end
    end
@@ -1528,31 +1530,31 @@ function weak_form_kernel_4!(
    # Add source term contribution to uttt and some to S
    for j in eachnode(dg), i in eachnode(dg)
       # Add source term contribution to ut
-      u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
-      um_node = Trixi.get_node_vars(um, equations, dg, i, j)
-      up_node = Trixi.get_node_vars(up, equations, dg, i, j)
+      u_node = get_node_vars(u, equations, dg, i, j, element)
+      um_node = get_node_vars(um, equations, dg, i, j)
+      up_node = get_node_vars(up, equations, dg, i, j)
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       stt = calc_source_tt_N23(u_node, up_node, um_node, x, t, dt, source_terms,
          equations, dg, cache)
-      Trixi.multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(uttt, dt, stt, equations, dg, i, j) # has no jacobian factor
+      multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, equations, dg, i, j)
+      multiply_add_to_node_vars!(uttt, dt, stt, equations, dg, i, j) # has no jacobian factor
    end
 
    # Compute ∇u_ttt
    for j in eachnode(dg), i in eachnode(dg)
-      uttt_node = Trixi.get_node_vars(uttt, equations, dg, i, j)
+      uttt_node = get_node_vars(uttt, equations, dg, i, j)
 
       for ii in eachnode(dg)
          # ut              += -lam * D * f for each variable
          # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-         Trixi.multiply_add_to_node_vars!(utttx, derivative_matrix[ii, i], uttt_node, equations, dg,
+         multiply_add_to_node_vars!(utttx, derivative_matrix[ii, i], uttt_node, equations, dg,
             ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(uttty, derivative_matrix[jj, j], uttt_node, equations, dg,
+         multiply_add_to_node_vars!(uttty, derivative_matrix[jj, j], uttt_node, equations, dg,
             i, jj)
       end
    end
@@ -1567,39 +1569,39 @@ function weak_form_kernel_4!(
    end
 
    for j in eachnode(dg), i in eachnode(dg)
-      uttt_node = Trixi.get_node_vars(uttt, equations, dg, i, j)
-      utttx_node = Trixi.get_node_vars(utttx, equations, dg, i, j)
-      uttty_node = Trixi.get_node_vars(uttty, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(U, 1.0 / 24.0, uttt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(um, -1.0 / 6.0, uttt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(up, 1.0 / 6.0, uttt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umm, -4.0 / 3.0, uttt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(upp, 4.0 / 3.0, uttt_node, equations, dg, i, j)
+      uttt_node = get_node_vars(uttt, equations, dg, i, j)
+      utttx_node = get_node_vars(utttx, equations, dg, i, j)
+      uttty_node = get_node_vars(uttty, equations, dg, i, j)
+      multiply_add_to_node_vars!(U, 1.0 / 24.0, uttt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(um, -1.0 / 6.0, uttt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(up, 1.0 / 6.0, uttt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umm, -4.0 / 3.0, uttt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upp, 4.0 / 3.0, uttt_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(umx, -1.0 / 6.0, utttx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(upx, 1.0 / 6.0, utttx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(ummx, -4.0 / 3.0, utttx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(uppx, 4.0 / 3.0, utttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umx, -1.0 / 6.0, utttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upx, 1.0 / 6.0, utttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(ummx, -4.0 / 3.0, utttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(uppx, 4.0 / 3.0, utttx_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(umy, -1.0 / 6.0, uttty_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(upy, 1.0 / 6.0, uttty_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(ummy, -4.0 / 3.0, uttty_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(uppy, 4.0 / 3.0, uttty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umy, -1.0 / 6.0, uttty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upy, 1.0 / 6.0, uttty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(ummy, -4.0 / 3.0, uttty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(uppy, 4.0 / 3.0, uttty_node, equations, dg, i, j)
 
-      um_node = Trixi.get_node_vars(um, equations, dg, i, j)
-      up_node = Trixi.get_node_vars(up, equations, dg, i, j)
-      umm_node = Trixi.get_node_vars(umm, equations, dg, i, j)
-      upp_node = Trixi.get_node_vars(upp, equations, dg, i, j)
+      um_node = get_node_vars(um, equations, dg, i, j)
+      up_node = get_node_vars(up, equations, dg, i, j)
+      umm_node = get_node_vars(umm, equations, dg, i, j)
+      upp_node = get_node_vars(upp, equations, dg, i, j)
 
-      umx_node = Trixi.get_node_vars(umx, equations, dg, i, j)
-      upx_node = Trixi.get_node_vars(upx, equations, dg, i, j)
-      ummx_node = Trixi.get_node_vars(ummx, equations, dg, i, j)
-      uppx_node = Trixi.get_node_vars(uppx, equations, dg, i, j)
+      umx_node = get_node_vars(umx, equations, dg, i, j)
+      upx_node = get_node_vars(upx, equations, dg, i, j)
+      ummx_node = get_node_vars(ummx, equations, dg, i, j)
+      uppx_node = get_node_vars(uppx, equations, dg, i, j)
 
-      umy_node = Trixi.get_node_vars(umy, equations, dg, i, j)
-      upy_node = Trixi.get_node_vars(upy, equations, dg, i, j)
-      ummy_node = Trixi.get_node_vars(ummy, equations, dg, i, j)
-      uppy_node = Trixi.get_node_vars(uppy, equations, dg, i, j)
+      umy_node = get_node_vars(umy, equations, dg, i, j)
+      upy_node = get_node_vars(upy, equations, dg, i, j)
+      ummy_node = get_node_vars(ummy, equations, dg, i, j)
+      uppy_node = get_node_vars(uppy, equations, dg, i, j)
 
       (fma, gma), (fmv, gmv) = fluxes(um_node, (umx_node, umy_node), equations, equations_parabolic)
       (fpa, gpa), (fpv, gpv) = fluxes(up_node, (upx_node, upy_node), equations, equations_parabolic)
@@ -1608,27 +1610,27 @@ function weak_form_kernel_4!(
       (fppa, gppa), (fppv, gppv) = fluxes(upp_node, (uppx_node, uppy_node), equations, equations_parabolic)
 
       fttta = 0.5 * (fppa - 2.0 * fpa + 2.0 * fma - fmma)
-      Trixi.multiply_add_to_node_vars!(Fa, 1.0 / 24.0, fttta, equations, dg, i, j)
+      multiply_add_to_node_vars!(Fa, 1.0 / 24.0, fttta, equations, dg, i, j)
       ftttv = 0.5 * (fppv - 2.0 * fpv + 2.0 * fmv - fmmv)
-      Trixi.multiply_add_to_node_vars!(Fv, 1.0 / 24.0, ftttv, equations, dg, i, j)
+      multiply_add_to_node_vars!(Fv, 1.0 / 24.0, ftttv, equations, dg, i, j)
       fttt = fttta - ftttv
 
       gttta = 0.5 * (gppa - 2.0 * gpa + 2.0 * gma - gmma)
-      Trixi.multiply_add_to_node_vars!(Ga, 1.0 / 24.0, gttta, equations, dg, i, j)
+      multiply_add_to_node_vars!(Ga, 1.0 / 24.0, gttta, equations, dg, i, j)
       gtttv = 0.5 * (gppv - 2.0 * gpv + 2.0 * gmv - gmmv)
-      Trixi.multiply_add_to_node_vars!(Gv, 1.0 / 24.0, gtttv, equations, dg, i, j)
+      multiply_add_to_node_vars!(Gv, 1.0 / 24.0, gtttv, equations, dg, i, j)
       gttt = gttta - gtttv
 
       for ii in eachnode(dg)
          # res              += -lam * D * F for each variable
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-         Trixi.multiply_add_to_node_vars!(utttt, -dt * derivative_matrix[ii, i], fttt, equations, dg, ii, j)
+         multiply_add_to_node_vars!(utttt, -dt * derivative_matrix[ii, i], fttt, equations, dg, ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(utttt, -dt * derivative_matrix[jj, j], gttt, equations, dg, i, jj)
+         multiply_add_to_node_vars!(utttt, -dt * derivative_matrix[jj, j], gttt, equations, dg, i, jj)
       end
    end
 
@@ -1643,34 +1645,34 @@ function weak_form_kernel_4!(
    # Add source term contribution to utttt and some to S
    for j in eachnode(dg), i in eachnode(dg)
       # Add source term contribution to ut
-      u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
-      um_node = Trixi.get_node_vars(um, equations, dg, i, j)
-      umm_node = Trixi.get_node_vars(umm, equations, dg, i, j)
-      up_node = Trixi.get_node_vars(up, equations, dg, i, j)
-      upp_node = Trixi.get_node_vars(upp, equations, dg, i, j)
+      u_node = get_node_vars(u, equations, dg, i, j, element)
+      um_node = get_node_vars(um, equations, dg, i, j)
+      umm_node = get_node_vars(umm, equations, dg, i, j)
+      up_node = get_node_vars(up, equations, dg, i, j)
+      upp_node = get_node_vars(upp, equations, dg, i, j)
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       sttt = calc_source_ttt_N34(u_node, up_node, upp_node, um_node, umm_node,
          x, t, dt, source_terms,
          equations, dg, cache)
-      Trixi.multiply_add_to_node_vars!(S, 1.0 / 24.0, sttt, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(utttt, dt, sttt, equations, dg, i, j) # has no jacobian factor
+      multiply_add_to_node_vars!(S, 1.0 / 24.0, sttt, equations, dg, i, j)
+      multiply_add_to_node_vars!(utttt, dt, sttt, equations, dg, i, j) # has no jacobian factor
    end
 
    # Compute ∇u_tttt
    for j in eachnode(dg), i in eachnode(dg)
-      utttt_node = Trixi.get_node_vars(utttt, equations, dg, i, j)
+      utttt_node = get_node_vars(utttt, equations, dg, i, j)
 
       for ii in eachnode(dg)
          # ut              += -lam * D * f for each variable
          # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-         Trixi.multiply_add_to_node_vars!(uttttx, derivative_matrix[ii, i], utttt_node, equations, dg,
+         multiply_add_to_node_vars!(uttttx, derivative_matrix[ii, i], utttt_node, equations, dg,
             ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(utttty, derivative_matrix[jj, j], utttt_node, equations, dg,
+         multiply_add_to_node_vars!(utttty, derivative_matrix[jj, j], utttt_node, equations, dg,
             i, jj)
       end
    end
@@ -1685,50 +1687,50 @@ function weak_form_kernel_4!(
    end
 
    for j in eachnode(dg), i in eachnode(dg)
-      utttt_node = Trixi.get_node_vars(utttt, equations, dg, i, j)
-      uttttx_node = Trixi.get_node_vars(uttttx, equations, dg, i, j)
-      utttty_node = Trixi.get_node_vars(utttty, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(U, 1.0 / 120.0, utttt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(um, 1.0 / 24.0, utttt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(up, 1.0 / 24.0, utttt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(umm, 2.0 / 3.0, utttt_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(upp, 2.0 / 3.0, utttt_node, equations, dg, i, j)
+      utttt_node = get_node_vars(utttt, equations, dg, i, j)
+      uttttx_node = get_node_vars(uttttx, equations, dg, i, j)
+      utttty_node = get_node_vars(utttty, equations, dg, i, j)
+      multiply_add_to_node_vars!(U, 1.0 / 120.0, utttt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(um, 1.0 / 24.0, utttt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(up, 1.0 / 24.0, utttt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umm, 2.0 / 3.0, utttt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upp, 2.0 / 3.0, utttt_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(umx, 1.0 / 24.0, uttttx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(upx, 1.0 / 24.0, uttttx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(ummx, 2.0 / 3.0, uttttx_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(uppx, 2.0 / 3.0, uttttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umx, 1.0 / 24.0, uttttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upx, 1.0 / 24.0, uttttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(ummx, 2.0 / 3.0, uttttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(uppx, 2.0 / 3.0, uttttx_node, equations, dg, i, j)
 
-      Trixi.multiply_add_to_node_vars!(umy, 1.0 / 24.0, utttty_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(upy, 1.0 / 24.0, utttty_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(ummy, 2.0 / 3.0, utttty_node, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(uppy, 2.0 / 3.0, utttty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umy, 1.0 / 24.0, utttty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upy, 1.0 / 24.0, utttty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(ummy, 2.0 / 3.0, utttty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(uppy, 2.0 / 3.0, utttty_node, equations, dg, i, j)
 
-      fa_node = Trixi.get_node_vars(fa, equations, dg, i, j)
-      fv_node = Trixi.get_node_vars(fv, equations, dg, i, j)
+      fa_node = get_node_vars(fa, equations, dg, i, j)
+      fv_node = get_node_vars(fv, equations, dg, i, j)
 
-      ga_node = Trixi.get_node_vars(ga, equations, dg, i, j)
-      gv_node = Trixi.get_node_vars(gv, equations, dg, i, j)
+      ga_node = get_node_vars(ga, equations, dg, i, j)
+      gv_node = get_node_vars(gv, equations, dg, i, j)
 
-      um_node = Trixi.get_node_vars(um, equations, dg, i, j)
-      up_node = Trixi.get_node_vars(up, equations, dg, i, j)
-      umm_node = Trixi.get_node_vars(umm, equations, dg, i, j)
-      upp_node = Trixi.get_node_vars(upp, equations, dg, i, j)
+      um_node = get_node_vars(um, equations, dg, i, j)
+      up_node = get_node_vars(up, equations, dg, i, j)
+      umm_node = get_node_vars(umm, equations, dg, i, j)
+      upp_node = get_node_vars(upp, equations, dg, i, j)
 
-      um_node = Trixi.get_node_vars(um, equations, dg, i, j)
-      up_node = Trixi.get_node_vars(up, equations, dg, i, j)
-      umm_node = Trixi.get_node_vars(umm, equations, dg, i, j)
-      upp_node = Trixi.get_node_vars(upp, equations, dg, i, j)
+      um_node = get_node_vars(um, equations, dg, i, j)
+      up_node = get_node_vars(up, equations, dg, i, j)
+      umm_node = get_node_vars(umm, equations, dg, i, j)
+      upp_node = get_node_vars(upp, equations, dg, i, j)
 
-      umx_node = Trixi.get_node_vars(umx, equations, dg, i, j)
-      upx_node = Trixi.get_node_vars(upx, equations, dg, i, j)
-      ummx_node = Trixi.get_node_vars(ummx, equations, dg, i, j)
-      uppx_node = Trixi.get_node_vars(uppx, equations, dg, i, j)
+      umx_node = get_node_vars(umx, equations, dg, i, j)
+      upx_node = get_node_vars(upx, equations, dg, i, j)
+      ummx_node = get_node_vars(ummx, equations, dg, i, j)
+      uppx_node = get_node_vars(uppx, equations, dg, i, j)
 
-      umy_node = Trixi.get_node_vars(umy, equations, dg, i, j)
-      upy_node = Trixi.get_node_vars(upy, equations, dg, i, j)
-      ummy_node = Trixi.get_node_vars(ummy, equations, dg, i, j)
-      uppy_node = Trixi.get_node_vars(uppy, equations, dg, i, j)
+      umy_node = get_node_vars(umy, equations, dg, i, j)
+      upy_node = get_node_vars(upy, equations, dg, i, j)
+      ummy_node = get_node_vars(ummy, equations, dg, i, j)
+      uppy_node = get_node_vars(uppy, equations, dg, i, j)
 
       (fma, gma), (fmv, gmv) = fluxes(um_node, (umx_node, umy_node), equations, equations_parabolic)
       (fpa, gpa), (fpv, gpv) = fluxes(up_node, (upx_node, upy_node), equations, equations_parabolic)
@@ -1741,79 +1743,79 @@ function weak_form_kernel_4!(
 
       # UPDATING u_np1_low HERE!!!
 
-      Fa_node_ = Trixi.get_node_vars(Fa, equations, dg, i, j)
-      Fv_node_ = Trixi.get_node_vars(Fv, equations, dg, i, j)
+      Fa_node_ = get_node_vars(Fa, equations, dg, i, j)
+      Fv_node_ = get_node_vars(Fv, equations, dg, i, j)
 
       F_ = Fa_node_ - Fv_node_
 
-      Ga_node_ = Trixi.get_node_vars(Ga, equations, dg, i, j)
-      Gv_node_ = Trixi.get_node_vars(Gv, equations, dg, i, j)
+      Ga_node_ = get_node_vars(Ga, equations, dg, i, j)
+      Gv_node_ = get_node_vars(Gv, equations, dg, i, j)
 
       G_ = Ga_node_ - Gv_node_
 
       for ii in eachnode(dg)
          # res              += -lam * D * F for each variable
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-         Trixi.multiply_add_to_node_vars!(u_np1_low, -dt*inv_jacobian*derivative_matrix[ii, i],
+         multiply_add_to_node_vars!(u_np1_low, -dt*inv_jacobian*derivative_matrix[ii, i],
                                           F_, equations, dg, ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(u_np1_low, -dt*inv_jacobian*derivative_matrix[jj, j],
+         multiply_add_to_node_vars!(u_np1_low, -dt*inv_jacobian*derivative_matrix[jj, j],
                                           G_, equations, dg, i, jj)
       end
 
       # UPDATING u_np1_low ENDS!!!
 
 
-      Trixi.multiply_add_to_node_vars!(Fa, 1.0 / 120.0, ftttta, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(Fv, 1.0 / 120.0, fttttv, equations, dg, i, j)
+      multiply_add_to_node_vars!(Fa, 1.0 / 120.0, ftttta, equations, dg, i, j)
+      multiply_add_to_node_vars!(Fv, 1.0 / 120.0, fttttv, equations, dg, i, j)
 
       gtttta = 0.5 * (gppa - 4.0 * gpa + 6.0 * ga_node - 4.0 * gma + gmma)
       gttttv = 0.5 * (gppv - 4.0 * gpv + 6.0 * gv_node - 4.0 * gmv + gmmv)
-      Trixi.multiply_add_to_node_vars!(Ga, 1.0 / 120.0, gtttta, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(Gv, 1.0 / 120.0, gttttv, equations, dg, i, j)
+      multiply_add_to_node_vars!(Ga, 1.0 / 120.0, gtttta, equations, dg, i, j)
+      multiply_add_to_node_vars!(Gv, 1.0 / 120.0, gttttv, equations, dg, i, j)
 
-      Fa_node = Trixi.get_node_vars(Fa, equations, dg, i, j)
-      Fv_node = Trixi.get_node_vars(Fv, equations, dg, i, j)
+      Fa_node = get_node_vars(Fa, equations, dg, i, j)
+      Fv_node = get_node_vars(Fv, equations, dg, i, j)
 
       F = Fa_node - Fv_node
 
-      Ga_node = Trixi.get_node_vars(Ga, equations, dg, i, j)
-      Gv_node = Trixi.get_node_vars(Gv, equations, dg, i, j)
+      Ga_node = get_node_vars(Ga, equations, dg, i, j)
+      Gv_node = get_node_vars(Gv, equations, dg, i, j)
 
       G = Ga_node - Gv_node
 
       for ii in eachnode(dg)
          # res              += -lam * D * F for each variable
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-         Trixi.multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F, equations, dg, ii, j, element)
+         multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F, equations, dg, ii, j, element)
 
-         Trixi.multiply_add_to_node_vars!(u_np1, -dt*inv_jacobian*derivative_matrix[ii, i],
+         multiply_add_to_node_vars!(u_np1, -dt*inv_jacobian*derivative_matrix[ii, i],
                                           F, equations, dg, ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G, equations, dg, i, jj, element)
+         multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G, equations, dg, i, jj, element)
 
-         Trixi.multiply_add_to_node_vars!(u_np1, -dt*inv_jacobian*derivative_matrix[jj, j],
+         multiply_add_to_node_vars!(u_np1, -dt*inv_jacobian*derivative_matrix[jj, j],
                                           G, equations, dg, i, jj)
       end
 
-      u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+      u_node = get_node_vars(u, equations, dg, i, j, element)
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       stttt = calc_source_tttt_N4(u_node, up_node, um_node, upp_node, umm_node,
          x, t, dt, source_terms,
          equations, dg, cache)
-      Trixi.multiply_add_to_node_vars!(S, 1.0 / 120.0, stttt, equations, dg, i, j)
+      multiply_add_to_node_vars!(S, 1.0 / 120.0, stttt, equations, dg, i, j)
 
       # TODO - update to v1.8 and call with @inline
       # Give u1_ or U depending on dissipation model
-      U_node = Trixi.get_node_vars(U, equations, dg, i, j)
+      U_node = get_node_vars(U, equations, dg, i, j)
 
       set_node_vars!(cache.element_cache.F, Fa_node, equations, dg, 1, i, j, element)
       set_node_vars!(cache_parabolic.Fv, Fv_node, equations, dg, 1, i, j, element)
@@ -1823,9 +1825,9 @@ function weak_form_kernel_4!(
 
       set_node_vars!(element_cache.U, U_node, equations, dg, i, j, element)
 
-      S_node = Trixi.get_node_vars(S, equations, dg, i, j)
+      S_node = get_node_vars(S, equations, dg, i, j)
       # inv_jacobian = inverse_jacobian[i, j, element]
-      Trixi.multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg,
+      multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg,
          i, j, element)
    end
 
@@ -1833,9 +1835,9 @@ function weak_form_kernel_4!(
    @unpack abstol,  reltol = tolerances
    temporal_errors[element] = zero(dt)
    for j in eachnode(dg), i in eachnode(dg)
-      u_np1_node     = Trixi.get_node_vars(u_np1, equations, dg, i, j)
-      u_np1_low_node = Trixi.get_node_vars(u_np1_low, equations, dg, i, j)
-      u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+      u_np1_node     = get_node_vars(u_np1, equations, dg, i, j)
+      u_np1_low_node = get_node_vars(u_np1_low, equations, dg, i, j)
+      u_node = get_node_vars(u, equations, dg, i, j, element)
       for v in eachvariable(equations)
          temporal_errors[element] += (
             ( u_np1_node[v] - u_np1_low_node[v] )
@@ -2065,7 +2067,5 @@ function calc_boundary_flux_by_direction_divergence_lw!(surface_flux_values::Abs
 
    return nothing
 end
-
-
 
 end # muladd macro
