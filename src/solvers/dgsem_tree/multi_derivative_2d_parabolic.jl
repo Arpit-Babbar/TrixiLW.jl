@@ -430,18 +430,16 @@ end
 
       set_node_vars!(cache.element_cache.F, Fa_node, equations, dg, 1, i, j, element)
       set_node_vars!(cache_parabolic.Fv, Fv_node, equations, dg, 1, i, j, element)
-
-      Fa_node2 = get_node_vars(Fa2, equations, dg, i, j)
-      Fv_node2 = get_node_vars(Fv2, equations, dg, i, j)
-
-      set_node_vars!(mdrk_cache.F2, Fa_node2, equations, dg, 1, i, j, element)
-      set_node_vars!(cache_parabolic.mdrk_cache.Fv2, Fv_node2, equations, dg, 1, i, j, element)
-
       set_node_vars!(cache.element_cache.F, Ga_node, equations, dg, 2, i, j, element)
       set_node_vars!(cache_parabolic.Fv, Gv_node, equations, dg, 2, i, j, element)
 
+      Fa_node2 = get_node_vars(Fa2, equations, dg, i, j)
+      Fv_node2 = get_node_vars(Fv2, equations, dg, i, j)
       Ga_node2 = get_node_vars(Ga2, equations, dg, i, j)
       Gv_node2 = get_node_vars(Gv2, equations, dg, i, j)
+
+      set_node_vars!(mdrk_cache.F2, Fa_node2, equations, dg, 1, i, j, element)
+      set_node_vars!(cache_parabolic.mdrk_cache.Fv2, Fv_node2, equations, dg, 1, i, j, element)
       set_node_vars!(mdrk_cache.F2, Ga_node2, equations, dg, 2, i, j, element)
       set_node_vars!(cache_parabolic.mdrk_cache.Fv2, Gv_node2, equations, dg, 2, i, j, element)
 
