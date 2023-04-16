@@ -1533,9 +1533,9 @@ using LoopVectorization: @turbo
          # Add source term contribution to ust
          x = get_node_coords(node_coordinates, equations, dg, i, j, element)
          us_node = get_node_vars(us, equations, dg, i, j, element)
-         s_s_node = calc_source(us_node, x, t, source_terms, equations, dg, cache)
-         set_node_vars!(S, s_s_node, equations, dg, i, j)
-         multiply_add_to_node_vars!(ust, dt, s_s_node, equations, dg, i, j) # has no jacobian factor
+         s_node = calc_source(us_node, x, t, source_terms, equations, dg, cache)
+         set_node_vars!(S, s_node, equations, dg, i, j)
+         multiply_add_to_node_vars!(ust, dt, s_node, equations, dg, i, j) # has no jacobian factor
       end
 
       for j in eachnode(dg), i in eachnode(dg)
