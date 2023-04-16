@@ -13,16 +13,15 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
    # First stage
    @unpack _us = cache.element_cache.mdrk_cache
    # Compute du = u^{n+1/2}-0.5*dt*u^n
-   rhs!(du_ode, u, semi, integrator.t, dummy_tolerances, calc_volume_integral_mdrk1!)
+   rhs_mdrk1!(du_ode, u, semi, integrator.t, dummy_tolerances)
    update_soln!(integrator, _us, uprev, du_ode) # us = uprev + dt * du
    @unpack _u_low = cache.element_cache.mdrk_cache
    apply_limiters!(limiters, integrator)
 
 
    # Second stage
-   rhs!(du_ode, u, semi, integrator.t, dummy_tolerances,
-   calc_volume_integral_mdrk2!
-        )
+   # TODO - Just pass u* here!
+   rhs_mdrk2!(du_ode, u, semi, integrator.t, dummy_tolerances)
    update_soln!(integrator, u, uprev, du_ode) # u += dt * du
 
    set_t_and_iter!(integrator, dt)
