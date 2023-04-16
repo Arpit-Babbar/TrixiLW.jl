@@ -359,8 +359,8 @@ end
       (fmma, gmma), (fmmv, gmmv) = fluxes(umm, (ummx, ummy), equations, equations_parabolic)
       (fppa, gppa), (fppv, gppv) = fluxes(upp, (uppx, uppy), equations, equations_parabolic)
 
-      fa, ga = get_node_vars(Fa2, equations, dg, i, j), get_node_vars(Ga2, equations, dg, i, j)
-      fv, gv = get_node_vars(Fv2, equations, dg, i, j), get_node_vars(Gv2, equations, dg, i, j)
+      fa, ga = 2*get_node_vars(Fa, equations, dg, i, j), 2*get_node_vars(Ga, equations, dg, i, j)
+      fv, gv = 2*get_node_vars(Fv, equations, dg, i, j), 2*get_node_vars(Gv, equations, dg, i, j)
       f = fa-fv
       g = ga-gv
       s = get_node_vars(S2,  equations, dg, i, j)
@@ -406,7 +406,7 @@ end
       for ii in eachnode(dg)
          # res              += -lam * D * F for each variable
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-         multiply_add_to_node_vars!(du, 1 * derivative_dhat[ii, i], F,
+         multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F,
                                     equations, dg, ii, j, element)
          multiply_add_to_node_vars!(u_low, -dt * inv_jacobian * derivative_matrix[ii, i],
                                     F_node_low, equations, dg, ii, j, element)
@@ -415,7 +415,7 @@ end
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         multiply_add_to_node_vars!(du, 1 * derivative_dhat[jj, j], G,
+         multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G,
                                     equations, dg, i, jj, element)
          multiply_add_to_node_vars!(u_low, -dt * inv_jacobian * derivative_matrix[jj, j],
                                     G_node_low, equations, dg, i, jj, element)
@@ -428,6 +428,7 @@ end
       U_node = get_node_vars(U, equations, dg, i, j)
       U2_node = get_node_vars(U2, equations, dg, i, j)
 
+      set_node_vars!(element_cache.U, U_node, equations, dg, i, j, element)
       set_node_vars!(cache.element_cache.F, Fa_node, equations, dg, 1, i, j, element)
       set_node_vars!(cache_parabolic.Fv, Fv_node, equations, dg, 1, i, j, element)
       set_node_vars!(cache.element_cache.F, Ga_node, equations, dg, 2, i, j, element)
@@ -443,8 +444,7 @@ end
       set_node_vars!(mdrk_cache.F2, Ga_node2, equations, dg, 2, i, j, element)
       set_node_vars!(cache_parabolic.mdrk_cache.Fv2, Gv_node2, equations, dg, 2, i, j, element)
 
-      set_node_vars!(element_cache.U, U_node, equations, dg, i, j, element)
-      set_node_vars!(mdrk_cache.U2, U2_node, equations, dg,    i, j, element)
+      set_node_vars!(mdrk_cache.U2, U2_node, equations, dg, i, j, element)
 
       S_node = get_node_vars(S, equations, dg, i, j)
       multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations,
@@ -528,16 +528,16 @@ end
 
    refresh!(arr) = fill!(arr, zero(eltype(arr)))
 
-   Fa, Ga, ust, uttt, U, up, upp, um, umm, S = cell_arrays[id]
+   Fa, Ga, ust, U, S = cell_arrays[id]
 
    ustx, usty, Fv, Gv = cache_parabolic.lw_res_cache.cell_arrays[id]
    # Load U2, F2 in local arrays
-   @turbo for j in eachnode(dg), i in eachnode(dg), n in eachvariable(equations)
-      Fa[n,i,j,element] = F2[n,1,i,j,element]
-      Ga[n,i,j,element] = F2[n,2,i,j,element]
-      Fv[n,i,j,element] = Fv2[n,1,i,j,element]
-      Gv[n,i,j,element] = Fv2[n,2,i,j,element]
-      U[n,i,j,element]  = U[n,i,j,element]
+   for j in eachnode(dg), i in eachnode(dg), n in eachvariable(equations)
+      Fa[n,i,j] = F2[n,1,i,j,element]
+      Ga[n,i,j] = F2[n,2,i,j,element]
+      Fv[n,i,j] = Fv2[n,1,i,j,element]
+      Gv[n,i,j] = Fv2[n,2,i,j,element]
+      U[n,i,j]  = U2[n,i,j,element]
    end
 
    refresh!.((ust, ustx, usty))
@@ -662,12 +662,6 @@ end
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       st = calc_source_t_N34(u_node, up, upp, um, umm, x, t, dt,
                              source_terms, equations, dg, cache)
-
-      multiply_add_to_node_vars!(Fa, 1.0/3.0, fta, equations, dg, i, j)
-      multiply_add_to_node_vars!(Fv, 1.0/3.0, ftv, equations, dg, i, j)
-
-      multiply_add_to_node_vars!(Ga, 1.0/3.0, gta, equations, dg, i, j)
-      multiply_add_to_node_vars!(Gv, 1.0/3.0, gtv, equations, dg, i, j)
 
       multiply_add_to_node_vars!(U, 1.0/3.0, ut_node, equations, dg, i, j)
 

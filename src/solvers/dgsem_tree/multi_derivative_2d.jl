@@ -206,7 +206,7 @@ end
 
    id = Threads.threadid()
 
-   refresh!(arr) = fill!(arr, zero(eltype(u)))
+   refresh!(arr) = fill!(arr, zero(eltype(arr)))
 
    # TODO - Are the local F2, G2, U2 needed? This is a performance question
    # Benchmark and find out
@@ -374,7 +374,7 @@ end
    F, G, ut, ust, U, S = cell_arrays[id]
 
    # Load U2, F2 in local arrays
-   @turbo for j in eachnode(dg), i in eachnode(dg), n in eachvariable(equations)
+   for j in eachnode(dg), i in eachnode(dg), n in eachvariable(equations)
       F[n,i,j,element] = F2[n,1,i,j,element]
       G[n,i,j,element] = F2[n,2,i,j,element]
       U[n,i,j,element] = U2[n,i,j,element]
