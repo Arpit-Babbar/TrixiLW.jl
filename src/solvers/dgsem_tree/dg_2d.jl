@@ -1581,9 +1581,9 @@ using LoopVectorization: @turbo
          # Give u1_ or U depending on dissipation model
          U_node = Trixi.get_node_vars(U, equations, dg, i, j)
 
-         Trixi.set_node_vars!(element_cache.U, U_node, equations, dg,    i, j, element)
-         Trixi.set_node_vars!(element_cache.F, F_node, equations, dg, 1, i, j, element)
-         Trixi.set_node_vars!(element_cache.F, G_node, equations, dg, 2, i, j, element)
+         multiply_add_to_node_vars!(element_cache.U, 1.0, U_node, equations, dg,    i, j, element)
+         multiply_add_to_node_vars!(element_cache.F, 1.0, F_node, equations, dg, 1, i, j, element)
+         multiply_add_to_node_vars!(element_cache.F, 1.0, G_node, equations, dg, 2, i, j, element)
 
          S_node = Trixi.get_node_vars(S, equations, dg, i, j)
          Trixi.multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations,
