@@ -13,8 +13,8 @@ equations_parabolic = TrixiLW.CompressibleNavierStokesDiffusion2D(equations, mu=
   gradient_variables=TrixiLW.GradientVariablesConservative())
 
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
-solver = TrixiLW.DGSEM(polydeg=4, surface_flux=flux_lax_friedrichs,
-  volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
+solver = TrixiLW.DGSEM(polydeg=3, surface_flux=flux_lax_friedrichs,
+  volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.MDRK()))
 
 coordinates_min = (-1.0, -1.0) # minimum coordinates (min(x), min(y))
 coordinates_max = (1.0, 1.0) # maximum coordinates (max(x), max(y))
@@ -224,7 +224,7 @@ boundary_conditions_parabolic = (; x_neg=boundary_condition_periodic,
   y_neg=boundary_condition_top_bottom,
   y_pos=boundary_condition_top_bottom)
 
-cfl_number = 0.98
+cfl_number = 2.0
 
 semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
   get_time_discretization(solver),
@@ -238,39 +238,25 @@ semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
 
 # Create ODE problem with time span `tspan`
 tspan = (0.0, 0.5)
-ode = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 summary_callback = SummaryCallback()
 analysis_interval = 100
 alive_callback = AliveCallback(alive_interval=analysis_interval)
 analysis_callback = AnalysisCallback(semi, interval=10 * analysis_interval)
-stepsize_callback = TrixiLW.StepsizeCallbackFR(semi)
-# callbacks_set = CallbackSet(summary_callback,
-#                         alive_callback,
-#                         analysis_callback,
-#                         stepsize_callback);
 
-callbacks = (
-  # summary_callback,
+callbacks = (;
   alive_callback,
   analysis_callback,
-  # stepsize_callback
 );
 
 ###############################################################################
 # run the simulation
 
-time_int_tol = 1e-8
+time_int_tol = 1e-6
 tolerances = (; abstol=time_int_tol, reltol=time_int_tol)
 dt_initial = 1e-3
 sol, summary_callback = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
   # time_step_computation = TrixiLW.Adaptive()
   time_step_computation=TrixiLW.CFLBased(cfl_number)
 );
-# sol, summary_callback = solve(ode,
-#             # RDPK3SpFSAL49(), abstol=time_int_tol, reltol=time_int_tol, dt = 1e-5,
-#             # SSPRK54(), dt = 1,
-#             Euler(), dt = 1e-5,
-#             save_everystep=false, callback=callbacks)
-# summary_callback() # print the timer summary

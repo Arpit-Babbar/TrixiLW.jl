@@ -656,9 +656,6 @@ end
       gtv = 1.0 / 12.0 * (-gppv + 8.0 * gpv - 8.0 * gmv + gmmv)
       multiply_add_to_node_vars!(Gv, 1.0/3.0, gtv, equations, dg, i, j)
 
-      ft = fta - ftv
-      gt = gta - gtv
-
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       st = calc_source_t_N34(u_node, up, upp, um, umm, x, t, dt,
                              source_terms, equations, dg, cache)
