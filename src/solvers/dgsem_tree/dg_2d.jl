@@ -1478,8 +1478,8 @@ using LoopVectorization: @turbo
 
       @unpack U2, F2, S2 = mdrk_cache
 
-      @turbo element_cache.U .= U2
-      @turbo element_cache.F .= F2
+      # @turbo element_cache.U .= U2
+      # @turbo element_cache.F .= F2
 
       inv_jacobian = cache.elements.inverse_jacobian[element]
 
@@ -1490,6 +1490,13 @@ using LoopVectorization: @turbo
       refresh!(arr) = fill!(arr, zero(eltype(u)))
 
       F, G, ut, ust, U, S = cell_arrays[id]
+
+      # Load U2, F2 in local arrays
+      @turbo for j in eachnode(dg), i in eachnode(dg), n in eachvariable(equations)
+         F[n,i,j,element] = F2[n,1,i,j,element]
+         G[n,i,j,element] = F2[n,2,i,j,element]
+         U[n,i,j,element] = U[ n,i,j,element]
+      end
       refresh!.((ut, ust))
       for j in eachnode(dg), i in eachnode(dg)
          us_node = Trixi.get_node_vars(us, equations, dg, i, j, element)
@@ -1581,9 +1588,9 @@ using LoopVectorization: @turbo
          # Give u1_ or U depending on dissipation model
          U_node = Trixi.get_node_vars(U, equations, dg, i, j)
 
-         multiply_add_to_node_vars!(element_cache.U, 1.0, U_node, equations, dg,    i, j, element)
-         multiply_add_to_node_vars!(element_cache.F, 1.0, F_node, equations, dg, 1, i, j, element)
-         multiply_add_to_node_vars!(element_cache.F, 1.0, G_node, equations, dg, 2, i, j, element)
+         Trixi.set_node_vars!(element_cache.U, U_node, equations, dg,    i, j, element)
+         Trixi.set_node_vars!(element_cache.F, F_node, equations, dg, 1, i, j, element)
+         Trixi.set_node_vars!(element_cache.F, G_node, equations, dg, 2, i, j, element)
 
          S_node = Trixi.get_node_vars(S, equations, dg, i, j)
          Trixi.multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations,
