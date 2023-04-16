@@ -1478,9 +1478,6 @@ using LoopVectorization: @turbo
 
       @unpack U2, F2, S2 = mdrk_cache
 
-      # @turbo element_cache.U .= U2
-      # @turbo element_cache.F .= F2
-
       inv_jacobian = cache.elements.inverse_jacobian[element]
 
       id = Threads.threadid()
@@ -1501,19 +1498,19 @@ using LoopVectorization: @turbo
       for j in eachnode(dg), i in eachnode(dg)
          us_node = Trixi.get_node_vars(us, equations, dg, i, j, element)
 
-         flux1_s, flux2_s = fluxes(us_node, equations)
+         flux1, flux2 = fluxes(us_node, equations)
 
          for ii in eachnode(dg)
             # ut              += -lam * D * f for each variable
             # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-            Trixi.multiply_add_to_node_vars!(ust, -dt * derivative_matrix[ii, i], flux1_s,
+            Trixi.multiply_add_to_node_vars!(ust, -dt * derivative_matrix[ii, i], flux1,
                equations, dg, ii, j)
          end
 
          for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            Trixi.multiply_add_to_node_vars!(ust, -dt * derivative_matrix[jj, j], flux2_s, equations, dg, i, jj)
+            Trixi.multiply_add_to_node_vars!(ust, -dt * derivative_matrix[jj, j], flux2, equations, dg, i, jj)
          end
 
       end
@@ -1547,27 +1544,27 @@ using LoopVectorization: @turbo
 
          x = Trixi.get_node_coords(node_coordinates, equations, dg, i, j, element)
 
-         um_s  = us_node -   ust_node
-         fm_s, gm_s  = fluxes(um_s, equations)
-         up_s  = us_node +   ust_node
-         fp_s, gp_s  = fluxes(up_s, equations)
-         umm_s = us_node - 2*ust_node
-         fmm_s, gmm_s  = fluxes(umm_s, equations)
-         upp_s = us_node + 2*ust_node
-         fpp_s, gpp_s  = fluxes(upp_s, equations)
-         st_s = calc_source_t_N34(us_node, up_s, upp_s, um_s, umm_s, x, t, dt,
+         um  = us_node -   ust_node
+         fm, gm  = fluxes(um, equations)
+         up  = us_node +   ust_node
+         fp, gp  = fluxes(up, equations)
+         umm = us_node - 2*ust_node
+         fmm, gmm  = fluxes(umm, equations)
+         upp = us_node + 2*ust_node
+         fpp, gpp  = fluxes(upp, equations)
+         st = calc_source_t_N34(us_node, up, upp, um, umm, x, t, dt,
                                   source_terms, equations, dg, cache)
 
-         ft_s = 1.0 / 12.0 * (-fpp_s + 8.0 * fp_s - 8.0 * fm_s + fmm_s)
-         gt_s = 1.0 / 12.0 * (-gpp_s + 8.0 * gp_s - 8.0 * gm_s + gmm_s)
+         ft = 1.0 / 12.0 * (-fpp + 8.0 * fp - 8.0 * fm + fmm)
+         gt = 1.0 / 12.0 * (-gpp + 8.0 * gp - 8.0 * gm + gmm)
 
-         Trixi.multiply_add_to_node_vars!(F, 1.0/3.0, ft_s, equations, dg, i, j)
+         Trixi.multiply_add_to_node_vars!(F, 1.0/3.0, ft, equations, dg, i, j)
 
-         Trixi.multiply_add_to_node_vars!(G, 1.0/3.0, gt_s, equations, dg, i, j)
+         Trixi.multiply_add_to_node_vars!(G, 1.0/3.0, gt, equations, dg, i, j)
 
          Trixi.multiply_add_to_node_vars!(U, 1.0/3.0, ust_node, equations, dg, i, j)
 
-         Trixi.multiply_add_to_node_vars!(S, 1.0/3.0, st_s, equations, dg, i, j) # Source term
+         Trixi.multiply_add_to_node_vars!(S, 1.0/3.0, st, equations, dg, i, j) # Source term
 
          F_node = Trixi.get_node_vars(F, equations, dg, i, j)
          G_node = Trixi.get_node_vars(G, equations, dg, i, j)
