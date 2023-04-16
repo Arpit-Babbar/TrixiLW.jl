@@ -10,14 +10,14 @@ equations = LinearScalarAdvectionEquation2D(advection_velocity)
 polydeg = 3
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
 solver = DGSEM(polydeg=polydeg, surface_flux=flux_lax_friedrichs,
-               volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.MDRK()))
+               volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
 
 coordinates_min = (-1.0, -1.0) # minimum coordinates (min(x), min(y))
 coordinates_max = ( 1.0,  1.0) # maximum coordinates (max(x), max(y))
 
 # Create a uniformly refined mesh with periodic boundaries
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level=4,
+                initial_refinement_level=5,
                 n_cells_max=30_000) # set maximum capacity of tree data structure
 
 # A semidiscretization collects data structures and functions for the spatial discretization
@@ -58,8 +58,9 @@ dt_initial = 1e-3;
 # 0.9 works for 2-staged
 cfl_number = TrixiLW.trixi2lw(0.71, solver)
 sol, summary = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
-                     #  time_step_computation = TrixiLW.Adaptive(),
-                      time_step_computation = TrixiLW.CFLBased(cfl_number)
+                      time_step_computation = TrixiLW.Adaptive(),
+                     #  time_step_computation = TrixiLW.CFLBased(cfl_number),
+                      stages = TrixiLW.TwoStaged()
                       );
 
 # Print the timer summary
