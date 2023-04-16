@@ -54,7 +54,7 @@ function create_cache(mesh::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D,P4e
    degree = n_nodes - 1
    cell_array_size = cell_array_sizes[min(4, degree)]
 
-   MArr = MArray{Tuple{n_variables,n_nodes,n_nodes},Float64}
+   MArr = MArray{Tuple{n_variables, n_nodes, n_nodes},Float64}
    cell_arrays = alloc_for_threads(MArr, cell_array_size)
 
    lw_res_cache = (; cell_arrays)
@@ -106,6 +106,8 @@ function create_element_cache(::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D
    _U = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
    _F = fill(nan_uEltype, n_variables * NDIMS * n_nodes^NDIMS * n_elements)
    _F2 = fill(nan_uEltype, n_variables * NDIMS * n_nodes^NDIMS * n_elements)
+   _U2 = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
+   _S2 = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
    _fn_low = fill(nan_uEltype, n_variables * n_nodes^(NDIMS - 1) * 2^NDIMS * n_elements)
 
    uEltype = typeof(nan_uEltype)
@@ -116,6 +118,10 @@ function create_element_cache(::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D
                    (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
    U = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_U),
                    (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
+   U2 = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_U2),
+                   (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
+   S2 = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_S2),
+                   (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
    F = unsafe_wrap(Array{uEltype,NDIMS + 3}, pointer(_F),
                    (n_variables, NDIMS, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
    F2 = unsafe_wrap(Array{uEltype,NDIMS + 3}, pointer(_F2),
@@ -123,7 +129,8 @@ function create_element_cache(::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D
 
 
    if isa(time_discretization, MDRK)
-      mdrk_cache = (; _F1 = _F, F1 = F, _us, us, _u_low, u_low, _F2, F2 )
+      # TODO - This is too much storage. Can some be avoided?
+      mdrk_cache = (; _F1 = _F, F1 = F, _us, us, _u_low, u_low, _F2, F2, _U2, U2, _S2, S2 )
    else
       mdrk_cache = (;)
    end

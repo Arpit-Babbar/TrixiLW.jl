@@ -160,7 +160,6 @@ function LWIntegrator(lw_update::LWUpdate, time_discretization, sol, callbacks, 
    n_interfaces = ninterfaces(semi.mesh, semi.solver, semi.cache, time_discretization)
    n_boundaries = nboundaries(semi.mesh, semi.solver, semi.cache, time_discretization)
    n_mortars = 1
-   @show time_discretization
    LWIntegrator(semi, sol, u, u0_ode, integrator_cache, iter, t, tspan, dt, f,
       dtpropose, dtcache, stats, epsilon,
       opts, n_elements, n_interfaces, n_boundaries, n_mortars, time_discretization)
