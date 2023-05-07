@@ -59,7 +59,7 @@ semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
 # ODE solvers, callbacks etc.
 
 # Create ODE problem with time span from 0.0 to 1.5
-tspan = (0.0, 1.0)
+tspan = (0.0, 100.0)
 ode = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
@@ -85,10 +85,12 @@ callbacks = (
 # run the simulation
 
 # OrdinaryDiffEq's `solve` method evolves the solution in time and executes the passed callbacks
-time_int_tol = 1e-6
+time_int_tol = 1e-4
 tolerances   = (;abstol = time_int_tol, reltol = time_int_tol)
 dt_initial   = 1.0
+# cfl_number = 4.4
+cfl_number = 3.4
 sol, summary_callback = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
-                      time_step_computation = TrixiLW.Adaptive()
-                      # time_step_computation = TrixiLW.CFLBased(cfl_number)
+                      # time_step_computation = TrixiLW.Adaptive()
+                      time_step_computation = TrixiLW.CFLBased(cfl_number)
                       );

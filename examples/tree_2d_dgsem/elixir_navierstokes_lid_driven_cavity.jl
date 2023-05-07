@@ -15,8 +15,8 @@ equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu=mu(),
                                                           gradient_variables=TrixiLW.GradientVariablesConservative())
 
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
-solver = DGSEM(polydeg=4, surface_flux=flux_lax_friedrichs,
-               volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
+solver = DGSEM(polydeg=3, surface_flux=flux_lax_friedrichs,
+               volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.MDRK()))
 
 coordinates_min = (-1.0, -1.0) # minimum coordinates (min(x), min(y))
 coordinates_max = ( 1.0,  1.0) # maximum coordinates (max(x), max(y))
@@ -96,10 +96,10 @@ callbacks = (
 ###############################################################################
 # run the simulation
 
-time_int_tol = 1e-8
+time_int_tol = 1e-4
 tolerances = (;abstol = time_int_tol, reltol = time_int_tol)
 dt_initial = 2.5e-01
 sol, summary_callback = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
-                      time_step_computation = TrixiLW.CFLBased(cfl_number),
-                      # time_step_computation = TrixiLW.Adaptive(),
+                      # time_step_computation = TrixiLW.CFLBased(cfl_number),
+                      time_step_computation = TrixiLW.Adaptive(),
                       );

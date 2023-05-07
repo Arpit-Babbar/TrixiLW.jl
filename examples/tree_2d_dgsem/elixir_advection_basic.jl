@@ -21,9 +21,8 @@ mesh = TreeMesh(coordinates_min, coordinates_max,
                 n_cells_max=30_000) # set maximum capacity of tree data structure
 
 # A semidiscretization collects data structures and functions for the spatial discretization
-semi = TrixiLW.SemidiscretizationHyperbolic(mesh,
-get_time_discretization(solver), equations,
- initial_condition_convergence_test, solver)
+semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver), equations,
+                                            initial_condition_convergence_test, solver)
 
 
 ###############################################################################
@@ -57,12 +56,12 @@ tolerances = (;abstol = time_int_tol, reltol = time_int_tol);
 dt_initial = 1e-3;
 # 0.9 works for 2-staged
 cfl_number = TrixiLW.trixi2lw(0.71, solver)
-sol, summary = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
+sol, summary_callback = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
                      #  time_step_computation = TrixiLW.Adaptive(),
                       time_step_computation = TrixiLW.CFLBased(cfl_number),
                       );
 
 # Print the timer summary
-summary()
+summary_callback()
 
 l2_errors = (;cfl = 4.96050384e-07, adaptive = 2.56661020e-06)
