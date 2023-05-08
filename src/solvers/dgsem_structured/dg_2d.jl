@@ -405,7 +405,7 @@ function calcflux_mh!(fstar1_L, fstar1_R, fstar2_L, fstar2_R,
          if i < nnodes(dg) # TODO - Find a better fix!
             # (1, i, j) means left trace value at (i,j) cell.
             # For i = nnodes(dg), there is no left trace value at (i,j) cell
-            # so this
+            # so quantities here are not needed in that case
             u_rr = get_node_vars(uf, equations, dg, 1, i, j)
             f_rr = flux(u_rr, normal_direction, equations)
             Δxip1 = x_subfaces[i+1] - x_subfaces[i]
@@ -433,9 +433,7 @@ function calcflux_mh!(fstar1_L, fstar1_R, fstar2_L, fstar2_R,
          Δyi = y_subfaces[j] - y_subfaces[j-1]
 
          u_dd = get_node_vars(uf, equations, dg, 4, i, j - 1)
-         u_uu = get_node_vars(uf, equations, dg, 3, i, j)
          f_dd = flux(u_dd, normal_direction, equations)
-         f_uu = flux(u_uu, normal_direction, equations)
 
          res_dd = -0.5 * Δt * inverse_jacobian[i, j, element] / Δyi * f_dd
 
@@ -449,6 +447,11 @@ function calcflux_mh!(fstar1_L, fstar1_R, fstar2_L, fstar2_R,
             unph[n, 2, i, j-1] += res_dd[n]
          end
          if j < nnodes(dg)
+            # (3, i, j) means bottom trace value at (i,j) cell.
+            # For j = nnodes(dg), there is no bottom trace value of (i,j) cell
+            # so quantities here are not needed in that case
+            u_uu = get_node_vars(uf, equations, dg, 3, i, j)
+            f_uu = flux(u_uu, normal_direction, equations)
             Δyip1 = y_subfaces[j+1] - y_subfaces[j]
             res_uu = 0.5 * Δt * inverse_jacobian[i, j+1, element] / Δyip1 * f_uu
             for n in eachvariable(equations) # Loop somehow needed to avoid allocations

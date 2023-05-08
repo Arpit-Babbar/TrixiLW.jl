@@ -21,7 +21,7 @@ coordinates_max = (1.0, 1.0) # maximum coordinates (max(x), max(y))
 
 # Create a uniformly refined mesh with periodic boundaries
 mesh = TreeMesh(coordinates_min, coordinates_max,
-  initial_refinement_level=3,
+  initial_refinement_level=4,
   periodicity=(true, false),
   n_cells_max=30_000) # set maximum capacity of tree data structure
 
@@ -237,7 +237,7 @@ semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
 # ODE solvers, callbacks etc.
 
 # Create ODE problem with time span `tspan`
-tspan = (0.0, 0.1)
+tspan = (0.0, 0.5)
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 summary_callback = SummaryCallback()
