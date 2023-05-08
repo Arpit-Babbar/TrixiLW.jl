@@ -1869,11 +1869,7 @@ using LoopVectorization: @turbo
       uext_threaded = [OffsetArray(zeros(nvar, nnodes(dg) + 2, nnodes(dg) + 2),
                                    OffsetArrays.Origin(1, 0, 0))
                        for _ in 1:Threads.nthreads()]
-      # mh_face_arrays = [(OffsetArray(zeros(nvar, 4, nnodes(dg) + 2, nnodes(dg) + 2),
-      #                                OffsetArrays.Origin(1, 1, 0, 0)),
-      #                    OffsetArray(zeros(nvar, 4, nnodes(dg) + 2, nnodes(dg) + 2),
-      #                                OffsetArrays.Origin(1, 1, 0, 0)))
-      #                   for _ in 1:Threads.nthreads()]
+
       mh_face_arrays = [(
                          zeros(nvar, 4, nnodes(dg), nnodes(dg)),
                          zeros(nvar, 4, nnodes(dg), nnodes(dg))
