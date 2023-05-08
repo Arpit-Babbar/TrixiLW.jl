@@ -63,7 +63,7 @@ volume_integral = TrixiLW.VolumeIntegralFRShockCapturing(
    shock_indicator;
    volume_flux_fv=surface_flux,
    # reconstruction=TrixiLW.FirstOrderReconstruction()
-  #  reconstruction=TrixiLW.MUSCLReconstruction()
+   # reconstruction=TrixiLW.MUSCLReconstruction()
    reconstruction=TrixiLW.MUSCLHancockReconstruction()
 )
 
@@ -84,7 +84,7 @@ semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-tspan = (0.0, 0.1)
+tspan = (0.0, 1.0)
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 summary_callback = SummaryCallback()
