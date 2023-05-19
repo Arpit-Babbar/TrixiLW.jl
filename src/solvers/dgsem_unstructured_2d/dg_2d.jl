@@ -432,9 +432,8 @@ end
 @inline function calc_boundary_flux!(surface_flux_values, t, boundary_condition,
    mesh::UnstructuredMesh2D,
    nonconservative_terms::False, equations,
-   surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache,
+   surface_integral, dt, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache,
    node_index, side_index, element_index, boundary_index)
-   dt = cache.dt[1]
    @unpack normal_directions = cache.elements
    @unpack u, f, node_coordinates = cache.boundaries
    @unpack surface_flux = surface_integral

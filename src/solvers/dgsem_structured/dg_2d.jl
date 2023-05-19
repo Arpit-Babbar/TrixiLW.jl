@@ -18,6 +18,7 @@ function rhs!(du, u, t,
    mesh::StructuredMesh{2}, equations,
    initial_condition, boundary_conditions, source_terms,
    dg::DG, time_discretization::AbstractLWTimeDiscretization, cache, tolerances::NamedTuple)
+
    # Reset du
    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
 
@@ -556,27 +557,29 @@ function weak_form_kernel_1!(du, u, t, dt, tolerances,
    ftildet, gtildet, S, u_np1, u_np1_low = cell_arrays[id]
    refresh!.((ut, ftildet, gtildet))
    for j in eachnode(dg), i in eachnode(dg)
-      u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+      u_node = get_node_vars(u, equations, dg, i, j, element)
 
       Ja = get_contravariant_matrix(contravariant_vectors, i, j, element)
 
       flux1, flux2, cv_flux1, cv_flux2 = contravariant_flux(u_node, Ja, equations)
 
-      Trixi.set_node_vars!(element_cache.F, flux1, equations, dg, 1, i, j, element)
-      Trixi.set_node_vars!(element_cache.F, flux2, equations, dg, 2, i, j, element)
+      set_node_vars!(element_cache.F, flux1, equations, dg, 1, i, j, element)
+      set_node_vars!(element_cache.F, flux2, equations, dg, 2, i, j, element)
 
-      Trixi.set_node_vars!(Ftilde, cv_flux1, equations, dg, i, j)
+      set_node_vars!(Ftilde, cv_flux1, equations, dg, i, j)
       for ii in eachnode(dg)
          # ut              += -lam * D * f for each variable
          # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-         Trixi.multiply_add_to_node_vars!(ut, -dt * derivative_matrix[ii, i], cv_flux1, equations, dg, ii, j)
+         multiply_add_to_node_vars!(ut, -dt * derivative_matrix[ii, i], cv_flux1,
+            equations, dg, ii, j)
       end
 
-      Trixi.set_node_vars!(Gtilde, cv_flux2, equations, dg, i, j)
+      set_node_vars!(Gtilde, cv_flux2, equations, dg, i, j)
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(ut, -dt * derivative_matrix[jj, j], cv_flux2, equations, dg, i, jj)
+         multiply_add_to_node_vars!(ut, -dt * derivative_matrix[jj, j], cv_flux2,
+            equations, dg, i, jj)
       end
 
       Trixi.set_node_vars!(u_np1, u_node, equations, dg, i, j)
@@ -1193,48 +1196,48 @@ function weak_form_kernel_3!(du, u, t, dt, tolerances,
       Trixi.multiply_add_to_node_vars!(Ftilde, 1.0 / 24.0, ftilde_ttt, equations, dg, i, j)
       gttt = 0.5 * (gpp - 2.0 * gp + 2.0 * gm - gmm)
       gtilde_ttt = 0.5 * (cv_gpp - 2.0 * cv_gp + 2.0 * cv_gm - cv_gmm)
-      Trixi.multiply_add_to_node_vars!(element_cache.F, 1.0 / 24.0, gttt, equations, dg, 2, i, j, element)
-      Trixi.multiply_add_to_node_vars!(Gtilde, 1.0 / 24.0, gtilde_ttt, equations, dg, i, j)
+      multiply_add_to_node_vars!(element_cache.F, 1.0 / 24.0, gttt, equations, dg, 2, i, j, element)
+      multiply_add_to_node_vars!(Gtilde, 1.0 / 24.0, gtilde_ttt, equations, dg, i, j)
 
-      Ftilde_node = Trixi.get_node_vars(Ftilde, equations, dg, i, j)
-      Gtilde_node = Trixi.get_node_vars(Gtilde, equations, dg, i, j)
+      Ftilde_node = get_node_vars(Ftilde, equations, dg, i, j)
+      Gtilde_node = get_node_vars(Gtilde, equations, dg, i, j)
       for ii in eachnode(dg)
          # res              += -lam * D * F for each variable
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-         Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], Ftilde_node, equations, dg, ii, j, element)
+         multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], Ftilde_node, equations, dg, ii, j, element)
 
-         Trixi.multiply_add_to_node_vars!(u_np1, -dt * inv_jacobian * derivative_matrix[ii, i],
+         multiply_add_to_node_vars!(u_np1, -dt * inv_jacobian * derivative_matrix[ii, i],
             Ftilde_node, equations, dg, ii, j)
       end
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], Gtilde_node, equations, dg, i, jj, element)
+         multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], Gtilde_node, equations, dg, i, jj, element)
 
-         Trixi.multiply_add_to_node_vars!(u_np1, -dt * inv_jacobian * derivative_matrix[jj, j],
+         multiply_add_to_node_vars!(u_np1, -dt * inv_jacobian * derivative_matrix[jj, j],
             Gtilde_node, equations, dg, i, jj)
       end
 
-      u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+      u_node = get_node_vars(u, equations, dg, i, j, element)
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       sttt = calc_source_ttt_N34(u_node, up_node, um_node, upp_node, umm_node,
          x, t, dt, source_terms,
          equations, dg, cache)
-      Trixi.multiply_add_to_node_vars!(S, 1.0 / 24.0, sttt, equations, dg, i, j)
+      multiply_add_to_node_vars!(S, 1.0 / 24.0, sttt, equations, dg, i, j)
 
       # TODO - update to v1.8 and call with @inline
       # Give u1_ or U depending on dissipation model
-      U_node = Trixi.get_node_vars(U, equations, dg, i, j)
+      U_node = get_node_vars(U, equations, dg, i, j)
 
       # Ub = UT * V
       # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
-      Trixi.set_node_vars!(element_cache.U, U_node, equations, dg, i, j, element)
+      set_node_vars!(element_cache.U, U_node, equations, dg, i, j, element)
 
-      S_node = Trixi.get_node_vars(S, equations, dg, i, j)
+      S_node = get_node_vars(S, equations, dg, i, j)
       inv_jacobian = inverse_jacobian[i, j, element]
-      Trixi.multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg,
+      multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg,
          i, j, element)
-      Trixi.multiply_add_to_node_vars!(u_np1, 1.0, S_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(u_np1, 1.0, S_node, equations, dg, i, j)
    end
 
    @unpack temporal_errors = cache

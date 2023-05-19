@@ -1,7 +1,7 @@
 import Trixi: ninterfaces
 using StaticArrays
 
-function ninterfaces(mesh::StructuredMesh, dg, cache, ::Union{LW})
+function ninterfaces(mesh::StructuredMesh, dg, cache, ::AbstractLWTimeDiscretization)
    return 2 # Not to be used
 end
 
@@ -10,7 +10,7 @@ function ninterfaces(::Union{LW}, cache)
 end
 
 
-function nboundaries(mesh::StructuredMesh, dg, cache, ::Union{LW})
+function nboundaries(mesh::StructuredMesh, dg, cache, ::AbstractLWTimeDiscretization)
    return 2 # Not to be used
 end
 

@@ -1,4 +1,3 @@
-
 import Trixi: create_cache, calc_volume_integral!, ninterfaces, nboundaries,
    prolong2interfaces!, calc_interface_flux!, prolong2boundaries!,
    calc_boundary_flux!, prolong2mortars!, calc_mortar_flux!,
@@ -26,15 +25,14 @@ using LoopVectorization: @turbo
    # we need to opt-in explicitly.
    # See https://ranocha.de/blog/Optimizing_EC_Trixi for further details.
 
-   function rhs!(du, u,
-      t, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
+   function rhs!(du, u, t, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
       initial_condition, boundary_conditions, source_terms, dg::DG,
       time_discretization::AbstractLWTimeDiscretization, cache, tolerances::NamedTuple)
+
       # Reset du
       @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
 
       dt = cache.dt[1]
-
 
       # Update dt in cache and the callback will just take it from there
 
@@ -53,7 +51,7 @@ using LoopVectorization: @turbo
       @trixi_timeit timer() "interface flux" calc_interface_flux!(
          cache.elements.surface_flux_values, mesh,
          have_nonconservative_terms(equations), equations,
-         dg.surface_integral, time_discretization, dg, cache)
+         dg.surface_integral, dt, time_discretization, dg, cache)
 
       # Prolong solution to boundaries
       @trixi_timeit timer() "prolong2boundaries" prolong2boundaries!(
@@ -1384,7 +1382,7 @@ using LoopVectorization: @turbo
       @assert isempty(eachboundary(dg, cache))
    end
 
-   function calc_boundary_flux!(cache, t, boundary_conditions::NamedTuple,
+   function calc_boundary_flux!(cache, t, dt, boundary_conditions::NamedTuple,
       ::TreeMesh{2}, equations, surface_integral,
       time_discretization::AbstractLWTimeDiscretization, dg::DG)
       @unpack surface_flux_values = cache.elements
@@ -1395,21 +1393,21 @@ using LoopVectorization: @turbo
       firsts = lasts - n_boundaries_per_direction .+ 1
 
       # Calc boundary fluxes in each direction
-      calc_adv_boundary_flux_by_direction!(surface_flux_values, t, boundary_conditions[1],
+      calc_adv_boundary_flux_by_direction!(surface_flux_values, t, dt, boundary_conditions[1],
          equations, surface_integral, time_discretization, dg, cache,
          1, firsts[1], lasts[1])
-      calc_adv_boundary_flux_by_direction!(surface_flux_values, t, boundary_conditions[2],
+      calc_adv_boundary_flux_by_direction!(surface_flux_values, t, dt, boundary_conditions[2],
          equations, surface_integral, time_discretization, dg, cache,
          2, firsts[2], lasts[2])
-      calc_adv_boundary_flux_by_direction!(surface_flux_values, t, boundary_conditions[3],
+      calc_adv_boundary_flux_by_direction!(surface_flux_values, t, dt, boundary_conditions[3],
          equations, surface_integral, time_discretization, dg, cache,
          3, firsts[3], lasts[3])
-      calc_adv_boundary_flux_by_direction!(surface_flux_values, t, boundary_conditions[4],
+      calc_adv_boundary_flux_by_direction!(surface_flux_values, t, dt, boundary_conditions[4],
          equations, surface_integral, time_discretization, dg, cache,
          4, firsts[4], lasts[4])
    end
 
-   function calc_adv_boundary_flux_by_direction!(surface_flux_values::AbstractArray{<:Any,4}, t,
+   function calc_adv_boundary_flux_by_direction!(surface_flux_values::AbstractArray{<:Any,4}, t, dt,
       boundary_condition, equations,
       surface_integral, ::AbstractLWTimeDiscretization, dg::DG, cache,
       direction, first_boundary, last_boundary)
@@ -1438,7 +1436,7 @@ using LoopVectorization: @turbo
             end
             x = get_node_coords(node_coordinates, equations, dg, i, boundary)
             flux = boundary_condition(U_inner, F_inner, u_inner, outer_cache, orientations[boundary],
-               direction, x, t, cache.dt[1], surface_flux, equations, dg,
+               direction, x, t, dt, surface_flux, equations, dg,
                get_time_discretization(dg))
 
             # flux = boundary_condition(u_inner, orientations[boundary], direction, x, t, surface_flux,
@@ -1892,11 +1890,10 @@ using LoopVectorization: @turbo
    function calc_interface_flux!(surface_flux_values, mesh::TreeMesh{2},
       nonconservative_terms::False,
       equations,
-      surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache)
+      surface_integral, dt, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache)
       @unpack surface_flux = surface_integral
       @unpack u, neighbor_ids, orientations = cache.interfaces
       @unpack U, f, fn_low = cache.interface_cache
-      dt = cache.dt[1]
 
       @threaded for interface in eachinterface(dg, cache)
          # Get neighboring elements
@@ -1913,9 +1910,6 @@ using LoopVectorization: @turbo
             # Call pointwise Riemann solver
             U_ll, U_rr = get_surface_node_vars(U, equations, dg, i, interface)
             u_ll, u_rr = get_surface_node_vars(u, equations, dg, i, interface)
-            # u_ll, u_rr = U_ll, U_rr
-            # @show maximum(abs.(u_ll-U_ll))
-            # @show maximum(abs.(u_rr-U_rr))
             f_ll, f_rr = get_surface_node_vars(f, equations, dg, i, interface)
             fn_inner_ll, fn_inner_rr = get_surface_node_vars(fn_low, equations, dg, i, interface)
             Fn_ = surface_flux(f_ll, f_rr, U_ll, U_rr, u_ll, u_rr, orientations[interface], equations)

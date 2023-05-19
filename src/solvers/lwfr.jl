@@ -104,7 +104,7 @@ end
 function initialize_callbacks!(callbacks, integrator::LWIntegrator)
    # TODO - iterating over tuple of functions is not type stable
    for callback in callbacks
-      initialize!(callback, integrator.u, 0.0, integrator)
+      callback.initialize(callback, integrator.u, 0.0, integrator)
    end
 end
 
@@ -231,10 +231,6 @@ function solve_lwfr(lw_update, callbacks, dt_initial, tolerances;
    integrator = LWIntegrator(lw_update, time_discretization, sol, callbacks, tolerances,
       time_step_computation=time_step_computation)
 
-   # Initialize callbacks. e.g. resetting summary_callback
-   summary_callback = SummaryCallback()
-   Trixi.initialize_summary_callback(summary_callback, u, 0.0, integrator);
-
    initialize_callbacks!(callbacks, integrator)
 
    # Initialize the dt in integrator, semi.cache
@@ -248,7 +244,7 @@ function solve_lwfr(lw_update, callbacks, dt_initial, tolerances;
       apply_callbacks!(callbacks, integrator)
    end
 
-   return sol, summary_callback
+   return sol
 end
 
 include(solvers_dir() * "/adaptive.jl")
