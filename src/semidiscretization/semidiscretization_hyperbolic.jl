@@ -19,6 +19,42 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t, tolerances =
    return nothing
  end
 
+ function rhs_mdrk1!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t, tolerances = (;abstol = 0.0, reltol = 0.0))
+  @unpack mesh, equations, initial_condition, boundary_conditions, source_terms, solver, cache = semi
+
+  u  = wrap_array(u_ode,  mesh, equations, solver, cache)
+  du = wrap_array(du_ode, mesh, equations, solver, cache)
+
+  # TODO: Taal decide, do we need to pass the mesh?
+  time_start = time_ns()
+  @trixi_timeit timer() "rhs!" rhs_mdrk1!(du, u,
+  t, mesh, equations, initial_condition, boundary_conditions, source_terms, solver,
+  get_time_discretization(solver),
+  cache, tolerances)
+  runtime = time_ns() - time_start
+  put!(semi.performance_counter, runtime)
+
+  return nothing
+end
+
+function rhs_mdrk2!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t, tolerances = (;abstol = 0.0, reltol = 0.0))
+  @unpack mesh, equations, initial_condition, boundary_conditions, source_terms, solver, cache = semi
+
+  u  = wrap_array(u_ode,  mesh, equations, solver, cache)
+  du = wrap_array(du_ode, mesh, equations, solver, cache)
+
+  # TODO: Taal decide, do we need to pass the mesh?
+  time_start = time_ns()
+  @trixi_timeit timer() "rhs!" rhs_mdrk2!(du, u,
+  t, mesh, equations, initial_condition, boundary_conditions, source_terms, solver,
+  get_time_discretization(solver),
+  cache, tolerances)
+  runtime = time_ns() - time_start
+  put!(semi.performance_counter, runtime)
+
+  return nothing
+end
+
  function SemidiscretizationHyperbolic(mesh,
                                        time_discretization::AbstractLWTimeDiscretization,
                                        equations, initial_condition, solver;

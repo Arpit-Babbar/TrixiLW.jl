@@ -52,7 +52,7 @@ boundary_conditions = Dict(:Bottom => TrixiLW.slip_wall_approximate,
 
 surface_flux = flux_lax_friedrichs
 
-polydeg = 4
+polydeg = 3
 basis = LobattoLegendreBasis(polydeg)
 shock_indicator = IndicatorHennemannGassner(equations, basis,
    alpha_max=1.0,
@@ -61,6 +61,7 @@ shock_indicator = IndicatorHennemannGassner(equations, basis,
    variable=density_pressure)
 volume_integral = TrixiLW.VolumeIntegralFRShockCapturing(
    shock_indicator;
+   volume_integralFR = TrixiLW.VolumeIntegralFR(TrixiLW.MDRK()),
    volume_flux_fv=surface_flux,
    # reconstruction=TrixiLW.FirstOrderReconstruction()
    # reconstruction=TrixiLW.MUSCLReconstruction()
@@ -100,19 +101,27 @@ save_solution = SaveSolutionCallback(interval=2000,
    save_final_solution=true,
    solution_variables=cons2prim)
 
-callbacks = (; analysis_callback, alive_callback, save_solution)
+visualization_callback = VisualizationCallback(interval=100,
+   save_initial_solution=true,
+   save_final_solution=true,
+   solution_variables=cons2prim)
+
+summary_callback = SummaryCallback()
+callbacks = (; analysis_callback, alive_callback, save_solution, summary_callback,
+               visualization_callback)
 
 # positivity limiter necessary for this example with strong shocks
-stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds=(5.0e-6, 5.0e-6),
+stage_limiter! = PositivityPreservingLimiterZhangShu(
+   thresholds=(5.0e-6, 5.0e-6),
    variables=(Trixi.density, pressure))
 
 ###############################################################################
 # run the simulation
-time_int_tol = 1e-7
+time_int_tol = 1e-3
 tolerances = (; abstol=time_int_tol, reltol=time_int_tol);
 dt_initial = 1e-6;
 cfl_number = 0.1
-sol, summary_callback = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
+sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
   time_step_computation = TrixiLW.Adaptive(),
 #   time_step_computation=TrixiLW.CFLBased(cfl_number),
   limiters=(; stage_limiter!)

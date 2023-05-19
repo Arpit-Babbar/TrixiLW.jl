@@ -42,6 +42,7 @@ include(solvers_dir() * "/dgsem_tree/multi_derivative_2d_parabolic.jl")
 
 # Structured mesh
 include(solvers_dir() * "/dgsem_structured/dg_2d.jl")
+include(solvers_dir() * "/dgsem_structured/multi_derivative_2d.jl")
 include(solvers_dir() * "/dgsem_structured/containers_2d.jl")
 
 # UnstructuredMesh2D

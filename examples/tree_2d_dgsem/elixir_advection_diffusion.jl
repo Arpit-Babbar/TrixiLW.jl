@@ -18,7 +18,7 @@ coordinates_max = ( 1.0,  1.0) # maximum coordinates (max(x), max(y))
 
 # Create a uniformly refined mesh with periodic boundaries
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level=5,
+                initial_refinement_level=4,
                 periodicity=true,
                 n_cells_max=30_000) # set maximum capacity of tree data structure
 
@@ -60,7 +60,6 @@ semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
 
 # Create ODE problem with time span from 0.0 to 1.5
 tspan = (0.0, 1.0)
-ode = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 # At the beginning of the main loop, the SummaryCallback prints a summary of the simulation setup
@@ -76,6 +75,7 @@ alive_callback = AliveCallback(analysis_interval=100);
 
 # Create a CallbackSet to collect all callbacks such that they can be passed to the ODE solver
 callbacks = (
+              summary_callback,
               analysis_callback,
               alive_callback
             );
@@ -85,10 +85,11 @@ callbacks = (
 # run the simulation
 
 # OrdinaryDiffEq's `solve` method evolves the solution in time and executes the passed callbacks
-time_int_tol = 1e-6
+time_int_tol = 1e-8
 tolerances   = (;abstol = time_int_tol, reltol = time_int_tol)
 dt_initial   = 1.0
-sol, summary_callback = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
-                      time_step_computation = TrixiLW.Adaptive()
-                      # time_step_computation = TrixiLW.CFLBased(cfl_number)
+sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
+                      # time_step_computation = TrixiLW.Adaptive()
+                      time_step_computation = TrixiLW.CFLBased(cfl_number)
                       );
+summary_callback()

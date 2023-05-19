@@ -130,7 +130,7 @@ time_int_tol = 1e-5
 tolerances = (; abstol=time_int_tol, reltol=time_int_tol);
 dt_initial = 1e-4;
 cfl_number = 0.14
-sol, summary_callback = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
+sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
     time_step_computation=TrixiLW.Adaptive(),
    # time_step_computation=TrixiLW.CFLBased(cfl_number),
    limiters=(; stage_limiter!)

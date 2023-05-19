@@ -10,8 +10,8 @@ advection_velocity = (0.2, -0.7)
 equations = LinearScalarAdvectionEquation2D(advection_velocity)
 
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
-solver = DGSEM(polydeg=4, surface_flux=flux_lax_friedrichs,
-               volume_integral = TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
+solver = DGSEM(polydeg=3, surface_flux=flux_lax_friedrichs,
+               volume_integral = TrixiLW.VolumeIntegralFR(TrixiLW.MDRK()))
 
 coordinates_min = (-1.0, -1.0) # minimum coordinates (min(x), min(y))
 coordinates_max = ( 1.0,  1.0) # maximum coordinates (max(x), max(y))
@@ -19,9 +19,9 @@ coordinates_max = ( 1.0,  1.0) # maximum coordinates (max(x), max(y))
 trees_per_dimension = (1, 1)
 
 # Create P4estMesh with 8 x 8 trees and 16 x 16 elements (because level = 1)
-mesh = P4estMesh(trees_per_dimension, polydeg=4,
+mesh = P4estMesh(trees_per_dimension, polydeg=3,
                  coordinates_min=coordinates_min, coordinates_max=coordinates_max,
-                 initial_refinement_level=5)
+                 initial_refinement_level=6)
 
 # A semidiscretization collects data structures and functions for the spatial discretization
 cfl_number = 0.4
@@ -65,7 +65,7 @@ callbacks = (; analysis_callback, save_solution,
 time_int_tol = 1e-8
 tolerances = (;abstol = time_int_tol, reltol = time_int_tol);
 dt_initial = 1e-3;
-sol, summary_callback = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
+sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
                      #  time_step_computation = TrixiLW.Adaptive()
                       time_step_computation = TrixiLW.CFLBased(cfl_number)
                       );
