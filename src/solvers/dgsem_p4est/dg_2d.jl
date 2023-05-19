@@ -81,7 +81,7 @@ end
 function calc_interface_flux!(surface_flux_values,
    mesh::P4estMesh{2},
    nonconservative_terms,
-   equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache)
+   equations, surface_integral, dt, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache)
    @unpack neighbor_ids, node_indices = cache.interfaces
    @unpack contravariant_vectors = cache.elements
    index_range = eachnode(dg)
@@ -124,7 +124,7 @@ function calc_interface_flux!(surface_flux_values,
             i_primary, j_primary, primary_element)
 
          calc_interface_flux!(surface_flux_values, mesh, nonconservative_terms, equations,
-            surface_integral, time_discretization, dg, cache,
+            surface_integral, dt, time_discretization, dg, cache,
             interface, normal_direction,
             node, primary_direction, primary_element,
             node_secondary, secondary_direction, secondary_element)
@@ -144,11 +144,10 @@ end
 @inline function calc_interface_flux!(surface_flux_values,
    mesh::P4estMesh{2},
    nonconservative_terms::False, equations,
-   surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache,
+   surface_integral, dt, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache,
    interface_index, normal_direction,
    primary_node_index, primary_direction_index, primary_element_index,
    secondary_node_index, secondary_direction_index, secondary_element_index)
-   dt = cache.dt[1]
    @unpack u, f, fn_low, U = cache.interface_cache
    @unpack surface_flux = surface_integral
 
@@ -250,7 +249,7 @@ function prolong2boundaries!(cache, u,
    return nothing
 end
 
-function calc_boundary_flux!(cache, t, boundary_condition, boundary_indexing::Vector,
+function calc_boundary_flux!(cache, t, dt, boundary_condition, boundary_indexing::Vector,
    mesh::P4estMesh{2},
    equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
    @unpack boundaries = cache
@@ -273,7 +272,7 @@ function calc_boundary_flux!(cache, t, boundary_condition, boundary_indexing::Ve
       i_node = i_node_start
       j_node = j_node_start
       for node in eachnode(dg)
-         calc_boundary_flux!(surface_flux_values, t, boundary_condition,
+         calc_boundary_flux!(surface_flux_values, t, dt, boundary_condition,
             mesh, have_nonconservative_terms(equations),
             equations, surface_integral, time_discretization, dg, cache,
             i_node, j_node,
@@ -287,7 +286,7 @@ end
 
 
 # inlined version of the boundary flux calculation along a physical interface
-@inline function calc_boundary_flux!(surface_flux_values, t, boundary_condition,
+@inline function calc_boundary_flux!(surface_flux_values, t, dt, boundary_condition,
    mesh::P4estMesh{2},
    nonconservative_terms::False, equations,
    surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache,
@@ -295,7 +294,6 @@ end
    node_index, direction_index, element_index, boundary_index)
    @unpack boundaries, boundary_cache = cache
    @unpack outer_cache = boundary_cache
-   dt = cache.dt[1]
    @unpack node_coordinates, contravariant_vectors = cache.elements
    @unpack surface_flux = surface_integral
 
@@ -498,7 +496,7 @@ end
 # Inlined version of the mortar flux computation on small elements for conservation laws
 @inline function calc_mortar_flux!(fstar,
    mesh::P4estMesh{2},
-   nonconservative_terms::False, equations,
+   nonconservative_terms::False, equations, dt,
    surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache,
    mortar_index, position_index, element_small, element_large,
    normal_direction, node_index)
@@ -518,9 +516,7 @@ end
    Fn = surface_flux(f_ll, f_rr, u_ll, u_rr, U_ll, U_rr, normal_direction, equations)
 
    alp = compute_alp(u_ll, u_rr, element_small, element_large,
-      Jl, Jr, cache.dt[1],
-      fn, Fn, fn_inner_ll, fn_inner_rr, node_index,
-      equations, dg, dg.volume_integral)
+      Jl, Jr, dt, fn, Fn, fn_inner_ll, fn_inner_rr, node_index, equations, dg, dg.volume_integral)
 
    # Copy flux to buffer
    Trixi.set_node_vars!(fstar[position_index], alp * fn + (1-alp) * Fn,

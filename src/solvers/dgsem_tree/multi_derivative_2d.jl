@@ -24,7 +24,7 @@ function rhs_mdrk1!(du, u,
    @trixi_timeit timer() "interface flux" calc_interface_flux!(
       cache.elements.surface_flux_values, mesh,
       have_nonconservative_terms(equations), equations,
-      dg.surface_integral, time_discretization, dg, cache)
+      dg.surface_integral, dt, time_discretization, dg, cache)
 
    # Prolong solution to boundaries
    @trixi_timeit timer() "prolong2boundaries" prolong2boundaries!(
@@ -84,7 +84,7 @@ function rhs_mdrk2!(du, u,
    @trixi_timeit timer() "interface flux" calc_interface_flux!(
       cache.elements.surface_flux_values, mesh,
       have_nonconservative_terms(equations), equations,
-      dg.surface_integral, time_discretization, dg, cache)
+      dg.surface_integral, dt, time_discretization, dg, cache)
 
    # Prolong solution to boundaries
    @trixi_timeit timer() "prolong2boundaries" prolong2boundaries!(
