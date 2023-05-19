@@ -98,7 +98,7 @@ end
 
    # TODO - Are the local F2, G2, U2 needed? This is a performance question
    # Benchmark and find out
-   Ftilde, F2tilde, Gtilde, G2tilde, ut, U, U2, S, S2 = cell_arrays[id]
+   Ftilde, Gtilde, ut, U, U2, S, S2 = cell_arrays[id]
    @unpack u_low = mdrk_cache
    refresh!.((ut,))
    for j in eachnode(dg), i in eachnode(dg)
@@ -115,8 +115,6 @@ end
 
       set_node_vars!(Ftilde, 0.5*cv_flux1, equations, dg, i, j)
       set_node_vars!(Gtilde, 0.5*cv_flux2, equations, dg, i, j)
-      # set_node_vars!(F2tilde, cv_flux1,    equations, dg, i, j)
-      # set_node_vars!(G2tilde, cv_flux2,    equations, dg, i, j)
 
       for ii in eachnode(dg)
          # ut              += -lam * D * f for each variable
@@ -195,8 +193,6 @@ end
       multiply_add_to_node_vars!(U, 0.125, ut_node, equations, dg, i, j)
       multiply_add_to_node_vars!(S, 0.125, st, equations, dg, i, j) # Source term
 
-      # multiply_add_to_node_vars!(F2tilde, 1.0/6.0, ftilde_t, equations, dg, i, j)
-      # multiply_add_to_node_vars!(G2tilde, 1.0/6.0, gtilde_t, equations, dg, i, j)
       multiply_add_to_node_vars!(mdrk_cache.F2, 1.0/6.0, ft, equations, dg, 1, i, j, element)
       multiply_add_to_node_vars!(mdrk_cache.F2, 1.0/6.0, gt, equations, dg, 2, i, j, element)
       multiply_add_to_node_vars!(U2, 1.0/6.0, ut_node, equations, dg, i, j)
