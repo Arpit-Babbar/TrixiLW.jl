@@ -17,7 +17,7 @@ solver = DGSEM(polydeg=polydeg, surface_flux=flux_lax_friedrichs,
    volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
 
 coordinates_min = (-1.0, -1.0) # minimum coordinates (min(x), min(y))
-coordinates_max = (1.0, 1.0) # maximum coordinates (max(x), max(y))
+coordinates_max = ( 1.0,  1.0) # maximum coordinates (max(x), max(y))
 
 trees_per_dimension = (1, 1)
 
@@ -32,7 +32,6 @@ semi = SemidiscretizationHyperbolic(mesh,
    equations,
    initial_condition_convergence_test,
    solver)
-
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -63,9 +62,9 @@ amr_callback = AMRCallback(semi, amr_controller,
 
 
 # Create a CallbackSet to collect all callbacks such that they can be passed to the ODE solver
-# callbacks = CallbackSet(summary_callback, analysis_callback, save_solution, stepsize_callback)
+summary_callback = SummaryCallback()
 callbacks = (; analysis_callback, save_solution, alive_callback,
-               amr_callback
+               amr_callback, summary_callback
             )
 
 
@@ -77,7 +76,7 @@ time_int_tol = 1e-6
 tolerances = (; abstol=time_int_tol, reltol=time_int_tol);
 dt_initial = 1e-3;
 cfl_number = 0.2
-sol, summary_callback = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
+sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
    time_step_computation=TrixiLW.Adaptive()
    #  time_step_computation = TrixiLW.CFLBased(cfl_number)
 );

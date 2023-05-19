@@ -1,4 +1,3 @@
-
 import Trixi: create_cache, calc_volume_integral!, ninterfaces, nboundaries,
    prolong2interfaces!, calc_interface_flux!, prolong2boundaries!,
    calc_boundary_flux!, prolong2mortars!, calc_mortar_flux!,
@@ -26,15 +25,14 @@ using LoopVectorization: @turbo
    # we need to opt-in explicitly.
    # See https://ranocha.de/blog/Optimizing_EC_Trixi for further details.
 
-   function rhs!(du, u,
-      t, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
+   function rhs!(du, u, t, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
       initial_condition, boundary_conditions, source_terms, dg::DG,
       time_discretization::AbstractLWTimeDiscretization, cache, tolerances::NamedTuple)
+
       # Reset du
       @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
 
       dt = cache.dt[1]
-
 
       # Update dt in cache and the callback will just take it from there
 
@@ -1913,9 +1911,6 @@ using LoopVectorization: @turbo
             # Call pointwise Riemann solver
             U_ll, U_rr = get_surface_node_vars(U, equations, dg, i, interface)
             u_ll, u_rr = get_surface_node_vars(u, equations, dg, i, interface)
-            # u_ll, u_rr = U_ll, U_rr
-            # @show maximum(abs.(u_ll-U_ll))
-            # @show maximum(abs.(u_rr-U_rr))
             f_ll, f_rr = get_surface_node_vars(f, equations, dg, i, interface)
             fn_inner_ll, fn_inner_rr = get_surface_node_vars(fn_low, equations, dg, i, interface)
             Fn_ = surface_flux(f_ll, f_rr, U_ll, U_rr, u_ll, u_rr, orientations[interface], equations)

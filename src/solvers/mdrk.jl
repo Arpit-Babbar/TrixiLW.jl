@@ -18,7 +18,6 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
    @unpack _u_low = cache.element_cache.mdrk_cache
    apply_limiters!(limiters, integrator)
 
-
    # Second stage
    # TODO - Just pass u* here!
    rhs_mdrk2!(du_ode, u, semi, integrator.t, dummy_tolerances)

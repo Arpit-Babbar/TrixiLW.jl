@@ -1,39 +1,3 @@
-function rhs_mdrk1!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t, tolerances = (;abstol = 0.0, reltol = 0.0))
-   @unpack mesh, equations, initial_condition, boundary_conditions, source_terms, solver, cache = semi
-
-   u  = wrap_array(u_ode,  mesh, equations, solver, cache)
-   du = wrap_array(du_ode, mesh, equations, solver, cache)
-
-   # TODO: Taal decide, do we need to pass the mesh?
-   time_start = time_ns()
-   @trixi_timeit timer() "rhs!" rhs_mdrk1!(du, u,
-   t, mesh, equations, initial_condition, boundary_conditions, source_terms, solver,
-   get_time_discretization(solver),
-   cache, tolerances)
-   runtime = time_ns() - time_start
-   put!(semi.performance_counter, runtime)
-
-   return nothing
-end
-
-function rhs_mdrk2!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t, tolerances = (;abstol = 0.0, reltol = 0.0))
-   @unpack mesh, equations, initial_condition, boundary_conditions, source_terms, solver, cache = semi
-
-   u  = wrap_array(u_ode,  mesh, equations, solver, cache)
-   du = wrap_array(du_ode, mesh, equations, solver, cache)
-
-   # TODO: Taal decide, do we need to pass the mesh?
-   time_start = time_ns()
-   @trixi_timeit timer() "rhs!" rhs_mdrk2!(du, u,
-   t, mesh, equations, initial_condition, boundary_conditions, source_terms, solver,
-   get_time_discretization(solver),
-   cache, tolerances)
-   runtime = time_ns() - time_start
-   put!(semi.performance_counter, runtime)
-
-   return nothing
-end
-
 function rhs_mdrk1!(du, u,
    t, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
    initial_condition, boundary_conditions, source_terms, dg::DG,
@@ -96,7 +60,7 @@ end
 function rhs_mdrk2!(du, u,
    t, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
    initial_condition, boundary_conditions, source_terms, dg::DG,
-   time_discretization::AbstractLWTimeDiscretization, cache, tolerances::NamedTuple, calc_volume_integral! = calc_volume_integral!)
+   time_discretization::AbstractLWTimeDiscretization, cache, tolerances::NamedTuple)
    # Reset du
    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
 
@@ -104,16 +68,14 @@ function rhs_mdrk2!(du, u,
 
    # Update dt in cache and the callback will just take it from there
 
-
    @unpack us = cache.element_cache.mdrk_cache
 
    # Calculate volume integral
-   @trixi_timeit timer() "volume integral" calc_volume_integral_mdrk2!(
-      du,
-      us,
-      t, dt, tolerances, mesh,
+   alpha = @trixi_timeit timer() "volume integral" calc_volume_integral_mdrk2!(
+      du, us, t, dt, tolerances, mesh,
       have_nonconservative_terms(equations), source_terms, equations,
       dg.volume_integral, time_discretization, dg, cache)
+
    # Prolong solution to interfaces
    @trixi_timeit timer() "prolong2interfaces" prolong2interfaces!(
       cache, u, mesh, equations, dg.surface_integral, time_discretization, dg)
@@ -185,6 +147,118 @@ function calc_volume_integral_mdrk2!(du, u,
          dg, cache)
    end
    return nothing
+end
+
+function calc_volume_integral_mdrk1!(du, u, t, dt, tolerances,
+   mesh::Union{
+      TreeMesh{2},
+      StructuredMesh{2},
+      UnstructuredMesh2D,
+      P4estMesh{2}
+   },
+   nonconservative_terms, source_terms, equations,
+   volume_integral::VolumeIntegralFRShockCapturing,
+   ::AbstractLWTimeDiscretization,
+   dg::DGSEM, cache)
+
+   @unpack element_ids_dg, element_ids_dgfv = cache
+   @unpack volume_flux_fv, indicator = volume_integral
+
+   # Calculate blending factors α: u = u_DG * (1 - α) + u_FV * α
+   alpha = @trixi_timeit timer() "blending factors" indicator(u, mesh, equations, dg, cache)
+
+   # Determine element ids for DG-only and blended DG-FV volume integral
+   pure_and_blended_element_ids!(element_ids_dg, element_ids_dgfv, alpha, dg, cache)
+
+   # Loop over pure DG elements
+   @trixi_timeit timer() "pure DG" @threaded for idx_element in eachindex(element_ids_dg)
+      element = element_ids_dg[idx_element]
+      alpha_element = alpha[element]
+
+      # Calculate DG volume integral contribution
+      mdrk_kernel_1!(du, u, t, dt, tolerances, element, mesh,
+         nonconservative_terms, source_terms, equations,
+         dg, cache, 1 - alpha_element)
+
+      # Calculate fn_low because it is needed for admissibility preservation proof
+      calc_fn_low_kernel!(du, u,
+         mesh,
+         nonconservative_terms, equations,
+         volume_flux_fv, dg, cache, element, alpha_element)
+   end
+
+   # Loop over blended DG-FV elements
+   @trixi_timeit timer() "blended DG-FV" @threaded for idx_element in eachindex(element_ids_dgfv)
+      element = element_ids_dgfv[idx_element]
+      alpha_element = alpha[element]
+
+      # Calculate DG volume integral contribution
+      mdrk_kernel_1!(du, u, t, dt, tolerances, element, mesh,
+         nonconservative_terms, source_terms, equations,
+         dg, cache, 1 - alpha_element)
+
+      fv_kernel!(du, u, dt, volume_integral.reconstruction, mesh,
+         nonconservative_terms, equations, volume_flux_fv,
+         dg, cache, element, alpha_element)
+   end
+
+   return alpha
+end
+
+function calc_volume_integral_mdrk2!(du, u, t, dt, tolerances,
+   mesh::Union{
+      TreeMesh{2},
+      StructuredMesh{2},
+      UnstructuredMesh2D,
+      P4estMesh{2}
+   },
+   nonconservative_terms, source_terms, equations,
+   volume_integral::VolumeIntegralFRShockCapturing,
+   ::AbstractLWTimeDiscretization,
+   dg::DGSEM, cache)
+
+   @unpack element_ids_dg, element_ids_dgfv = cache
+   @unpack volume_flux_fv, indicator = volume_integral
+
+   # Calculate blending factors α: u = u_DG * (1 - α) + u_FV * α
+   alpha = @trixi_timeit timer() "blending factors" indicator(u, mesh, equations, dg, cache)
+
+   # Determine element ids for DG-only and blended DG-FV volume integral
+   pure_and_blended_element_ids!(element_ids_dg, element_ids_dgfv, alpha, dg, cache)
+
+   # Loop over pure DG elements
+   @trixi_timeit timer() "pure DG" @threaded for idx_element in eachindex(element_ids_dg)
+      element = element_ids_dg[idx_element]
+      alpha_element = alpha[element]
+
+      # Calculate DG volume integral contribution
+      mdrk_kernel_2!(du, u, t, dt, tolerances, element, mesh,
+         nonconservative_terms, source_terms, equations,
+         dg, cache, 1 - alpha_element)
+
+      # Calculate fn_low because it is needed for admissibility preservation proof
+      calc_fn_low_kernel!(du, u,
+         mesh,
+         nonconservative_terms, equations,
+         volume_flux_fv, dg, cache, element, alpha_element)
+   end
+
+   # Loop over blended DG-FV elements
+   @trixi_timeit timer() "blended DG-FV" @threaded for idx_element in eachindex(element_ids_dgfv)
+      element = element_ids_dgfv[idx_element]
+      alpha_element = alpha[element]
+
+      # Calculate DG volume integral contribution
+      mdrk_kernel_2!(du, u, t, dt, tolerances, element, mesh,
+         nonconservative_terms, source_terms, equations,
+         dg, cache, 1 - alpha_element)
+
+      fv_kernel!(du, u, dt, volume_integral.reconstruction, mesh,
+         nonconservative_terms, equations, volume_flux_fv,
+         dg, cache, element, alpha_element)
+   end
+
+   return alpha
 end
 
 @inline function mdrk_kernel_1!(du, u,
@@ -375,9 +449,9 @@ end
 
    # Load U2, F2 in local arrays
    for j in eachnode(dg), i in eachnode(dg), n in eachvariable(equations)
-      F[n,i,j,element] = F2[n,1,i,j,element]
-      G[n,i,j,element] = F2[n,2,i,j,element]
-      U[n,i,j,element] = U2[n,i,j,element]
+      F[n,i,j] = F2[n,1,i,j,element]
+      G[n,i,j] = F2[n,2,i,j,element]
+      U[n,i,j] = U2[n,i,j,element]
    end
 
    refresh!.((ut, ust))
@@ -439,7 +513,7 @@ end
       upp = us_node + 2*ust_node
       fpp, gpp  = fluxes(upp, equations)
       st = calc_source_t_N34(us_node, up, upp, um, umm, x, t, dt,
-                               source_terms, equations, dg, cache)
+                             source_terms, equations, dg, cache)
 
       ft = 1.0 / 12.0 * (-fpp + 8.0 * fp - 8.0 * fm + fmm)
       gt = 1.0 / 12.0 * (-gpp + 8.0 * gp - 8.0 * gm + gmm)
