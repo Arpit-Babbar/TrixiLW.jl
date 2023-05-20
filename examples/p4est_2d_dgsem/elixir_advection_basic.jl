@@ -66,8 +66,8 @@ time_int_tol = 1e-8
 tolerances = (;abstol = time_int_tol, reltol = time_int_tol);
 dt_initial = 1e-3;
 sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
-                     #  time_step_computation = TrixiLW.Adaptive()
-                      time_step_computation = TrixiLW.CFLBased(cfl_number)
+                      time_step_computation = TrixiLW.Adaptive()
+                     #  time_step_computation = TrixiLW.CFLBased(cfl_number)
                       );
 
 # Print the timer summary

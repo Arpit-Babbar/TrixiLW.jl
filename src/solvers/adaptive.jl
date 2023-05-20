@@ -194,7 +194,7 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
                      )
 
    # Update to us
-   update_soln!(integrator, _us, uprev, du_ode) # us = uprev + dt * du
+   update_soln!(integrator, _us, uprev, du_ode, 0.5*dt) # us = uprev + dt * du
 
    # Positivity limiter
    apply_limiters!(limiters, integrator, _us)

@@ -71,7 +71,7 @@ using LoopVectorization: @turbo
       @trixi_timeit timer() "mortar flux" calc_mortar_flux!(
          cache.elements.surface_flux_values, mesh,
          have_nonconservative_terms(equations), equations,
-         dg.mortar, dg.surface_integral, time_discretization, dg, cache)
+         dg.mortar, dg.surface_integral, dt, time_discretization, dg, cache)
 
       # Calculate surface integrals
       @trixi_timeit timer() "surface integral" calc_surface_integral!(
@@ -309,7 +309,6 @@ using LoopVectorization: @turbo
 
       # Calculate FV volume integral contribution
       for j in eachnode(dg), i in eachnode(dg)
-         u_node = get_node_vars(u, equations, dg, i, j, element)
          for v in eachvariable(equations)
             du[v, i, j, element] += (alpha *
                                      (inverse_weights[i] * (fstar1_L[v, i+1, j] - fstar1_R[v, i, j]) +
@@ -1917,7 +1916,7 @@ using LoopVectorization: @turbo
 
             Jl = Jr = cache.interface_cache.inverse_jacobian[i, interface]
 
-            alp = compute_alp(u_ll, u_rr, left_id, right_id, Jl, Jr, dt,
+            alp = compute_alp(u_ll, u_rr, left_id, right_id, Jl, Jr, 0.5*dt,
                fn, Fn_, fn_inner_ll, fn_inner_rr, i, equations,
                dg, dg.volume_integral, mesh)
             # Copy flux to left and right element storage

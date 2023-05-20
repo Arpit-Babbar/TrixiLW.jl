@@ -287,8 +287,8 @@ function calcflux_muscl!(fstar1_L, fstar1_R, fstar2_L, fstar2_R,
          # normal vector and the flux vector
          contravariant_flux = volume_flux_fv(u_ll, u_rr, normal_direction, equations)
 
-         Trixi.set_node_vars!(fstar2_L, contravariant_flux, equations, dg, i, j)
-         Trixi.set_node_vars!(fstar2_R, contravariant_flux, equations, dg, i, j)
+         set_node_vars!(fstar2_L, contravariant_flux, equations, dg, i, j)
+         set_node_vars!(fstar2_R, contravariant_flux, equations, dg, i, j)
       end
    end
 

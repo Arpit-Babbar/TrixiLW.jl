@@ -108,13 +108,13 @@ end
 
       flux1, flux2, cv_flux1, cv_flux2 = contravariant_flux(u_node, Ja, equations)
 
-      set_node_vars!(element_cache.F, 0.5*flux1, equations, dg, 1, i, j, element)
-      set_node_vars!(element_cache.F, 0.5*flux2, equations, dg, 2, i, j, element)
+      set_node_vars!(element_cache.F, flux1, equations, dg, 1, i, j, element)
+      set_node_vars!(element_cache.F, flux2, equations, dg, 2, i, j, element)
       set_node_vars!(mdrk_cache.F2, flux1, equations, dg, 1, i, j, element)
       set_node_vars!(mdrk_cache.F2, flux2, equations, dg, 2, i, j, element)
 
-      set_node_vars!(Ftilde, 0.5*cv_flux1, equations, dg, i, j)
-      set_node_vars!(Gtilde, 0.5*cv_flux2, equations, dg, i, j)
+      set_node_vars!(Ftilde, cv_flux1, equations, dg, i, j)
+      set_node_vars!(Gtilde, cv_flux2, equations, dg, i, j)
 
       for ii in eachnode(dg)
          # ut              += -lam * D * f for each variable
@@ -149,7 +149,7 @@ end
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       u_node = get_node_vars(u, equations, dg, i, j, element)
       s_node = calc_source(u_node, x, t, source_terms, equations, dg, cache)
-      set_node_vars!(S, 0.5*s_node, equations, dg, i, j)
+      set_node_vars!(S, s_node, equations, dg, i, j)
       set_node_vars!(S2, s_node, equations, dg, i, j)
       multiply_add_to_node_vars!(ut, dt, s_node, equations, dg, i, j) # has no jacobian factor
    end
@@ -179,19 +179,19 @@ end
       st = calc_source_t_N34(u_node, up, upp, um, umm, x, t, dt,
                              source_terms, equations, dg, cache)
 
-      ftilde_node = 2.0*get_node_vars(Ftilde, equations, dg, i, j)
-      gtilde_node = 2.0*get_node_vars(Gtilde, equations, dg, i, j)
-      s_node = 2.0*get_node_vars(S, equations, dg, i, j)
+      ftilde_node = get_node_vars(Ftilde, equations, dg, i, j)
+      gtilde_node = get_node_vars(Gtilde, equations, dg, i, j)
+      s_node = get_node_vars(S, equations, dg, i, j)
       Ftilde_node_low = ftilde_node + 0.5 * ftilde_t
       Gtilde_node_low = gtilde_node + 0.5 * gtilde_t
       S_node_low = s_node + 0.5 * st
 
-      multiply_add_to_node_vars!(element_cache.F, 0.125, ft, equations, dg, 1, i, j, element)
-      multiply_add_to_node_vars!(element_cache.F, 0.125, gt, equations, dg, 2, i, j, element)
-      multiply_add_to_node_vars!(Ftilde, 0.125, ftilde_t, equations, dg, i, j)
-      multiply_add_to_node_vars!(Gtilde, 0.125, gtilde_t, equations, dg, i, j)
-      multiply_add_to_node_vars!(U, 0.125, ut_node, equations, dg, i, j)
-      multiply_add_to_node_vars!(S, 0.125, st, equations, dg, i, j) # Source term
+      multiply_add_to_node_vars!(element_cache.F, 0.25, ft, equations, dg, 1, i, j, element)
+      multiply_add_to_node_vars!(element_cache.F, 0.25, gt, equations, dg, 2, i, j, element)
+      multiply_add_to_node_vars!(Ftilde, 0.25, ftilde_t, equations, dg, i, j)
+      multiply_add_to_node_vars!(Gtilde, 0.25, gtilde_t, equations, dg, i, j)
+      multiply_add_to_node_vars!(U, 0.25, ut_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(S, 0.25, st, equations, dg, i, j) # Source term
 
       multiply_add_to_node_vars!(mdrk_cache.F2, 1.0/6.0, ft, equations, dg, 1, i, j, element)
       multiply_add_to_node_vars!(mdrk_cache.F2, 1.0/6.0, gt, equations, dg, 2, i, j, element)

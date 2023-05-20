@@ -44,7 +44,7 @@ function rhs_mdrk1!(du, u,
    @trixi_timeit timer() "mortar flux" calc_mortar_flux!(
       cache.elements.surface_flux_values, mesh,
       have_nonconservative_terms(equations), equations,
-      dg.mortar, dg.surface_integral, time_discretization, dg, cache)
+      dg.mortar, dg.surface_integral, dt, time_discretization, dg, cache)
 
    # Calculate surface integrals
    @trixi_timeit timer() "surface integral" calc_surface_integral!(
@@ -104,7 +104,7 @@ function rhs_mdrk2!(du, u,
    @trixi_timeit timer() "mortar flux" calc_mortar_flux!(
       cache.elements.surface_flux_values, mesh,
       have_nonconservative_terms(equations), equations,
-      dg.mortar, dg.surface_integral, time_discretization, dg, cache)
+      dg.mortar, dg.surface_integral, dt, time_discretization, dg, cache)
 
    # Calculate surface integrals
    @trixi_timeit timer() "surface integral" calc_surface_integral!(
@@ -197,7 +197,7 @@ function calc_volume_integral_mdrk1!(du, u, t, dt, tolerances,
          nonconservative_terms, source_terms, equations,
          dg, cache, 1 - alpha_element)
 
-      fv_kernel!(du, u, dt, volume_integral.reconstruction, mesh,
+      fv_kernel!(du, u, 0.5*dt, volume_integral.reconstruction, mesh,
          nonconservative_terms, equations, volume_flux_fv,
          dg, cache, element, alpha_element)
    end
@@ -292,7 +292,7 @@ end
 
       flux1, flux2 = fluxes(u_node, equations)
 
-      set_node_vars!(F, 0.5*flux1, equations, dg, i, j)
+      set_node_vars!(F,  flux1, equations, dg, i, j)
       set_node_vars!(F2, flux1, equations, dg, i, j)
       for ii in eachnode(dg)
          # ut              += -lam * D * f for each variable
@@ -301,7 +301,7 @@ end
             equations, dg, ii, j)
       end
 
-      set_node_vars!(G, 0.5*flux2, equations, dg, i, j)
+      set_node_vars!(G,  flux2, equations, dg, i, j)
       set_node_vars!(G2, flux2, equations, dg, i, j)
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
@@ -309,7 +309,7 @@ end
          multiply_add_to_node_vars!(ut, -dt * derivative_matrix[jj, j], flux2, equations, dg, i, jj)
       end
 
-      set_node_vars!(U, 0.5*u_node, equations, dg, i, j)
+      set_node_vars!(U, u_node, equations, dg, i, j)
       set_node_vars!(U2, u_node, equations, dg, i, j)
       set_node_vars!(u_low, u_node, equations, dg, i, j, element)
    end
@@ -327,7 +327,7 @@ end
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       u_node = get_node_vars(u, equations, dg, i, j, element)
       s_node = calc_source(u_node, x, t, source_terms, equations, dg, cache)
-      set_node_vars!(S, 0.5*s_node, equations, dg, i, j)
+      set_node_vars!(S, s_node, equations, dg, i, j)
       set_node_vars!(S2, s_node, equations, dg, i, j)
       multiply_add_to_node_vars!(ut, dt, s_node, equations, dg, i, j) # has no jacobian factor
    end
@@ -353,17 +353,17 @@ end
       st = calc_source_t_N34(u_node, up, upp, um, umm, x, t, dt,
                              source_terms, equations, dg, cache)
 
-      f_node = 2.0*get_node_vars(F, equations, dg, i, j)
-      g_node = 2.0*get_node_vars(G, equations, dg, i, j)
-      s_node = 2.0*get_node_vars(S, equations, dg, i, j)
+      f_node = get_node_vars(F, equations, dg, i, j)
+      g_node = get_node_vars(G, equations, dg, i, j)
+      s_node = get_node_vars(S, equations, dg, i, j)
       F_node_low = f_node + 0.5 * ft
       G_node_low = g_node + 0.5 * gt
       S_node_low = s_node + 0.5 * st
 
-      multiply_add_to_node_vars!(F, 0.125, ft, equations, dg, i, j)
-      multiply_add_to_node_vars!(G, 0.125, gt, equations, dg, i, j)
-      multiply_add_to_node_vars!(U, 0.125, ut_node, equations, dg, i, j)
-      multiply_add_to_node_vars!(S, 0.125, st, equations, dg, i, j) # Source term
+      multiply_add_to_node_vars!(F, 0.25, ft, equations, dg, i, j)
+      multiply_add_to_node_vars!(G, 0.25, gt, equations, dg, i, j)
+      multiply_add_to_node_vars!(U, 0.25, ut_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(S, 0.25, st, equations, dg, i, j) # Source term
 
       multiply_add_to_node_vars!(F2, 1.0/6.0, ft, equations, dg, i, j)
       multiply_add_to_node_vars!(G2, 1.0/6.0, gt, equations, dg, i, j)

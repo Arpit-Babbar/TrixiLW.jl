@@ -67,8 +67,8 @@ end
 # For some callbacks from Trixi
 DiffEqBase.get_tmp_cache(integrator::LWIntegrator) = integrator.cache
 
-function update_soln!(integrator, u, uprev, du)
-   @.. u = uprev + integrator.dt * du
+function update_soln!(integrator, u, uprev, du, dt=integrator.dt)
+   @.. u = uprev + dt * du
    return nothing
 end
 

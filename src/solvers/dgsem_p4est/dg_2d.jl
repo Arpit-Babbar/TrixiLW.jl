@@ -439,7 +439,7 @@ function calc_mortar_flux!(surface_flux_values,
    mesh::P4estMesh{2},
    nonconservative_terms, equations,
    mortar_l2::LobattoLegendreMortarL2,
-   surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache)
+   surface_integral, dt, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache)
    @unpack neighbor_ids, node_indices = cache.mortars
    @unpack contravariant_vectors = cache.elements
    @unpack fstar_upper_threaded, fstar_lower_threaded = cache
@@ -470,7 +470,7 @@ function calc_mortar_flux!(surface_flux_values,
 
             element_large = neighbor_ids[3, mortar]
 
-            calc_mortar_flux!(fstar, mesh, nonconservative_terms, equations,
+            calc_mortar_flux!(fstar, mesh, nonconservative_terms, equations, dt,
                surface_integral, time_discretization, dg, cache,
                mortar, position, element, element_large, normal_direction,
                node)

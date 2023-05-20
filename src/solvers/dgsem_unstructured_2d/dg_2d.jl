@@ -44,7 +44,7 @@ function rhs!(du, u, t,
 
    # Calculate boundary fluxes
    @trixi_timeit timer() "boundary flux" calc_boundary_flux!(
-      cache, t, boundary_conditions, mesh, equations, dg.surface_integral,
+      cache, t, dt, boundary_conditions, mesh, equations, dg.surface_integral,
       time_discretization, dg)
 
    # Calculate surface integrals
@@ -351,7 +351,7 @@ function prolong2boundaries!(cache, u,
 end
 
 # TODO: Taal dimension agnostic
-function calc_boundary_flux!(cache, t, boundary_condition::BoundaryConditionPeriodic,
+function calc_boundary_flux!(cache, t, dt, boundary_condition::BoundaryConditionPeriodic,
    mesh::Union{UnstructuredMesh2D,P4estMesh},
    equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
    @assert isempty(eachboundary(dg, cache))
@@ -359,12 +359,12 @@ end
 
 
 # Function barrier for type stability
-function calc_boundary_flux!(cache, t, boundary_conditions,
+function calc_boundary_flux!(cache, t, dt, boundary_conditions,
    mesh::Union{UnstructuredMesh2D,P4estMesh},
    equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
    @unpack boundary_condition_types, boundary_indices = boundary_conditions
 
-   calc_boundary_flux_by_type!(cache, t, boundary_condition_types, boundary_indices,
+   calc_boundary_flux_by_type!(cache, t, dt, boundary_condition_types, boundary_indices,
       mesh, equations, surface_integral, time_discretization, dg)
    return nothing
 end
@@ -372,7 +372,7 @@ end
 
 # Iterate over tuples of boundary condition types and associated indices
 # in a type-stable way using "lispy tuple programming".
-function calc_boundary_flux_by_type!(cache, t, BCs::NTuple{N,Any},
+function calc_boundary_flux_by_type!(cache, t, dt, BCs::NTuple{N,Any},
    BC_indices::NTuple{N,Vector{Int}},
    mesh::Union{UnstructuredMesh2D,P4estMesh},
    equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG) where {N}
@@ -384,11 +384,11 @@ function calc_boundary_flux_by_type!(cache, t, BCs::NTuple{N,Any},
    remaining_boundary_condition_indices = Base.tail(BC_indices)
 
    # process the first boundary condition type
-   calc_boundary_flux!(cache, t, boundary_condition, boundary_condition_indices,
+   calc_boundary_flux!(cache, t, dt, boundary_condition, boundary_condition_indices,
       mesh, equations, surface_integral, time_discretization, dg)
 
    # recursively call this method with the unprocessed boundary types
-   calc_boundary_flux_by_type!(cache, t, remaining_boundary_conditions,
+   calc_boundary_flux_by_type!(cache, t, dt, remaining_boundary_conditions,
       remaining_boundary_condition_indices,
       mesh, equations, surface_integral, time_discretization, dg)
 
@@ -396,14 +396,14 @@ function calc_boundary_flux_by_type!(cache, t, BCs::NTuple{N,Any},
 end
 
 # terminate the type-stable iteration over tuples
-function calc_boundary_flux_by_type!(cache, t, BCs::Tuple{}, BC_indices::Tuple{},
+function calc_boundary_flux_by_type!(cache, t, dt, BCs::Tuple{}, BC_indices::Tuple{},
    mesh::Union{UnstructuredMesh2D,P4estMesh},
    equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
    nothing
 end
 
 
-function calc_boundary_flux!(cache, t, boundary_condition, boundary_indexing,
+function calc_boundary_flux!(cache, t, dt, boundary_condition, boundary_indexing,
    mesh::UnstructuredMesh2D, equations,
    surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
    @unpack surface_flux_values = cache.elements
@@ -421,7 +421,7 @@ function calc_boundary_flux!(cache, t, boundary_condition, boundary_indexing,
       for node in eachnode(dg)
          calc_boundary_flux!(surface_flux_values, t, boundary_condition,
             mesh, have_nonconservative_terms(equations),
-            equations, surface_integral, time_discretization, dg, cache,
+            equations, surface_integral, dt, time_discretization, dg, cache,
             node, side, element, boundary)
       end
    end
