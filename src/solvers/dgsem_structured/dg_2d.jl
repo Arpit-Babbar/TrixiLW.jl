@@ -1,8 +1,6 @@
 # import Trixi: create_cache, calc_volume_integral!, calc_interface_flux!
 using Trixi: TreeMesh, P4estMesh, BoundaryConditionPeriodic,
-   prolong2mortars!, calc_mortar_flux!,
    calc_surface_integral!, apply_jacobian!, reset_du!,
-   max_dt,
    StructuredMesh, UnstructuredMesh2D,
    DG, DGSEM, nnodes, nelements, False,
    get_node_vars, set_node_vars!

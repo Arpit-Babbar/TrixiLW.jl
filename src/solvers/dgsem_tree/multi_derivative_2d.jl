@@ -24,7 +24,7 @@ function rhs_mdrk1!(du, u,
    @trixi_timeit timer() "interface flux" calc_interface_flux!(
       cache.elements.surface_flux_values, mesh,
       have_nonconservative_terms(equations), equations,
-      dg.surface_integral, dt, time_discretization, dg, cache)
+      dg.surface_integral, 0.5*dt, time_discretization, dg, cache)
 
    # Prolong solution to boundaries
    @trixi_timeit timer() "prolong2boundaries" prolong2boundaries!(
@@ -32,19 +32,17 @@ function rhs_mdrk1!(du, u,
 
    # Calculate boundary fluxes
    @trixi_timeit timer() "boundary flux" calc_boundary_flux!(
-      cache, t, dt, boundary_conditions, mesh, equations, dg.surface_integral, time_discretization, dg)
+      cache, t, 0.5*dt, boundary_conditions, mesh, equations, dg.surface_integral, time_discretization, dg)
 
    # Prolong solution to mortars
    @trixi_timeit timer() "prolong2mortars" prolong2mortars!(
       cache, u, mesh, equations, dg.mortar, dg.surface_integral, time_discretization, dg)
-   # @trixi_timeit timer() "prolong2mortars" prolong2mortars!(
-   #       cache, u, mesh, equations, dg.mortar, dg.surface_integral, dg)
 
    # Calculate mortar fluxes
    @trixi_timeit timer() "mortar flux" calc_mortar_flux!(
       cache.elements.surface_flux_values, mesh,
       have_nonconservative_terms(equations), equations,
-      dg.mortar, dg.surface_integral, dt, time_discretization, dg, cache)
+      dg.mortar, dg.surface_integral, 0.5*dt, time_discretization, dg, cache)
 
    # Calculate surface integrals
    @trixi_timeit timer() "surface integral" calc_surface_integral!(
