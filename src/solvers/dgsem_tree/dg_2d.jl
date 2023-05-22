@@ -1598,7 +1598,7 @@ using LoopVectorization: @turbo
       mesh::TreeMesh{2},
       nonconservative_terms::False, equations,
       mortar_l2::LobattoLegendreMortarL2,
-      surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache)
+      surface_integral, dt, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache)
       @unpack surface_flux = surface_integral
       @unpack u_lower, u_upper, orientations = cache.mortars
       @unpack U_lower, U_upper, F_lower, F_upper = cache.lw_mortars
