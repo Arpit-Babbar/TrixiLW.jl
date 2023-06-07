@@ -43,6 +43,8 @@ end
    time_discretization::AbstractLWTimeDiscretization)
    @unpack nodes, weights = dg.basis
    U_outer, F_outer = outer_cache[Threads.threadid()]
+   fill!(U_outer, zero(eltype(U_outer)))
+   fill!(F_outer, zero(eltype(F_outer)))
    for i in eachnode(dg) # Loop over intermediary time levels
       ts = t + 0.5 * dt * (nodes[i] + 1.0)
       # get the external value of the solution
