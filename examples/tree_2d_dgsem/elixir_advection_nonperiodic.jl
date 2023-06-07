@@ -13,13 +13,13 @@ initial_condition = initial_condition_gauss
 # 2*ndims == 4 directions or you can pass a tuple containing BCs for each direction
 boundary_conditions = BoundaryConditionDirichlet(initial_condition)
 
-solver = DGSEM(polydeg=3, surface_flux=flux_lax_friedrichs,
-               volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.MDRK()))
+solver = DGSEM(polydeg=4, surface_flux=flux_lax_friedrichs,
+               volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
 
 coordinates_min = (-5.0, -5.0)
 coordinates_max = ( 5.0,  5.0)
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level=6,
+                initial_refinement_level=5,
                 n_cells_max=30_000,
                 periodicity=false)
 
@@ -49,7 +49,7 @@ save_solution = SaveSolutionCallback(interval=100,
                                      solution_variables=cons2prim)
 
 callbacks = (;analysis_callback, alive_callback,
-              save_solution, summary_callback)
+              save_solution)
 ###############################################################################
 # run the simulation
 
@@ -61,4 +61,7 @@ sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
                       time_step_computation = TrixiLW.CFLBased(cfl_number)
                       );
 
+# sol = solve(ode, CarpenterKennedy2N54(williamson_condition=false),
+#             dt=stepsize_callback(ode), # solve needs some value here but it will be overwritten by the stepsize_callback
+#             save_everystep=false, callback=callbacks);
 summary_callback() # print the timer summary
