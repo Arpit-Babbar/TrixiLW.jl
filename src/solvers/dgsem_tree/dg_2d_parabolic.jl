@@ -68,7 +68,7 @@ function rhs!(du, u, t, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
 
    # Calculate boundary fluxes
    @trixi_timeit timer() "boundary flux" calc_boundary_flux!(
-      cache, t, boundary_conditions, mesh, equations, dg.surface_integral, time_discretization, dg)
+      cache, t, dt, boundary_conditions, mesh, equations, dg.surface_integral, time_discretization, dg)
 
    # Prolong viscous flux to boundaries
    @trixi_timeit timer() "prolong2boundaries" prolong2boundaries_visc_lw!(

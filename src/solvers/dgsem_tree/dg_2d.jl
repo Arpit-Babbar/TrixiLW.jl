@@ -59,7 +59,7 @@ using LoopVectorization: @turbo
 
       # Calculate boundary fluxes
       @trixi_timeit timer() "boundary flux" calc_boundary_flux!(
-         cache, t, boundary_conditions, mesh, equations, dg.surface_integral, time_discretization, dg)
+         cache, t, dt, boundary_conditions, mesh, equations, dg.surface_integral, time_discretization, dg)
 
       # Prolong solution to mortars
       @trixi_timeit timer() "prolong2mortars" prolong2mortars!(
@@ -1376,7 +1376,7 @@ using LoopVectorization: @turbo
    end
 
    # TODO: Taal dimension agnostic
-   function calc_boundary_flux!(cache, t, boundary_condition::BoundaryConditionPeriodic,
+   function calc_boundary_flux!(cache, t, dt, boundary_condition::BoundaryConditionPeriodic,
       mesh::TreeMesh{2}, equations, surface_integral, time_discretization::AbstractLWTimeDiscretization,
       dg::DG)
       @assert isempty(eachboundary(dg, cache))

@@ -32,7 +32,7 @@ function rhs_mdrk1!(du, u,
 
    # Calculate boundary fluxes
    @trixi_timeit timer() "boundary flux" calc_boundary_flux!(
-      cache, t, boundary_conditions, mesh, equations, dg.surface_integral, time_discretization, dg)
+      cache, t, dt, boundary_conditions, mesh, equations, dg.surface_integral, time_discretization, dg)
 
    # Prolong solution to mortars
    @trixi_timeit timer() "prolong2mortars" prolong2mortars!(
@@ -92,7 +92,7 @@ function rhs_mdrk2!(du, u,
 
    # Calculate boundary fluxes
    @trixi_timeit timer() "boundary flux" calc_boundary_flux!(
-      cache, t, boundary_conditions, mesh, equations, dg.surface_integral, time_discretization, dg)
+      cache, t, dt, boundary_conditions, mesh, equations, dg.surface_integral, time_discretization, dg)
 
    # Prolong solution to mortars
    @trixi_timeit timer() "prolong2mortars" prolong2mortars!(
