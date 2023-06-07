@@ -61,6 +61,33 @@ end
    return flux
 end
 
+@inline function (boundary_condition::BoundaryConditionDirichlet)(U_inner, F_inner, u_inner,
+   outer_cache,
+   normal_direction::AbstractVector,
+   x, t, dt,
+   surface_flux_function, equations, dg,
+   time_discretization::MDRK)
+   @unpack nodes, weights = dg.basis
+   u_outer = boundary_condition.boundary_value_function(x, t, equations)
+   U_outer, F_outer = outer_cache[Threads.threadid()]
+   fill!(U_outer, zero(eltype(U_outer)))
+   fill!(F_outer, zero(eltype(F_outer)))
+   for i in eachnode(dg) # Loop over intermediary time levels
+      ts = t + 0.5 * dt * (nodes[i] + 1.0)
+      # get the external value of the solution
+      u_boundary = boundary_condition.boundary_value_function(x, ts, equations)
+      f_boundary = Trixi.flux(u_boundary, normal_direction, equations)
+      U_outer .+= u_boundary * weights[i] / 2.0
+      F_outer .+= f_boundary * weights[i] / 2.0
+   end
+
+   # Calculate boundary flux
+   flux = surface_flux_function(F_inner, F_outer, u_inner, u_outer, U_inner, U_outer,
+      normal_direction, equations)
+
+   return flux
+end
+
 @inline function boundary_condition_slip_wall_vertical(U_inner, F_inner, u_inner, outer_cache,
    orientation_or_normal, direction,
    x, t, dt,

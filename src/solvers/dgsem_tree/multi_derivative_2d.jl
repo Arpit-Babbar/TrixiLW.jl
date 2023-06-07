@@ -2,6 +2,7 @@ function rhs_mdrk1!(du, u,
    t, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
    initial_condition, boundary_conditions, source_terms, dg::DG,
    time_discretization::AbstractLWTimeDiscretization, cache, tolerances::NamedTuple)
+   
    # Reset du
    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
 
@@ -11,11 +12,10 @@ function rhs_mdrk1!(du, u,
 
    # Calculate volume integral
    @trixi_timeit timer() "volume integral" calc_volume_integral_mdrk1!(
-      du,
-      u,
-      t, dt, tolerances, mesh,
+      du, u, t, dt, tolerances, mesh,
       have_nonconservative_terms(equations), source_terms, equations,
       dg.volume_integral, time_discretization, dg, cache)
+
    # Prolong solution to interfaces
    @trixi_timeit timer() "prolong2interfaces" prolong2interfaces!(
       cache, u, mesh, equations, dg.surface_integral, time_discretization, dg)
@@ -32,7 +32,8 @@ function rhs_mdrk1!(du, u,
 
    # Calculate boundary fluxes
    @trixi_timeit timer() "boundary flux" calc_boundary_flux!(
-      cache, t, 0.5*dt, boundary_conditions, mesh, equations, dg.surface_integral, time_discretization, dg)
+      cache, t, 0.5*dt, boundary_conditions, mesh, equations, dg.surface_integral,
+      time_discretization, dg)
 
    # Prolong solution to mortars
    @trixi_timeit timer() "prolong2mortars" prolong2mortars!(
@@ -59,6 +60,7 @@ function rhs_mdrk2!(du, u,
    t, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
    initial_condition, boundary_conditions, source_terms, dg::DG,
    time_discretization::AbstractLWTimeDiscretization, cache, tolerances::NamedTuple)
+
    # Reset du
    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
 
@@ -95,8 +97,6 @@ function rhs_mdrk2!(du, u,
    # Prolong solution to mortars
    @trixi_timeit timer() "prolong2mortars" prolong2mortars!(
       cache, u, mesh, equations, dg.mortar, dg.surface_integral, time_discretization, dg)
-   # @trixi_timeit timer() "prolong2mortars" prolong2mortars!(
-   #       cache, u, mesh, equations, dg.mortar, dg.surface_integral, dg)
 
    # Calculate mortar fluxes
    @trixi_timeit timer() "mortar flux" calc_mortar_flux!(
@@ -374,7 +374,7 @@ end
       for ii in eachnode(dg)
          # res              += -lam * D * F for each variable
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-         multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], F_node,
+         multiply_add_to_node_vars!(du, alpha * 0.5 * dt* derivative_dhat[ii, i], F_node,
                                     equations, dg, ii, j, element)
          multiply_add_to_node_vars!(u_low, -dt * inv_jacobian * derivative_matrix[ii, i],
                                     F_node_low, equations, dg, ii, j, element)
@@ -383,7 +383,7 @@ end
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], G_node,
+         multiply_add_to_node_vars!(du, alpha * 0.5 * dt * derivative_dhat[jj, j], G_node,
                                     equations, dg, i, jj, element)
          multiply_add_to_node_vars!(u_low, -dt * inv_jacobian * derivative_matrix[jj, j],
                                     G_node_low, equations, dg, i, jj, element)
@@ -407,7 +407,7 @@ end
 
       S_node = get_node_vars(S, equations, dg, i, j)
       S2_node = get_node_vars(S2, equations, dg, i, j)
-      multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations,
+      multiply_add_to_node_vars!(du, - 0.5 * dt / inv_jacobian, S_node, equations,
                                        dg, i, j, element)
       multiply_add_to_node_vars!(u_low, dt , S_node_low, equations,
                                        dg, i, j, element)
@@ -530,13 +530,13 @@ end
       for ii in eachnode(dg)
          # res              += -lam * D * F for each variable
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-         multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], F_node, equations, dg, ii, j, element)
+         multiply_add_to_node_vars!(du, alpha * dt * derivative_dhat[ii, i], F_node, equations, dg, ii, j, element)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], G_node, equations, dg, i, jj, element)
+         multiply_add_to_node_vars!(du, alpha * dt * derivative_dhat[jj, j], G_node, equations, dg, i, jj, element)
       end
 
       # TODO - update to v1.8 and call with @inline
@@ -548,7 +548,7 @@ end
       set_node_vars!(element_cache.F, G_node, equations, dg, 2, i, j, element)
 
       S_node = get_node_vars(S, equations, dg, i, j)
-      multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations,
+      multiply_add_to_node_vars!(du, -dt / inv_jacobian, S_node, equations,
                                        dg, i, j, element)
    end
 

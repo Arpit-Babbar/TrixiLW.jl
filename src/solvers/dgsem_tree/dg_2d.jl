@@ -43,6 +43,7 @@ using LoopVectorization: @turbo
          t, dt, tolerances, mesh,
          have_nonconservative_terms(equations), source_terms, equations,
          dg.volume_integral, time_discretization, dg, cache)
+
       # Prolong solution to interfaces
       @trixi_timeit timer() "prolong2interfaces" prolong2interfaces!(
          cache, u, mesh, equations, dg.surface_integral, time_discretization, dg)
@@ -64,8 +65,6 @@ using LoopVectorization: @turbo
       # Prolong solution to mortars
       @trixi_timeit timer() "prolong2mortars" prolong2mortars!(
          cache, u, mesh, equations, dg.mortar, dg.surface_integral, time_discretization, dg)
-      # @trixi_timeit timer() "prolong2mortars" prolong2mortars!(
-      #       cache, u, mesh, equations, dg.mortar, dg.surface_integral, dg)
 
       # Calculate mortar fluxes
       @trixi_timeit timer() "mortar flux" calc_mortar_flux!(

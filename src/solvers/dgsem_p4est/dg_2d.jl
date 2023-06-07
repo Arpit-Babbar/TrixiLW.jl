@@ -170,11 +170,11 @@ end
 
    for v in eachvariable(equations)
       surface_flux_values[v, primary_node_index, primary_direction_index, primary_element_index] = (
-         alp * fn[v] + (1.0 - alp) * Fn[v]
+         alp * dt * fn[v] + (1.0 - alp) * Fn[v]
          # Fn[v]
       )
       surface_flux_values[v, secondary_node_index, secondary_direction_index, secondary_element_index] = -(
-         alp * fn[v] + (1.0 - alp) * Fn[v]
+         alp * dt * fn[v] + (1.0 - alp) * Fn[v]
          # Fn[v]
       )
    end
@@ -447,8 +447,7 @@ function calc_mortar_flux!(surface_flux_values,
 
    @threaded for mortar in eachmortar(dg, cache)
       # Choose thread-specific pre-allocated container
-      fstar = (fstar_lower_threaded[Threads.threadid()],
-         fstar_upper_threaded[Threads.threadid()])
+      fstar = (fstar_lower_threaded[Threads.threadid()], fstar_upper_threaded[Threads.threadid()])
 
       # Get index information on the small elements
       small_indices = node_indices[1, mortar]
