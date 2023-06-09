@@ -5,13 +5,14 @@ using SimpleUnPack
 # Dirichlet-type boundary condition for use with TreeMesh or StructuredMesh
 @inline function (boundary_condition::BoundaryConditionDirichlet)(U_inner, F_inner, u_inner,
    outer_cache, orientation_or_normal, direction, x, t, dt, surface_flux_function, equations, dg,
-   time_discretization::AbstractLWTimeDiscretization)
+   time_discretization::AbstractLWTimeDiscretization, scaling_factor = 1)
    @unpack nodes, weights = dg.basis
    U_outer, F_outer = outer_cache[Threads.threadid()]
    fill!(U_outer, zero(eltype(U_outer)))
    fill!(F_outer, zero(eltype(F_outer)))
+   dt_scaled = scaling_factor * dt
    for i in eachnode(dg) # Loop over intermediary time levels
-      ts = t + 0.5 * dt * (nodes[i] + 1.0)
+      ts = t + 0.5 * dt_scaled * (nodes[i] + 1.0)
       # get the external value of the solution
       u_boundary = boundary_condition.boundary_value_function(x, ts, equations)
       f_boundary = Trixi.flux(u_boundary, orientation_or_normal, equations)
@@ -40,13 +41,15 @@ end
    normal_direction::AbstractVector,
    x, t, dt,
    surface_flux_function, equations, dg,
-   time_discretization::AbstractLWTimeDiscretization)
+   time_discretization::AbstractLWTimeDiscretization,
+   scaling_factor = 1)
    @unpack nodes, weights = dg.basis
    U_outer, F_outer = outer_cache[Threads.threadid()]
    fill!(U_outer, zero(eltype(U_outer)))
    fill!(F_outer, zero(eltype(F_outer)))
+   dt_ = scaling_factor * dt
    for i in eachnode(dg) # Loop over intermediary time levels
-      ts = t + 0.5 * dt * (nodes[i] + 1.0)
+      ts = t + 0.5 * dt_ * (nodes[i] + 1.0)
       # get the external value of the solution
       u_boundary = boundary_condition.boundary_value_function(x, ts, equations)
       f_boundary = Trixi.flux(u_boundary, normal_direction, equations)

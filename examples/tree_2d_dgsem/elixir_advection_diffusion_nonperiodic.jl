@@ -57,7 +57,7 @@ semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
                                                   (equations, equations_parabolic),
                                                   initial_condition, solver;
                                                   boundary_conditions=(boundary_conditions,
-                                                                        boundary_conditions_parabolic),
+                                                                       boundary_conditions_parabolic),
                                                   initial_caches = ((;cfl_number, dt = zeros(1)),(;cfl_number)))
 
 
