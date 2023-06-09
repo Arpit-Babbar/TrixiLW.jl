@@ -1,4 +1,3 @@
-using OrdinaryDiffEq
 using TrixiLW
 using Trixi
 
@@ -224,7 +223,7 @@ boundary_conditions_parabolic = (; x_neg=boundary_condition_periodic,
   y_neg=boundary_condition_top_bottom,
   y_pos=boundary_condition_top_bottom)
 
-cfl_number = 2.0
+cfl_number = 0.5
 
 semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
   get_time_discretization(solver),
@@ -248,6 +247,7 @@ analysis_callback = AnalysisCallback(semi, interval=10 * analysis_interval)
 callbacks = (;
   alive_callback,
   analysis_callback,
+  summary_callback
 );
 
 ###############################################################################
@@ -260,3 +260,4 @@ sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
   # time_step_computation = TrixiLW.Adaptive()
   time_step_computation=TrixiLW.CFLBased(cfl_number)
 );
+summary_callback()
