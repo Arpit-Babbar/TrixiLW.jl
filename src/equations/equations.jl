@@ -47,14 +47,14 @@ end
    U_outer, F_outer = outer_cache[Threads.threadid()]
    fill!(U_outer, zero(eltype(U_outer)))
    fill!(F_outer, zero(eltype(F_outer)))
-   dt_ = scaling_factor * dt
+   dt_scaled = scaling_factor * dt
    for i in eachnode(dg) # Loop over intermediary time levels
-      ts = t + 0.5 * dt_ * (nodes[i] + 1.0)
+      ts = t + 0.5 * dt_scaled * (nodes[i] + 1.0)
       # get the external value of the solution
       u_boundary = boundary_condition.boundary_value_function(x, ts, equations)
       f_boundary = Trixi.flux(u_boundary, normal_direction, equations)
-      U_outer .+= u_boundary * weights[i] / 2.0
-      F_outer .+= f_boundary * weights[i] / 2.0
+      U_outer .+= u_boundary * scaling_factor * weights[i] / 2.0
+      F_outer .+= f_boundary * scaling_factor * weights[i] / 2.0
    end
 
    # Calculate boundary flux
