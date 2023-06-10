@@ -1327,7 +1327,8 @@ using LoopVectorization: @turbo
    end
 
    function prolong2boundaries!(cache, u,
-      mesh::TreeMesh{2}, equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
+      mesh::TreeMesh{2}, equations, surface_integral,
+      time_discretization::AbstractLWTimeDiscretization, dg::DG)
       @unpack boundaries, boundary_cache = cache
       @unpack orientations, neighbor_sides = boundaries
       @unpack U, F = cache.element_cache
@@ -1378,13 +1379,14 @@ using LoopVectorization: @turbo
    # TODO: Taal dimension agnostic
    function calc_boundary_flux!(cache, t, dt, boundary_condition::BoundaryConditionPeriodic,
       mesh::TreeMesh{2}, equations, surface_integral, time_discretization::AbstractLWTimeDiscretization,
-      dg::DG)
+      dg::DG, scaling_factor = 1)
       @assert isempty(eachboundary(dg, cache))
    end
 
    function calc_boundary_flux!(cache, t, dt, boundary_conditions::NamedTuple,
       ::TreeMesh{2}, equations, surface_integral,
-      time_discretization::AbstractLWTimeDiscretization, dg::DG)
+      time_discretization::AbstractLWTimeDiscretization, dg::DG,
+      scaling_factor = 1)
       @unpack surface_flux_values = cache.elements
       @unpack n_boundaries_per_direction = cache.boundaries
 
@@ -1395,22 +1397,22 @@ using LoopVectorization: @turbo
       # Calc boundary fluxes in each direction
       calc_adv_boundary_flux_by_direction!(surface_flux_values, t, dt, boundary_conditions[1],
          equations, surface_integral, time_discretization, dg, cache,
-         1, firsts[1], lasts[1])
+         1, firsts[1], lasts[1], scaling_factor)
       calc_adv_boundary_flux_by_direction!(surface_flux_values, t, dt, boundary_conditions[2],
          equations, surface_integral, time_discretization, dg, cache,
-         2, firsts[2], lasts[2])
+         2, firsts[2], lasts[2], scaling_factor)
       calc_adv_boundary_flux_by_direction!(surface_flux_values, t, dt, boundary_conditions[3],
          equations, surface_integral, time_discretization, dg, cache,
-         3, firsts[3], lasts[3])
+         3, firsts[3], lasts[3], scaling_factor)
       calc_adv_boundary_flux_by_direction!(surface_flux_values, t, dt, boundary_conditions[4],
          equations, surface_integral, time_discretization, dg, cache,
-         4, firsts[4], lasts[4])
+         4, firsts[4], lasts[4], scaling_factor)
    end
 
    function calc_adv_boundary_flux_by_direction!(surface_flux_values::AbstractArray{<:Any,4}, t, dt,
       boundary_condition, equations,
       surface_integral, ::AbstractLWTimeDiscretization, dg::DG, cache,
-      direction, first_boundary, last_boundary)
+      direction, first_boundary, last_boundary, scaling_factor)
 
       @unpack surface_flux = surface_integral
       @unpack u, neighbor_ids, neighbor_sides, node_coordinates, orientations = cache.boundaries
@@ -1437,7 +1439,7 @@ using LoopVectorization: @turbo
             x = get_node_coords(node_coordinates, equations, dg, i, boundary)
             flux = boundary_condition(U_inner, F_inner, u_inner, outer_cache, orientations[boundary],
                direction, x, t, dt, surface_flux, equations, dg,
-               get_time_discretization(dg))
+               get_time_discretization(dg), scaling_factor)
 
             # flux = boundary_condition(u_inner, orientations[boundary], direction, x, t, surface_flux,
             #                           equations)
