@@ -251,7 +251,8 @@ end
 
 function calc_boundary_flux!(cache, t, dt, boundary_condition, boundary_indexing::Vector,
    mesh::P4estMesh{2},
-   equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
+   equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG,
+   scaling_factor)
    @unpack boundaries = cache
    @unpack surface_flux_values = cache.elements
    index_range = eachnode(dg)
@@ -276,7 +277,7 @@ function calc_boundary_flux!(cache, t, dt, boundary_condition, boundary_indexing
             mesh, have_nonconservative_terms(equations),
             equations, surface_integral, time_discretization, dg, cache,
             i_node, j_node,
-            node, direction, element, boundary)
+            node, direction, element, boundary, scaling_factor)
 
          i_node += i_node_step
          j_node += j_node_step
@@ -291,7 +292,7 @@ end
    nonconservative_terms::False, equations,
    surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache,
    i_index, j_index,
-   node_index, direction_index, element_index, boundary_index)
+   node_index, direction_index, element_index, boundary_index, scaling_factor)
    @unpack boundaries, boundary_cache = cache
    @unpack outer_cache = boundary_cache
    @unpack node_coordinates, contravariant_vectors = cache.elements
@@ -312,7 +313,7 @@ end
    # flux_ = boundary_condition(u_inner, normal_direction, x, t, surface_flux, equations)
 
    flux_ = boundary_condition(U_inner, f_inner, u_inner, outer_cache, normal_direction, x, t, dt,
-      surface_flux, equations, dg, time_discretization)
+      surface_flux, equations, dg, time_discretization, scaling_factor)
 
    # Copy flux to element storage in the correct orientation
    for v in eachvariable(equations)
