@@ -17,8 +17,8 @@ using SimpleUnPack
       u_boundary = boundary_condition.boundary_value_function(x, ts, equations)
       f_boundary = Trixi.flux(u_boundary, orientation_or_normal, equations)
       for n in eachvariable(equations)
-         U_outer[n] += 0.5 * u_boundary[n] * weights[i]
-         F_outer[n] += 0.5 * f_boundary[n] * weights[i]
+         U_outer[n] += 0.5 * scaling_factor * u_boundary[n] * weights[i]
+         F_outer[n] += 0.5 * scaling_factor * f_boundary[n] * weights[i]
       end
    end
 

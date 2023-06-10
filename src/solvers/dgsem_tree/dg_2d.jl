@@ -59,7 +59,7 @@ using LoopVectorization: @turbo
 
       # Calculate boundary fluxes
       @trixi_timeit timer() "boundary flux" calc_boundary_flux!(
-         cache, t, dt, boundary_conditions, mesh, equations, dg.surface_integral, time_discretization, dg, 1.0)
+         cache, t, dt, boundary_conditions, mesh, equations, dg.surface_integral, time_discretization, dg)
 
       # Prolong solution to mortars
       @trixi_timeit timer() "prolong2mortars" prolong2mortars!(
@@ -1327,7 +1327,8 @@ using LoopVectorization: @turbo
    end
 
    function prolong2boundaries!(cache, u,
-      mesh::TreeMesh{2}, equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
+      mesh::TreeMesh{2}, equations, surface_integral,
+      time_discretization::AbstractLWTimeDiscretization, dg::DG)
       @unpack boundaries, boundary_cache = cache
       @unpack orientations, neighbor_sides = boundaries
       @unpack U, F = cache.element_cache
