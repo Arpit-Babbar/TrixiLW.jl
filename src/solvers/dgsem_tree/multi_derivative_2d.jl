@@ -61,6 +61,7 @@ function rhs_mdrk2!(du, u,
    t, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
    initial_condition, boundary_conditions, source_terms, dg::DG,
    time_discretization::AbstractLWTimeDiscretization, cache, tolerances::NamedTuple)
+
    # Reset du
    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
 
@@ -97,8 +98,6 @@ function rhs_mdrk2!(du, u,
    # Prolong solution to mortars
    @trixi_timeit timer() "prolong2mortars" prolong2mortars!(
       cache, u, mesh, equations, dg.mortar, dg.surface_integral, time_discretization, dg)
-   # @trixi_timeit timer() "prolong2mortars" prolong2mortars!(
-   #       cache, u, mesh, equations, dg.mortar, dg.surface_integral, dg)
 
    # Calculate mortar fluxes
    @trixi_timeit timer() "mortar flux" calc_mortar_flux!(
@@ -197,7 +196,7 @@ function calc_volume_integral_mdrk1!(du, u, t, dt, tolerances,
          nonconservative_terms, source_terms, equations,
          dg, cache, 1 - alpha_element)
 
-      fv_kernel!(du, u, dt, volume_integral.reconstruction, mesh,
+      fv_kernel!(du, u, 0.5*dt, volume_integral.reconstruction, mesh,
          nonconservative_terms, equations, volume_flux_fv,
          dg, cache, element, alpha_element)
    end

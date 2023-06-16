@@ -107,7 +107,7 @@ initial_condition = initial_condition_double_mach_reflection
    outer_cache,
    normal_direction::AbstractVector, x, t, dt,
    surface_flux_function, equations::CompressibleEulerEquations2D,
-   dg, time_discretization)
+   dg, time_discretization, scaling_factor = 1)
 
    u_boundary = initial_condition_double_mach_reflection(x, t, equations)
    flux = Trixi.flux(u_boundary, normal_direction, equations)
@@ -121,7 +121,7 @@ end
    outer_cache,
    normal_direction::AbstractVector, x, t, dt,
    surface_flux_function, equations::CompressibleEulerEquations2D,
-   dg, time_discretization)
+   dg, time_discretization, scaling_factor = 1)
   # NOTE: Only for the supersonic outflow is this strategy valid
   # Calculate the boundary flux entirely from the internal solution state
   return flux(u_inner, normal_direction, equations)
@@ -133,7 +133,7 @@ end
    outer_cache,
    normal_direction::AbstractVector, x, t, dt,
    surface_flux_function, equations::CompressibleEulerEquations2D,
-   dg, time_discretization)
+   dg, time_discretization, scaling_factor = 1)
   if x[1] < 1 / 6
     # From the BoundaryConditionDirichlet
     # get the external value of the solution
@@ -155,7 +155,7 @@ boundary_conditions = Dict( :Bottom => boundary_condition_mixed_dirichlet_wall,
 
 surface_flux = flux_lax_friedrichs
 
-polydeg = 4
+polydeg = 3
 basis = LobattoLegendreBasis(polydeg)
 shock_indicator = IndicatorHennemannGassner(equations, basis,
   alpha_max=1.0,
@@ -164,10 +164,11 @@ shock_indicator = IndicatorHennemannGassner(equations, basis,
   variable=density_pressure)
 volume_integral = TrixiLW.VolumeIntegralFRShockCapturing(
   shock_indicator;
+  volume_integralFR = TrixiLW.VolumeIntegralFR(TrixiLW.MDRK()),
   volume_flux_fv=surface_flux,
-  reconstruction = TrixiLW.FirstOrderReconstruction(),
+  # reconstruction = TrixiLW.FirstOrderReconstruction(),
   # reconstruction=TrixiLW.MUSCLReconstruction()
-  # reconstruction=TrixiLW.MUSCLHancockReconstruction()
+  reconstruction=TrixiLW.MUSCLHancockReconstruction()
 )
 
 solver = DGSEM(polydeg=polydeg, surface_flux=surface_flux,
@@ -180,7 +181,7 @@ isfile(default_mesh_file) || download("https://gist.githubusercontent.com/andrew
                                       default_mesh_file)
 mesh_file = default_mesh_file
 
-mesh = P4estMesh{2}(mesh_file)
+mesh = P4estMesh{2}(mesh_file, initial_refinement_level = 2)
 
 cfl_number = 0.1
 semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver),
@@ -206,7 +207,13 @@ save_solution = SaveSolutionCallback(interval=100,
                                      save_final_solution=true,
                                      solution_variables=cons2prim)
 
-callbacks = (;analysis_callback, alive_callback, save_solution)
+visualization_callback = VisualizationCallback(interval=100,
+   save_initial_solution=true,
+   save_final_solution=true,
+   solution_variables=cons2prim)
+
+callbacks = (;analysis_callback, alive_callback, save_solution,
+              visualization_callback)
 
 # positivity limiter necessary for this example with strong shocks
 stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds=(5.0e-6, 5.0e-6),
@@ -214,7 +221,9 @@ stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds=(5.0e-6, 5.0e-6)
 
 ###############################################################################
 # run the simulation
-time_int_tol = 1e-6
+time_int_tol = 1e-2
+
+# For MDRK, initial_refinement_level = 2, time_int_tol = 1e-2 work.
 tolerances = (; abstol=time_int_tol, reltol=time_int_tol);
 dt_initial = 1e-6;
 sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,

@@ -191,7 +191,7 @@ end
    outer_cache,
    normal_direction::AbstractVector, x, t, dt,
    surface_flux_function, equations::CompressibleEulerEquations2D,
-   dg, time_discretization)
+   dg, time_discretization , scaling_factor = 1)
 
    flux = Trixi.flux(u_inner, normal_direction, equations)
 
