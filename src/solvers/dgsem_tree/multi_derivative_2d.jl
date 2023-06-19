@@ -11,11 +11,10 @@ function rhs_mdrk1!(du, u,
 
    # Calculate volume integral
    @trixi_timeit timer() "volume integral" calc_volume_integral_mdrk1!(
-      du,
-      u,
-      t, dt, tolerances, mesh,
+      du, u, t, dt, tolerances, mesh,
       have_nonconservative_terms(equations), source_terms, equations,
       dg.volume_integral, time_discretization, dg, cache)
+
    # Prolong solution to interfaces
    @trixi_timeit timer() "prolong2interfaces" prolong2interfaces!(
       cache, u, mesh, equations, dg.surface_integral, time_discretization, dg)
