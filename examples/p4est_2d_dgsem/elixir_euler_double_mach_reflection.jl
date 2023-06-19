@@ -1,6 +1,7 @@
 using Downloads: download
 using TrixiLW
 using Trixi
+using Plots
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations
@@ -167,8 +168,8 @@ volume_integral = TrixiLW.VolumeIntegralFRShockCapturing(
   volume_integralFR = TrixiLW.VolumeIntegralFR(TrixiLW.MDRK()),
   volume_flux_fv=surface_flux,
   # reconstruction = TrixiLW.FirstOrderReconstruction(),
-  # reconstruction=TrixiLW.MUSCLReconstruction()
-  reconstruction=TrixiLW.MUSCLHancockReconstruction()
+  reconstruction=TrixiLW.MUSCLReconstruction()
+  # reconstruction=TrixiLW.MUSCLHancockReconstruction()
 )
 
 solver = DGSEM(polydeg=polydeg, surface_flux=surface_flux,

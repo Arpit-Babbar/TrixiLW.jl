@@ -1827,6 +1827,7 @@ using LoopVectorization: @turbo
       for i in eachnode(dg)
          @views x_subfaces[i] = y_subfaces[i] = -1.0 + sum(weights[1:i])
       end
+
       ξ_extended = OffsetArray(Vector{RealT}(undef, nnodes(dg) + 2), OffsetArrays.Origin(0))
       ξ_extended[0] = -1.0 # TODO - Should this be different for GL points?
       for i in eachnode(dg)

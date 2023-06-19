@@ -169,7 +169,8 @@ function calcflux_muscl!(fstar1_L, fstar1_R, fstar2_L, fstar2_R,
 
    # TODO - Create a boundary neighbour element and re-use it
    for boundary in eachboundary(dg, cache)
-      if element in cache.boundaries.neighbor_ids[boundary]
+      nbrs = cache.boundaries.neighbor_ids[boundary]
+      if element in nbrs
          # If element neighbours boundary, reduce to first order
          calcflux_fv!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u, mesh,
             nonconservative_terms, equations, volume_flux_fv, dg, element, cache)
@@ -208,11 +209,11 @@ function calcflux_muscl!(fstar1_L, fstar1_R, fstar2_L, fstar2_R,
       beta1, beta2 = 2.0 - alpha, 2.0 - alpha # Unfortunate way to fix type instability
 
       slope_tuple_x = (minmod(back_x[n], cent_x[n], fwd_x[n], beta1, 0.0)
-                        for n in eachvariable(equations))
+                       for n in eachvariable(equations))
       slope_x = SVector{nvar}(slope_tuple_x)
 
       slope_tuple_y = (minmod(back_y[n], cent_y[n], fwd_y[n], beta2, 0.0)
-                        for n in eachvariable(equations))
+                       for n in eachvariable(equations))
       slope_y = SVector{nvar}(slope_tuple_y)
 
       ufl = u_ + slope_x * (x_subfaces[i-1] - ξ_extended[i]) # left face value u_{i-1/2,j}
