@@ -36,6 +36,34 @@ using SimpleUnPack
    return flux
 end
 
+@inline function time_averaged_bc_dirichlet(U_inner, F_inner, u_inner,
+   outer_cache,
+   normal_direction::AbstractVector,
+   x, t, dt,
+   surface_flux_function, equations, dg, boundary_value_function,
+   time_discretization::AbstractLWTimeDiscretization,
+   scaling_factor = 1)
+   @unpack nodes, weights = dg.basis
+   U_outer, F_outer = outer_cache[Threads.threadid()]
+   fill!(U_outer, zero(eltype(U_outer)))
+   fill!(F_outer, zero(eltype(F_outer)))
+   dt_scaled = scaling_factor * dt
+   for i in eachnode(dg) # Loop over intermediary time levels
+      ts = t + 0.5 * dt_scaled * (nodes[i] + 1.0)
+      # get the external value of the solution
+      u_boundary = boundary_value_function(x, ts, equations)
+      f_boundary = Trixi.flux(u_boundary, normal_direction, equations)
+      U_outer .+= u_boundary * scaling_factor * weights[i] / 2.0
+      F_outer .+= f_boundary * scaling_factor * weights[i] / 2.0
+   end
+
+   # Calculate boundary flux
+   flux = surface_flux_function(F_inner, F_outer, u_inner, U_outer, U_inner, U_outer,
+      normal_direction, equations)
+
+   return flux
+end
+
 @inline function (boundary_condition::BoundaryConditionDirichlet)(U_inner, F_inner, u_inner,
    outer_cache,
    normal_direction::AbstractVector,
@@ -69,7 +97,7 @@ end
    x, t, dt,
    surface_flux_function,
    equations::CompressibleEulerEquations2D,
-   dg, time_discretization::AbstractLWTimeDiscretization)
+   dg, time_discretization::AbstractLWTimeDiscretization, scaling_factor = 1)
 
    F_outer = SVector(-F_inner[1], F_inner[2], -F_inner[3], -F_inner[4])
    U_outer = SVector(U_inner[1], -U_inner[2], U_inner[3], U_inner[4])
@@ -92,7 +120,7 @@ end
    x, t, dt,
    surface_flux_function,
    equations::CompressibleEulerEquations2D,
-   dg, time_discretization::AbstractLWTimeDiscretization)
+   dg, time_discretization::AbstractLWTimeDiscretization, scaling_factor = 1)
 
    F_outer = SVector(-F_inner[1], -F_inner[2], F_inner[3], -F_inner[4])
    U_outer = SVector(U_inner[1], U_inner[2], -U_inner[3], U_inner[4])
@@ -107,6 +135,22 @@ end
          orientation_or_normal, equations)
    end
 
+   return flux
+end
+
+@inline function boundary_condition_slip_wall_horizontal(U_inner, F_inner, u_inner, outer_cache,
+   normal_direction,
+   x, t, dt,
+   surface_flux_function,
+   equations::CompressibleEulerEquations2D,
+   dg, time_discretization::AbstractLWTimeDiscretization, scaling_factor = 1)
+
+   F_outer = SVector(-F_inner[1], -F_inner[2], F_inner[3], -F_inner[4])
+   U_outer = SVector(U_inner[1], U_inner[2], -U_inner[3], U_inner[4])
+   u_outer = SVector(u_inner[1], u_inner[2], -u_inner[3], u_inner[4])
+
+   flux = surface_flux_function(F_inner, F_outer, u_inner, u_outer, U_inner, U_outer,
+      normal_direction, equations)
    return flux
 end
 
@@ -127,7 +171,7 @@ end
    x, t, dt,
    surface_flux_function,
    equations::CompressibleEulerEquations2D,
-   dg, time_discretization)
+   dg, time_discretization, scaling_factor = 1)
 
    u_outer = TrixiLW.get_reflection(u_inner, normal_direction, equations)
 
@@ -142,7 +186,7 @@ end
    x, t, dt,
    surface_flux_function,
    equations::CompressibleEulerEquations2D,
-   dg, time_discretization)
+   dg, time_discretization, scaling_factor = 1)
 
    norm_ = norm(normal_direction)
    # Normalize the vector without using `normalize` since we need to multiply by the `norm_` later
@@ -191,7 +235,7 @@ end
    outer_cache,
    normal_direction::AbstractVector, x, t, dt,
    surface_flux_function, equations::CompressibleEulerEquations2D,
-   dg, time_discretization)
+   dg, time_discretization , scaling_factor = 1)
 
    flux = Trixi.flux(u_inner, normal_direction, equations)
 

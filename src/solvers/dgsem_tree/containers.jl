@@ -74,6 +74,21 @@ mutable struct LWElementContainer{uEltype<:Real, NDIMSP2, NDIMSP3, MDRKCache}
    mdrk_cache::MDRKCache
 end
 
+mutable struct MDRKElementCache{uEltype<:Real, NDIMSP2, NDIMSP3}
+   us::Array{uEltype, NDIMSP2}
+   u_low::Array{uEltype, NDIMSP2}
+   U2::Array{uEltype, NDIMSP2}
+   S2::Array{uEltype, NDIMSP2}
+   F1::Array{uEltype, NDIMSP3}
+   F2::Array{uEltype, NDIMSP3}
+   _us::Vector{uEltype}
+   _u_low::Vector{uEltype}
+   _U2::Vector{uEltype}
+   _S2::Vector{uEltype}
+   _F1::Vector{uEltype}
+   _F2::Vector{uEltype}
+end
+
 mutable struct LWInterfaceContainer{RealT,uEltype,NDIMS,NDIMSP2}
    u::Array{uEltype,NDIMSP2}      # [left/right, variables, i, j, k, interface]
    U::Array{uEltype,NDIMSP2}      # [left/right, variables, i, j, k, interface]
@@ -127,10 +142,9 @@ function create_element_cache(::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D
    F2 = unsafe_wrap(Array{uEltype,NDIMS + 3}, pointer(_F2),
                    (n_variables, NDIMS, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
 
-
    if isa(time_discretization, MDRK)
       # TODO - This is too much storage. Can some be avoided?
-      mdrk_cache = (; _F1 = _F, F1 = F, _us, us, _u_low, u_low, _F2, F2, _U2, U2, _S2, S2 )
+      mdrk_cache = MDRKElementCache(us, u_low, U2, S2, F, F2, _us, _u_low, _U2, _S2, _F, _F2)
    else
       mdrk_cache = (;)
    end

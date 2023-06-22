@@ -1,5 +1,5 @@
-using Trixi: LaplaceDiffusion2D, TreeMesh
-import Trixi: max_dt
+using Trixi: LaplaceDiffusion2D, TreeMesh, Divergence
+import Trixi: max_dt, BoundaryConditionDirichlet
 
 function max_dt(u, t, mesh::TreeMesh{2}, equations_parabolic::LaplaceDiffusion2D, dg, cache)
    max_diffusion = nextfloat(zero(t))
@@ -50,4 +50,11 @@ function max_dt(u, t, mesh::TreeMesh{2}, equations_parabolic::LaplaceDiffusion2D
    # end
 
    # return 1/(N^4 * max_diffusion)
+end
+
+@inline function (boundary_condition::BoundaryConditionDirichlet)(flux_inner, u_inner, normal::AbstractVector,
+   x, t, operator_type::Divergence,
+   equations_parabolic::LaplaceDiffusion2D, time_discretization::AbstractLWTimeDiscretization,
+   scaling_factor = 1)
+   return flux_inner
 end

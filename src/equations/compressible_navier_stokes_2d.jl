@@ -50,7 +50,8 @@ end
 
 @inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:NoSlip,<:Adiabatic})(
    flux_inner, u_inner, normal::AbstractVector, x, t, operator_type::Divergence,
-   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative})
+   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
+   ::AbstractLWTimeDiscretization)
    # rho, v1, v2, _ = u_inner
    normal_heat_flux = boundary_condition.boundary_condition_heat_flux.boundary_value_normal_flux_function(x, t, equations)
    v1, v2 = boundary_condition.boundary_condition_velocity.boundary_value_function(x, t, equations)

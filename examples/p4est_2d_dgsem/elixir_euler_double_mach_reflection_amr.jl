@@ -49,7 +49,7 @@ initial_condition = initial_condition_double_mach_reflection
    outer_cache,
    normal_direction::AbstractVector, x, t, dt,
    surface_flux_function, equations::CompressibleEulerEquations2D,
-   dg, time_discretization)
+   dg, time_discretization, scaling_factor = 1)
 
    u_boundary = initial_condition_double_mach_reflection(x, t, equations)
    flux = Trixi.flux(u_boundary, normal_direction, equations)
@@ -162,6 +162,6 @@ dt_initial = 1e-6;
 sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
   time_step_computation = TrixiLW.Adaptive(),
   # time_step_computation=TrixiLW.CFLBased(cfl_number),
-  limiters=(; stage_limiter!), time_discretization = TrixiLW.MDRK()
+  limiters=(; stage_limiter!)
 );
 summary_callback() # print the timer summary

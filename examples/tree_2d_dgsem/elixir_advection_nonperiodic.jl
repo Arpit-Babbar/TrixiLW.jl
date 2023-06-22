@@ -13,8 +13,8 @@ initial_condition = initial_condition_gauss
 # 2*ndims == 4 directions or you can pass a tuple containing BCs for each direction
 boundary_conditions = BoundaryConditionDirichlet(initial_condition)
 
-solver = DGSEM(polydeg=4, surface_flux=flux_lax_friedrichs,
-               volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
+solver = DGSEM(polydeg=3, surface_flux=flux_lax_friedrichs,
+               volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.MDRK()))
 
 coordinates_min = (-5.0, -5.0)
 coordinates_max = ( 5.0,  5.0)
@@ -24,7 +24,8 @@ mesh = TreeMesh(coordinates_min, coordinates_max,
                 periodicity=false)
 
 cfl_number = 0.2
-semi = TrixiLW.SemidiscretizationHyperbolic(mesh, solver.volume_integral.time_discretization,
+semi = TrixiLW.SemidiscretizationHyperbolic(mesh,
+ solver.volume_integral.time_discretization,
  equations, initial_condition, solver,
  boundary_conditions = boundary_conditions)
 
@@ -33,7 +34,9 @@ semi = TrixiLW.SemidiscretizationHyperbolic(mesh, solver.volume_integral.time_di
 
 tspan = (0.0, 10.0)
 # ode = semidiscretize(semi, tspan)
-lw_update = TrixiLW.semidiscretize(semi, solver.volume_integral.time_discretization, tspan);
+lw_update = TrixiLW.semidiscretize(semi,
+                                   solver.volume_integral.time_discretization,
+                                   tspan);
 
 summary_callback = SummaryCallback()
 
@@ -48,8 +51,7 @@ save_solution = SaveSolutionCallback(interval=100,
                                      save_final_solution=true,
                                      solution_variables=cons2prim)
 
-callbacks = (;analysis_callback, alive_callback,
-              save_solution)
+callbacks = (;analysis_callback, alive_callback, save_solution)
 ###############################################################################
 # run the simulation
 

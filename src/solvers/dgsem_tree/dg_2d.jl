@@ -38,11 +38,10 @@ using LoopVectorization: @turbo
 
       # Calculate volume integral
       @trixi_timeit timer() "volume integral" calc_volume_integral!(
-         du,
-         u,
-         t, dt, tolerances, mesh,
+         du, u, t, dt, tolerances, mesh,
          have_nonconservative_terms(equations), source_terms, equations,
          dg.volume_integral, time_discretization, dg, cache)
+
       # Prolong solution to interfaces
       @trixi_timeit timer() "prolong2interfaces" prolong2interfaces!(
          cache, u, mesh, equations, dg.surface_integral, time_discretization, dg)
@@ -59,7 +58,8 @@ using LoopVectorization: @turbo
 
       # Calculate boundary fluxes
       @trixi_timeit timer() "boundary flux" calc_boundary_flux!(
-         cache, t, dt, boundary_conditions, mesh, equations, dg.surface_integral, time_discretization, dg)
+         cache, t, dt, boundary_conditions, mesh, equations, dg.surface_integral,
+         time_discretization, dg)
 
       # Prolong solution to mortars
       @trixi_timeit timer() "prolong2mortars" prolong2mortars!(
@@ -1274,7 +1274,7 @@ using LoopVectorization: @turbo
       @unpack orientations = interfaces
 
       @threaded for interface in eachinterface(dg, cache)
-         left_element = interfaces.neighbor_ids[1, interface]
+         left_element  = interfaces.neighbor_ids[1, interface]
          right_element = interfaces.neighbor_ids[2, interface]
 
          if orientations[interface] == 1
@@ -1827,6 +1827,7 @@ using LoopVectorization: @turbo
       for i in eachnode(dg)
          @views x_subfaces[i] = y_subfaces[i] = -1.0 + sum(weights[1:i])
       end
+
       ξ_extended = OffsetArray(Vector{RealT}(undef, nnodes(dg) + 2), OffsetArrays.Origin(0))
       ξ_extended[0] = -1.0 # TODO - Should this be different for GL points?
       for i in eachnode(dg)

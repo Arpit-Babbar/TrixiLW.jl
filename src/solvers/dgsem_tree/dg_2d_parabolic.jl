@@ -1993,13 +1993,13 @@ end
 
 function calc_boundary_flux_divergence_lw!(
    cache_parabolic, cache_hyperbolic, t, boundary_conditions_parabolic::BoundaryConditionPeriodic, mesh::TreeMesh{2},
-   equations_parabolic::AbstractEquationsParabolic, surface_integral, dg::DG)
+   equations_parabolic::AbstractEquationsParabolic, surface_integral, dg::DG, scaling_factor = 1)
    return nothing
 end
 
 function calc_boundary_flux_divergence_lw!(cache, cache_hyperbolic, t, boundary_conditions_parabolic::NamedTuple,
    mesh::TreeMesh{2}, equations_parabolic::AbstractEquationsParabolic,
-   surface_integral, dg::DG)
+   surface_integral, dg::DG, scaling_factor = 1)
    @unpack surface_flux_values = cache_hyperbolic.elements
    @unpack n_boundaries_per_direction = cache.boundaries
 
@@ -2010,25 +2010,25 @@ function calc_boundary_flux_divergence_lw!(cache, cache_hyperbolic, t, boundary_
    # Calc boundary fluxes in each direction
    calc_boundary_flux_by_direction_divergence_lw!(surface_flux_values, t, boundary_conditions_parabolic[1],
       equations_parabolic, surface_integral, dg, cache,
-      1, firsts[1], lasts[1])
+      1, firsts[1], lasts[1], scaling_factor)
    calc_boundary_flux_by_direction_divergence_lw!(surface_flux_values, t,
       boundary_conditions_parabolic[2],
       equations_parabolic, surface_integral, dg, cache,
-      2, firsts[2], lasts[2])
+      2, firsts[2], lasts[2], scaling_factor)
    calc_boundary_flux_by_direction_divergence_lw!(surface_flux_values, t,
       boundary_conditions_parabolic[3],
       equations_parabolic, surface_integral, dg, cache,
-      3, firsts[3], lasts[3])
+      3, firsts[3], lasts[3], scaling_factor)
    calc_boundary_flux_by_direction_divergence_lw!(surface_flux_values, t, boundary_conditions_parabolic[4],
       equations_parabolic, surface_integral, dg, cache,
-      4, firsts[4], lasts[4])
+      4, firsts[4], lasts[4], scaling_factor)
 end
 
 function calc_boundary_flux_by_direction_divergence_lw!(surface_flux_values::AbstractArray{<:Any,4}, t,
    boundary_condition,
    equations_parabolic::AbstractEquationsParabolic,
    surface_integral, dg::DG, cache,
-   direction, first_boundary, last_boundary)
+   direction, first_boundary, last_boundary, scaling_factor)
    @unpack surface_flux = surface_integral
 
    # Note: cache.boundaries.u contains the unsigned normal component (using "orientation", not "direction")
@@ -2056,7 +2056,7 @@ function calc_boundary_flux_by_direction_divergence_lw!(surface_flux_values::Abs
          # NoSlipWall/Adiabatic boundary conditions for CompressibleNavierStokesDiffusion2D as of 2022-6-27.
          # It will not work with implementations which utilize `u_inner` to impose boundary conditions.
          flux = boundary_condition(flux_inner, nothing, get_unsigned_normal_vector_2d(direction),
-            x, t, Divergence(), equations_parabolic)
+            x, t, Divergence(), equations_parabolic, get_time_discretization(dg))
 
          # Copy flux to left and right element storage
          for v in eachvariable(equations_parabolic)

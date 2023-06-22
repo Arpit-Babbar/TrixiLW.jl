@@ -445,6 +445,7 @@ function calc_mortar_flux!(surface_flux_values,
    @unpack contravariant_vectors = cache.elements
    @unpack fstar_upper_threaded, fstar_lower_threaded = cache
    index_range = eachnode(dg)
+   dt = cache.dt[1]
 
    @threaded for mortar in eachmortar(dg, cache)
       # Choose thread-specific pre-allocated container
@@ -471,7 +472,7 @@ function calc_mortar_flux!(surface_flux_values,
 
             element_large = neighbor_ids[3, mortar]
 
-            calc_mortar_flux!(fstar, mesh, nonconservative_terms, equations,
+            calc_mortar_flux!(fstar, mesh, nonconservative_terms, equations, dt,
                surface_integral, time_discretization, dg, cache,
                mortar, position, element, element_large, normal_direction,
                node)
