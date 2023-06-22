@@ -97,7 +97,7 @@ function minmod(a, b, c, beta, Mdx2=1e-10)
 end
 
 function minmod(a, b, Mdx2=1e-10)
-   if abs(b) && abs(a) < Mdx2
+   if abs(b) < Mdx2 && abs(a) < Mdx2
       return b
    end
    slope = min(abs(a), abs(b))
