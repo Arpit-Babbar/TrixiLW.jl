@@ -391,7 +391,7 @@ end
 
       # TODO - update to v1.8 and call with @inline
       # Give u1_ or U depending on dissipation model
-      U_node = get_node_vars(U, equations, dg, i, j)
+      U_node  = get_node_vars(U,  equations, dg, i, j)
       U2_node = get_node_vars(U2, equations, dg, i, j)
 
       F2_node = get_node_vars(F2, equations, dg, i, j)
@@ -449,7 +449,7 @@ end
    for j in eachnode(dg), i in eachnode(dg), n in eachvariable(equations)
       F[n,i,j] = F2[n,1,i,j,element]
       G[n,i,j] = F2[n,2,i,j,element]
-      U[n,i,j] = U2[n,i,j,element]
+      U[n,i,j] = U2[n,  i,j,element]
    end
 
    refresh!.((ut, ust))
@@ -491,8 +491,7 @@ end
       # Add source term contribution to ust
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       us_node = get_node_vars(us, equations, dg, i, j, element)
-      s_node = calc_source(us_node, x, t, source_terms, equations, dg, cache)
-      set_node_vars!(S, s_node, equations, dg, i, j)
+      s_node = calc_source(us_node, x, t+0.5*dt, source_terms, equations, dg, cache)
       multiply_add_to_node_vars!(ust, dt, s_node, equations, dg, i, j) # has no jacobian factor
    end
 
@@ -510,14 +509,13 @@ end
       fmm, gmm  = fluxes(umm, equations)
       upp = us_node + 2*ust_node
       fpp, gpp  = fluxes(upp, equations)
-      st = calc_source_t_N34(us_node, up, upp, um, umm, x, t, dt,
+      st = calc_source_t_N34(us_node, up, upp, um, umm, x, t+0.5*dt, dt,
                              source_terms, equations, dg, cache)
 
       ft = 1.0 / 12.0 * (-fpp + 8.0 * fp - 8.0 * fm + fmm)
       gt = 1.0 / 12.0 * (-gpp + 8.0 * gp - 8.0 * gm + gmm)
 
       multiply_add_to_node_vars!(F, 1.0/3.0, ft, equations, dg, i, j)
-
       multiply_add_to_node_vars!(G, 1.0/3.0, gt, equations, dg, i, j)
 
       multiply_add_to_node_vars!(U, 1.0/3.0, ust_node, equations, dg, i, j)

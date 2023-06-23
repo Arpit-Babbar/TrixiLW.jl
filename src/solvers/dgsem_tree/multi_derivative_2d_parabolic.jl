@@ -585,8 +585,7 @@ end
       # Add source term contribution to ut
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       us_node = get_node_vars(us, equations, dg, i, j, element)
-      s_node = calc_source(us_node, x, t, source_terms, equations, dg, cache)
-      set_node_vars!(S, s_node, equations, dg, i, j)
+      s_node = calc_source(us_node, x, t+0.5*dt, source_terms, equations, dg, cache)
       multiply_add_to_node_vars!(ust, dt, s_node, equations, dg, i, j) # has no jacobian factor
    end
 
@@ -658,7 +657,7 @@ end
       multiply_add_to_node_vars!(Gv, 1.0/3.0, gtv, equations, dg, i, j)
 
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
-      st = calc_source_t_N34(u_node, up, upp, um, umm, x, t, dt,
+      st = calc_source_t_N34(u_node, up, upp, um, umm, x, t+0.5*dt, dt,
                              source_terms, equations, dg, cache)
 
       multiply_add_to_node_vars!(U, 1.0/3.0, ut_node, equations, dg, i, j)

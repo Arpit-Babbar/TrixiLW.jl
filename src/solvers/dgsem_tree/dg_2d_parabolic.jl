@@ -431,7 +431,7 @@ function weak_form_kernel_2!(
    @unpack node_coordinates = cache.elements
 
    @unpack lw_res_cache = cache
-   @unpack cell_arrays, eval_data = lw_res_cache
+   @unpack cell_arrays = lw_res_cache
 
    inv_jacobian = cache.elements.inverse_jacobian[element]
 
@@ -712,12 +712,12 @@ function weak_form_kernel_2!(
 
       # Ub = UT * V
       # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
-      set_node_vars!(cache.U, U_node, equations, dg, i, j, element)
+      set_node_vars!(cache.element_cache.U, U_node, equations, dg, i, j, element)
 
-      set_node_vars!(cache.F, Fa_node, equations, dg, 1, i, j, element)
+      set_node_vars!(cache.element_cache.F, Fa_node, equations, dg, 1, i, j, element)
       set_node_vars!(cache_parabolic.Fv, Fv_node, equations, dg, 1, i, j, element)
 
-      set_node_vars!(cache.F, Ga_node, equations, dg, 2, i, j, element)
+      set_node_vars!(cache.element_cache.F, Ga_node, equations, dg, 2, i, j, element)
       set_node_vars!(cache_parabolic.Fv, Gv_node, equations, dg, 2, i, j, element)
 
       S_node = get_node_vars(S, equations, dg, i, j)
