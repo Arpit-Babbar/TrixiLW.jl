@@ -96,6 +96,7 @@ function set_t_and_iter!(integrator::LWIntegrator, dt) # TODO - Remove dt from a
       dt = Tf - t
    end
    integrator.t += dt
+   integrator.sol.t[1] += dt
    integrator.iter += 1
    integrator.stats.naccept += 1
    return nothing
@@ -141,7 +142,7 @@ function LWIntegrator(lw_update::LWUpdate, time_discretization, sol, callbacks, 
    @unpack soln_arrays, semi, tspan = lw_update
    @unpack u0_ode, du_ode = soln_arrays # Previous time level solution and residual
    integrator_cache = (du_ode,) # Don't know what else to put here.
-   u = sol.u
+   u = sol.u[1]
    iter = 0
    t = first(tspan)
    tType = typeof(t)
@@ -225,7 +226,7 @@ function solve_lwfr(lw_update, callbacks, dt_initial, tolerances;
    @unpack du_ode, u0_ode = soln_arrays            # Vectors form for compability with callbacks
    prob = LWProblem(rhs!, u0_ode, semi, tspan)     # Would be an ODE problem in Trixi
    u = compute_coefficients(first(tspan), semi)    # u satisfying initial condition
-   sol = LWSolution(u, prob, 0.0)
+   sol = LWSolution([u], prob, [0.0])
    @unpack solver = semi
    time_discretization = get_time_discretization(solver)
    integrator = LWIntegrator(lw_update, time_discretization, sol, callbacks, tolerances,

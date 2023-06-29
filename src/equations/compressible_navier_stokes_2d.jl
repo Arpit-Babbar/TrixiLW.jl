@@ -65,6 +65,7 @@ end
    equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative})
    v1, v2 = boundary_condition.boundary_condition_velocity.boundary_value_function(x, t, equations)
    T = boundary_condition.boundary_condition_heat_flux.boundary_value_function(x, t, equations)
+   # TODO - FIXME - URGENT - THIS IS WRONG, THESE ARE PRIMITIVE VARIABLES!
    return SVector(u_inner[1], v1, v2, T)
 end
 

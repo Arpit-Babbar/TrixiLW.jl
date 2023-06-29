@@ -243,7 +243,7 @@ function weak_form_kernel_1!(
    utx, uty, upx, upy, umx, umy, f_visc_t, g_visc_t, Fv, Gv,
      u_np1, unp1_low = cache_parabolic.lw_res_cache.cell_arrays[id]
 
-   refresh!(arr) = fill!(arr, zero(eltype(u)))
+   refresh!(arr) = fill!(arr, zero(eltype(arr)))
 
    refresh!.((ut, ft, gt, f_visc_t, g_visc_t, utx, uty))
 

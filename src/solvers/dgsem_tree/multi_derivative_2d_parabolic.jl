@@ -389,6 +389,8 @@ end
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       st = calc_source_t_N34(u_node, up, upp, um, umm, x, t, dt,
                              source_terms, equations, dg, cache)
+      multiply_add_to_node_vars!(S,  0.125, st, equations, dg, i, j) # Source term
+      multiply_add_to_node_vars!(S2, 1.0/6.0, st, equations, dg, i, j) # Source term
 
       F_node_low = f + 0.5 * ft
       G_node_low = g + 0.5 * gt
@@ -428,6 +430,7 @@ end
       # TODO - Move them out of dof loop and then use @turbo
       U_node = get_node_vars(U, equations, dg, i, j)
       U2_node = get_node_vars(U2, equations, dg, i, j)
+      S2_node = get_node_vars(S2, equations, dg, i, j)
 
       set_node_vars!(element_cache.U, U_node, equations, dg, i, j, element)
       set_node_vars!(cache.element_cache.F, Fa_node, equations, dg, 1, i, j, element)
@@ -446,6 +449,7 @@ end
       set_node_vars!(cache_parabolic.mdrk_cache.Fv2, Gv_node2, equations, dg, 2, i, j, element)
 
       set_node_vars!(mdrk_cache.U2, U2_node, equations, dg, i, j, element)
+      set_node_vars!(mdrk_cache.S2, S2_node, equations, dg, i, j, element)
 
       S_node = get_node_vars(S, equations, dg, i, j)
       multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations,
@@ -585,7 +589,8 @@ end
       # Add source term contribution to ut
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       us_node = get_node_vars(us, equations, dg, i, j, element)
-      s_node = calc_source(us_node, x, t+0.5*dt, source_terms, equations, dg, cache)
+      s_node = calc_source(us_node, x, t, source_terms, equations, dg, cache)
+      # set_node_vars!(S, s_node, equations, dg, i, j)
       multiply_add_to_node_vars!(ust, dt, s_node, equations, dg, i, j) # has no jacobian factor
    end
 
@@ -657,7 +662,7 @@ end
       multiply_add_to_node_vars!(Gv, 1.0/3.0, gtv, equations, dg, i, j)
 
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
-      st = calc_source_t_N34(u_node, up, upp, um, umm, x, t+0.5*dt, dt,
+      st = calc_source_t_N34(u_node, up, upp, um, umm, x, t, dt,
                              source_terms, equations, dg, cache)
 
       multiply_add_to_node_vars!(U, 1.0/3.0, ut_node, equations, dg, i, j)
