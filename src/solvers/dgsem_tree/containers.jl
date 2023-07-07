@@ -11,7 +11,7 @@ function create_cache(mesh::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D,P4e
 
    n_variables = nvariables(equations)
    n_nodes = nnodes(dg)
-   n_elements = nelements(dg, cache)
+n_elements = nelements(dg, cache)
 
    temporal_errors = fill(nan_uEltype, n_elements)
 

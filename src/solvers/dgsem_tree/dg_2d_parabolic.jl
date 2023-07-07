@@ -113,7 +113,7 @@ function create_cache(mesh::Union{TreeMesh{2}, P4estMesh{2}},
    Fb = fill(nan_uEltype, (2, n_variables, n_nodes, n_interfaces))
 
    nt = Threads.nthreads()
-   cell_array_sizes = Dict(1 => 12, 2 => 14, 3 => 20, 4 => 22)
+   cell_array_sizes = Dict(1 => 8, 2 => 14, 3 => 20, 4 => 22)
    # big_eval_data_sizes = Dict(1 => 12, 2 => 32, 3 => 40, 4 => 56)
    # small_eval_data_sizes = Dict(1 => 4, 2 => 4, 3 => 4, 4 => 4)
    # if bflux_ind ==  extrapolate
