@@ -3,7 +3,7 @@ using Trixi: DG, indices2direction, P4estMesh, eachnode, get_normal_direction,
 
 import Trixi
 import Trixi: prolong2interfaces!, calc_interface_flux!, calc_boundary_flux!,
-              prolong2mortars!, calc_mortar_flux!
+   prolong2mortars!, calc_mortar_flux!
 
 function prolong2interfaces!(cache, u,
    mesh::P4estMesh{2},
@@ -414,7 +414,7 @@ function prolong2mortars!(cache, u,
          for i in eachnode(dg)
             f = get_flux_vars(F, equations, dg, i_small, j_small, element)
             normal_direction = get_normal_direction(small_direction, contravariant_vectors,
-                                                    i_small, j_small, element)
+               i_small, j_small, element)
             fn_node = normal_product(f, equations, normal_direction)
             for v in eachvariable(equations)
                cache.mortars.u[1, v, position, i, mortar] = u[v, i_small, j_small, element]
@@ -452,8 +452,8 @@ function prolong2mortars!(cache, u,
       for i in eachnode(dg)
          f = get_flux_vars(F, equations, dg, i_large, j_large, element)
          # TODO - Why this minus? Why this 0.5? Is it correct? Does it work on curved meshes?
-         normal_direction = -0.5*get_normal_direction(large_direction, contravariant_vectors,
-                                                      i_large, j_large, element)
+         normal_direction = -0.5 * get_normal_direction(large_direction, contravariant_vectors,
+            i_large, j_large, element)
          u_node = Trixi.get_node_vars(u, equations, dg, i_large, j_large, element)
          fn_node = normal_product(f, equations, normal_direction)
          fn_node = Trixi.flux(u_node, normal_direction, equations)
@@ -462,7 +462,7 @@ function prolong2mortars!(cache, u,
             U_buffer[v, i] = U[v, i_large, j_large, element]
             F_buffer[v, i] = fn_node[v]
             # TODO - Should this have a 0.5 factor?
-            fn_low_buffer[v,i] = fn_low[v, i, large_direction, element]
+            fn_low_buffer[v, i] = fn_low[v, i, large_direction, element]
          end
          i_large += i_large_step
          j_large += j_large_step

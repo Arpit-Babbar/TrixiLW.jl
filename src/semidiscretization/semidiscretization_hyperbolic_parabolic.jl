@@ -105,6 +105,8 @@ function SemidiscretizationHyperbolicParabolic(mesh, time_discretization::Abstra
                                     RealT, uEltype, cache_parabolic)...,
                        cache_parabolic...) # LW Additions
 
+
+  cache = (; cache_parabolic, cache...) # Add parabolic cache to hyperbolic to be used in callbacks
   SemidiscretizationHyperbolicParabolic{
     typeof(mesh),typeof(equations),typeof(equations_parabolic),
     typeof(initial_condition),typeof(_boundary_conditions),typeof(_boundary_conditions_parabolic),
