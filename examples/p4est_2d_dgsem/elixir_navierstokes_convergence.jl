@@ -12,7 +12,7 @@ equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu=mu(), Pr
                                                           gradient_variables=TrixiLW.GradientVariablesConservative())
 
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
-solver = DGSEM(polydeg=2, surface_flux=flux_lax_friedrichs,
+solver = DGSEM(polydeg=3, surface_flux=flux_lax_friedrichs,
                volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
 
 coordinates_min = (-1.0, -1.0) # minimum coordinates (min(x), min(y))
@@ -20,7 +20,7 @@ coordinates_max = ( 1.0,  1.0) # maximum coordinates (max(x), max(y))
 
 trees_per_dimension = (4, 4)
 mesh = P4estMesh(trees_per_dimension,
-                 polydeg=2, initial_refinement_level=3,
+                 polydeg=3, initial_refinement_level=1,
                  coordinates_min=coordinates_min, coordinates_max=coordinates_max,
                  periodicity=(true, false))
 
@@ -201,17 +201,17 @@ lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan)
 summary_callback = SummaryCallback()
 
 # The AnalysisCallback allows to analyse the solution in regular intervals and prints the results
-analysis_interval = 100
+analysis_interval = 1000
 analysis_callback = AnalysisCallback(semi, interval=analysis_interval)
 
 # The AliveCallback prints short status information in regular intervals
 alive_callback = AliveCallback(analysis_interval=analysis_interval)
 
-visualization_callback = VisualizationCallback(interval=300,
+visualization_callback = VisualizationCallback(interval=5000,
    save_initial_solution=true,
    save_final_solution=true)
 
-save_solution = SaveSolutionCallback(interval=1000,
+save_solution = SaveSolutionCallback(interval=5000,
    solution_variables=cons2prim)
 
 # Create a CallbackSet to collect all callbacks such that they can be passed to the ODE solver
@@ -225,7 +225,7 @@ callbacks = (
 
 ###############################################################################
 # run the simulation
-cfl_number = 100
+cfl_number = 18
 time_int_tol = 1e-8
 tolerances = (; abstol=time_int_tol, reltol=time_int_tol)
 dt_initial = 1.0
@@ -234,3 +234,4 @@ sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
    time_step_computation=TrixiLW.CFLBased(cfl_number)
 );
 summary_callback()
+# level 2, cfl_number 18, error = 3.48005424e-05, Δt: 3.0374e-05

@@ -12,7 +12,7 @@ equations_parabolic = TrixiLW.CompressibleNavierStokesDiffusion2D(equations, mu=
   gradient_variables=TrixiLW.GradientVariablesConservative())
 
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
-solver = TrixiLW.DGSEM(polydeg=2, surface_flux=flux_lax_friedrichs,
+solver = TrixiLW.DGSEM(polydeg=3, surface_flux=flux_lax_friedrichs,
   volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
 
 coordinates_min = (-1.0, -1.0) # minimum coordinates (min(x), min(y))
@@ -20,7 +20,7 @@ coordinates_max = (1.0, 1.0) # maximum coordinates (max(x), max(y))
 
 # Create a uniformly refined mesh with periodic boundaries
 mesh = TreeMesh(coordinates_min, coordinates_max,
-  initial_refinement_level=3,
+  initial_refinement_level=4,
   periodicity=(true, false),
   n_cells_max=30_000) # set maximum capacity of tree data structure
 
@@ -261,3 +261,5 @@ sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
   time_step_computation=TrixiLW.CFLBased(cfl_number)
 );
 summary_callback()
+# 4e-04
+# error = 2.76408721e-05, dt =  1.6288e-04
