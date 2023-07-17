@@ -188,9 +188,9 @@ function weak_form_kernel_1!(
 
       Ja = get_contravariant_matrix(contravariant_vectors, i, j, element)
 
-      fma, gma, cv_fma, cv_gma, fmv, gmv, cv_fmv, cv_gmv, cv_fm, cv_gm = contravariant_fluxes(
+      fma, gma, fmv, gmv, cv_fm, cv_gm = contravariant_fluxes(
          um_node, (umx_node, umy_node), Ja, equations, equations_parabolic)
-      fpa, gpa, cv_fpa, cv_gpa, fpv, gpv, cv_fpv, cv_gpv, cv_fp, cv_gp = contravariant_fluxes(
+      fpa, gpa, fpv, gpv, cv_fp, cv_gp = contravariant_fluxes(
          up_node, (upx_node, upy_node), Ja, equations, equations_parabolic)
 
       fta = 0.5 * (fpa - fma)
@@ -245,12 +245,339 @@ function weak_form_kernel_1!(
 
    return nothing
 end
+function weak_form_kernel_2!(
+   du, flux_viscous, gradients, u_transformed, u, t, dt,
+   tolerances, mesh::P4estMesh{2},
+   have_nonconservative_terms, source_terms,
+   equations, equations_parabolic::AbstractEquationsParabolic,
+   volume_integral::VolumeIntegralFR, time_discretization::AbstractLWTimeDiscretization,
+   dg::DGSEM, cache, cache_parabolic, element)
 
+   gradients_x, gradients_y = gradients
+   flux_viscous_x, flux_viscous_y = flux_viscous # viscous fluxes computed by correction
+
+   @unpack derivative_dhat, derivative_matrix = dg.basis
+   @unpack node_coordinates, contravariant_vectors = cache.elements
+
+   @unpack lw_res_cache, element_cache = cache
+   @unpack cell_arrays = lw_res_cache
+
+   @unpack inverse_jacobian = cache.elements
+
+   id = Threads.threadid()
+
+   F, G, fa, ga, cv_f, cv_g, ut, utt, U, up, um, S = cell_arrays[id]
+
+   fv, gv, utx, uty, uttx, utty, upx, upy, umx, umy,
+   u_np1, u_np1_low = cache_parabolic.lw_res_cache.cell_arrays[id]
+
+   refresh!(arr) = fill!(arr, zero(eltype(arr)))
+
+   refresh!.((ut, utx, uty, utt, uttx, utty))
+
+   # Calculate volume terms in one element
+   for j in eachnode(dg), i in eachnode(dg)
+      u_node = get_node_vars(u, equations, dg, i, j, element)
+      Ja = get_contravariant_matrix(contravariant_vectors, i, j, element)
+      flux_adv_1, flux_adv_2, cv_flux_adv_1, cv_flux_adv_2 = contravariant_flux(u_node, Ja, equations)
+
+      flux_visc_1 = get_node_vars(flux_viscous_x, equations_parabolic, dg, i, j, element)
+      flux_visc_2 = get_node_vars(flux_viscous_y, equations_parabolic, dg, i, j, element)
+      (Ja11, Ja12), (Ja21, Ja22) = Ja
+      cv_flux_visc_1 = Ja11 * flux_visc_1 + Ja12 * flux_visc_2
+      cv_flux_visc_2 = Ja21 * flux_visc_1 + Ja22 * flux_visc_2
+
+      set_node_vars!(element_cache.F, flux_adv_1, equations, dg, 1, i, j, element) # This is Fa
+      set_node_vars!(fa, flux_adv_1, equations, dg, i, j)
+
+      set_node_vars!(cache_parabolic.Fv, flux_visc_1, equations, dg, 1, i, j, element)
+      set_node_vars!(fv, flux_visc_1, equations, dg, i, j)
+
+      set_node_vars!(element_cache.F, flux_adv_2, equations, dg, 2, i, j, element) # This is Ga
+      set_node_vars!(ga, flux_adv_2, equations, dg, i, j)
+
+      set_node_vars!(cache_parabolic.Fv, flux_visc_2, equations, dg, 2, i, j, element)
+      set_node_vars!(gv, flux_visc_2, equations, dg, i, j)
+
+      cv_flux1 = cv_flux_adv_1 - cv_flux_visc_1
+      cv_flux2 = cv_flux_adv_2 - cv_flux_visc_2
+
+      for ii in eachnode(dg)
+         # ut              += -lam * D * f for each variable
+         # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
+         multiply_add_to_node_vars!(ut, -dt * derivative_matrix[ii, i], cv_flux1, equations, dg, ii, j)
+      end
+
+      for jj in eachnode(dg)
+         # C += -lam*g*Dm' for each variable
+         # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+         multiply_add_to_node_vars!(ut, -dt * derivative_matrix[jj, j], cv_flux2, equations, dg, i, jj)
+      end
+
+      set_node_vars!(cv_f, cv_flux1, equations, dg, i, j)
+      set_node_vars!(cv_g, cv_flux2, equations, dg, i, j)
+
+      set_node_vars!(F, cv_flux1, equations, dg, i, j)
+      set_node_vars!(G, cv_flux2, equations, dg, i, j)
+
+      set_node_vars!(u_np1, u_node, equations, dg, i, j)
+      set_node_vars!(u_np1_low, u_node, equations, dg, i, j)
+
+      set_node_vars!(um, u_node, equations, dg, i, j)
+      set_node_vars!(up, u_node, equations, dg, i, j)
+
+      ux_node = get_node_vars(gradients_x, equations, dg, i, j, element)
+      set_node_vars!(upx, ux_node, equations, dg, i, j)
+      set_node_vars!(umx, ux_node, equations, dg, i, j)
+
+      uy_node = get_node_vars(gradients_y, equations, dg, i, j, element)
+      set_node_vars!(upy, uy_node, equations, dg, i, j)
+      set_node_vars!(umy, uy_node, equations, dg, i, j)
+
+      set_node_vars!(U, u_node, equations, dg, i, j)
+   end
+
+   # Scale ut
+   for j in eachnode(dg), i in eachnode(dg)
+      inv_jacobian = inverse_jacobian[i, j, element]
+      for v in eachvariable(equations)
+         ut[v, i, j] *= inv_jacobian
+      end
+   end
+
+   # Add source term contribution to ut and some to S
+   for j in eachnode(dg), i in eachnode(dg)
+      # Add source term contribution to ut
+      x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+      u_node = get_node_vars(u, equations, dg, i, j, element)
+      s_node = calc_source(u_node, x, t, source_terms, equations, dg, cache)
+      set_node_vars!(S, s_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(ut, dt, s_node, equations, dg, i, j) # has no jacobian factor
+   end
+
+   # Compute ∇u_t
+   for j in eachnode(dg), i in eachnode(dg)
+      ut_node = get_node_vars(ut, equations, dg, i, j)
+
+      for ii in eachnode(dg)
+         # ut              += -lam * D * f for each variable
+         # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
+         multiply_add_to_node_vars!(utx, derivative_matrix[ii, i], ut_node, equations, dg,
+            ii, j)
+      end
+
+      for jj in eachnode(dg)
+         # C += -lam*g*Dm' for each variable
+         # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+         multiply_add_to_node_vars!(uty, derivative_matrix[jj, j], ut_node, equations, dg,
+            i, jj)
+      end
+   end
+
+   # Scale ∇u_t
+   for j in eachnode(dg), i in eachnode(dg)
+      inv_jacobian = inverse_jacobian[i, j, element]
+      for v in eachvariable(equations)
+         utx[v, i, j] *= inv_jacobian
+         uty[v, i, j] *= inv_jacobian
+      end
+   end
+
+   for j in eachnode(dg), i in eachnode(dg)
+      ut_node = get_node_vars(ut, equations, dg, i, j)
+      utx_node = get_node_vars(utx, equations, dg, i, j)
+      uty_node = get_node_vars(uty, equations, dg, i, j)
+      multiply_add_to_node_vars!(U, 0.5, ut_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(up, 1.0, ut_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(um, -1.0, ut_node, equations, dg, i, j)
+
+      multiply_add_to_node_vars!(upx, 1.0, utx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umx, -1.0, utx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(upy, 1.0, uty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umy, -1.0, uty_node, equations, dg, i, j)
+
+      um_node = get_node_vars(um, equations, dg, i, j)
+      up_node = get_node_vars(up, equations, dg, i, j)
+      umx_node = get_node_vars(umx, equations, dg, i, j)
+      upx_node = get_node_vars(upx, equations, dg, i, j)
+      umy_node = get_node_vars(umy, equations, dg, i, j)
+      upy_node = get_node_vars(upy, equations, dg, i, j)
+
+      Ja = get_contravariant_matrix(contravariant_vectors, i, j, element)
+
+      fma, gma, fmv, gmv, cv_fm, cv_gm = contravariant_fluxes(
+         um_node, (umx_node, umy_node), Ja, equations, equations_parabolic)
+      fpa, gpa, fpv, gpv, cv_fp, cv_gp = contravariant_fluxes(
+         up_node, (upx_node, upy_node), Ja, equations, equations_parabolic)
+
+      fta = 0.5 * (fpa - fma)
+      gta = 0.5 * (gpa - gma)
+      multiply_add_to_node_vars!(element_cache.F, 0.5, fta, equations, dg, 1, i, j, element)
+      multiply_add_to_node_vars!(element_cache.F, 0.5, gta, equations, dg, 2, i, j, element)
+
+      ftv = 0.5 * (fpv - fmv)
+      gtv = 0.5 * (gpv - gmv)
+      multiply_add_to_node_vars!(cache_parabolic.Fv, 0.5, ftv, equations, dg, 1, i, j, element)
+      multiply_add_to_node_vars!(cache_parabolic.Fv, 0.5, gtv, equations, dg, 2, i, j, element)
+
+      ft = 0.5 * (cv_fp - cv_fm)
+      gt = 0.5 * (cv_gp - cv_gm)
+      multiply_add_to_node_vars!(F, 0.5, ft, equations, dg, i, j)
+      multiply_add_to_node_vars!(G, 0.5, gt, equations, dg, i, j)
+
+      for ii in eachnode(dg)
+         # res              += -lam * D * F for each variable
+         # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
+         multiply_add_to_node_vars!(utt, -dt * derivative_matrix[ii, i], ft, equations,
+            dg, ii, j)
+      end
+
+      for jj in eachnode(dg)
+         # C += -lam*g*Dm' for each variable
+         # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+         multiply_add_to_node_vars!(utt, -dt * derivative_matrix[jj, j], gt, equations,
+            dg, i, jj)
+      end
+   end
+
+   # Scale ut
+   for j in eachnode(dg), i in eachnode(dg)
+      inv_jacobian = inverse_jacobian[i, j, element]
+      for v in eachvariable(equations)
+         utt[v, i, j] *= inv_jacobian
+      end
+   end
+
+   # Add source term contribution to utt and some to S
+   for j in eachnode(dg), i in eachnode(dg)
+      # Add source term contribution to ut
+      um_node = get_node_vars(um, equations, dg, i, j)
+      up_node = get_node_vars(up, equations, dg, i, j)
+      x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+      st = calc_source_t_N12(up_node, um_node, x, t, dt, source_terms,
+         equations, dg, cache)
+      multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
+      multiply_add_to_node_vars!(utt, dt, st, equations, dg, i, j) # has no jacobian factor
+   end
+
+   # Compute ∇u_tt
+   for j in eachnode(dg), i in eachnode(dg)
+      utt_node = get_node_vars(utt, equations, dg, i, j)
+
+      for ii in eachnode(dg)
+         # ut              += -lam * D * f for each variable
+         # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
+         multiply_add_to_node_vars!(uttx, derivative_matrix[ii, i], utt_node, equations, dg,
+            ii, j)
+      end
+
+      for jj in eachnode(dg)
+         # C += -lam*g*Dm' for each variable
+         # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+         multiply_add_to_node_vars!(utty, derivative_matrix[jj, j], utt_node, equations, dg,
+            i, jj)
+      end
+   end
+
+   # Scale ∇u_tt
+   for j in eachnode(dg), i in eachnode(dg)
+      inv_jacobian = inverse_jacobian[i, j, element]
+      for v in eachvariable(equations)
+         uttx[v, i, j] *= inv_jacobian
+         utty[v, i, j] *= inv_jacobian
+      end
+   end
+
+   for j in eachnode(dg), i in eachnode(dg)
+      utt_node = get_node_vars(utt, equations, dg, i, j)
+      multiply_add_to_node_vars!(U, 1.0 / 6.0, utt_node, equations, dg, i, j)
+
+      uttx_node = get_node_vars(uttx, equations, dg, i, j)
+      utty_node = get_node_vars(utty, equations, dg, i, j)
+      multiply_add_to_node_vars!(up, 0.5, utt_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(um, 0.5, utt_node, equations, dg, i, j)
+
+      multiply_add_to_node_vars!(upx, 0.5, uttx_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umx, 0.5, uttx_node, equations, dg, i, j)
+
+      multiply_add_to_node_vars!(upy, 0.5, utty_node, equations, dg, i, j)
+      multiply_add_to_node_vars!(umy, 0.5, utty_node, equations, dg, i, j)
+
+      fa_node = get_node_vars(fa, equations, dg, i, j)
+      ga_node = get_node_vars(ga, equations, dg, i, j)
+      fv_node = get_node_vars(fv, equations, dg, i, j)
+      gv_node = get_node_vars(gv, equations, dg, i, j)
+
+      cv_f_node = get_node_vars(cv_f, equations, dg, i, j)
+      cv_g_node = get_node_vars(cv_g, equations, dg, i, j)
+
+      um_node = get_node_vars(um, equations, dg, i, j)
+      up_node = get_node_vars(up, equations, dg, i, j)
+      umx_node = get_node_vars(umx, equations, dg, i, j)
+      upx_node = get_node_vars(upx, equations, dg, i, j)
+      umy_node = get_node_vars(umy, equations, dg, i, j)
+      upy_node = get_node_vars(upy, equations, dg, i, j)
+
+      Ja = get_contravariant_matrix(contravariant_vectors, i, j, element)
+
+      fma, gma, fmv, gmv, cv_fm, cv_gm = contravariant_fluxes(
+         um_node, (umx_node, umy_node), Ja, equations, equations_parabolic)
+      fpa, gpa, fpv, gpv, cv_fp, cv_gp = contravariant_fluxes(
+         up_node, (upx_node, upy_node), Ja, equations, equations_parabolic)
+
+      ftta, gtta = fpa - 2.0 * fa_node + fma, gpa - 2.0 * ga_node + gma
+      fttv, gttv = fpv - 2.0 * fv_node + fmv, gpv - 2.0 * gv_node + gmv
+      multiply_add_to_node_vars!(element_cache.F, 1.0/6.0, ftta, equations, dg, 1, i, j, element)
+      multiply_add_to_node_vars!(element_cache.F, 1.0/6.0, gtta, equations, dg, 2, i, j, element)
+      multiply_add_to_node_vars!(cache_parabolic.Fv, 1.0/6.0, fttv, equations, dg, 1, i, j, element)
+      multiply_add_to_node_vars!(cache_parabolic.Fv, 1.0/6.0, gttv, equations, dg, 2, i, j, element)
+
+      ftt, gtt = cv_fp - 2.0 * cv_f_node + cv_fm, cv_gp - 2.0 * cv_g_node + cv_gm
+      multiply_add_to_node_vars!(F, 1.0/6.0, ftt, equations, dg, i, j)
+      multiply_add_to_node_vars!(G, 1.0/6.0, gtt, equations, dg, i, j)
+
+      F_node = get_node_vars(F, equations, dg, i, j)
+      G_node = get_node_vars(G, equations, dg, i, j)
+
+      for ii in eachnode(dg)
+         # res              += -lam * D * F for each variable
+         # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
+         multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F_node, equations,
+            dg, ii, j, element)
+      end
+
+      for jj in eachnode(dg)
+         # C += -lam*g*Dm' for each variable
+         # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+         multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G_node, equations,
+            dg, i, jj, element)
+      end
+
+      x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+      st = calc_source_t_N12(up_node, um_node, x, t, dt, source_terms, equations,
+         dg, cache)
+      multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
+
+      # TODO - update to v1.8 and call with @inline
+      # Give u1_ or U depending on dissipation model
+      U_node = get_node_vars(U, equations, dg, i, j)
+
+      # Ub = UT * V
+      # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
+      set_node_vars!(element_cache.U, U_node, equations, dg, i, j, element)
+
+      S_node = get_node_vars(S, equations, dg, i, j)
+      inv_jacobian = inverse_jacobian[i, j, element]
+      multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg, i, j, element)
+   end
+   return nothing
+end
 # This is the version used when calculating the divergence of the viscous fluxes
 # We pass the `surface_integral` argument solely for dispatch
 function prolong2interfaces_lw_parabolic!(cache, cache_parabolic, u,
    mesh::P4estMesh{2}, equations,
    surface_integral, dg::DG)
+
    (; interfaces, element_cache, interface_cache) = cache
    (; contravariant_vectors) = cache_parabolic.elements
    @unpack U, F = cache.element_cache
@@ -498,7 +825,7 @@ function calc_boundary_flux_divergence_lw!(cache, cache_hyperbolic, t,
 
    (; boundary_condition_types, boundary_indices) = boundary_conditions
 
-   calc_boundary_flux_by_type_lw!(cache, t, boundary_condition_types, boundary_indices,
+   calc_boundary_flux_by_type_lw!(cache, cache_hyperbolic, t, boundary_condition_types, boundary_indices,
       Divergence(), mesh, equations, surface_integral, dg,
       scaling_factor)
    return nothing
@@ -506,7 +833,7 @@ end
 
 # Iterate over tuples of boundary condition types and associated indices
 # in a type-stable way using "lispy tuple programming".
-function calc_boundary_flux_by_type_lw!(cache, t, BCs::NTuple{N,Any},
+function calc_boundary_flux_by_type_lw!(cache, cache_hyperbolic, t, BCs::NTuple{N,Any},
    BC_indices::NTuple{N,Vector{Int}},
    operator_type,
    mesh::P4estMesh,
@@ -520,11 +847,11 @@ function calc_boundary_flux_by_type_lw!(cache, t, BCs::NTuple{N,Any},
    remaining_boundary_condition_indices = Base.tail(BC_indices)
 
    # process the first boundary condition type
-   calc_boundary_flux_lw!(cache, t, boundary_condition, boundary_condition_indices,
+   calc_boundary_flux_lw!(cache, cache_hyperbolic, t, boundary_condition, boundary_condition_indices,
       operator_type, mesh, equations, surface_integral, dg, scaling_factor)
 
    # recursively call this method with the unprocessed boundary types
-   calc_boundary_flux_by_type_lw!(cache, t, remaining_boundary_conditions,
+   calc_boundary_flux_by_type_lw!(cache, cache_hyperbolic, t, remaining_boundary_conditions,
       remaining_boundary_condition_indices,
       operator_type,
       mesh, equations, surface_integral, dg, scaling_factor)
@@ -533,20 +860,21 @@ function calc_boundary_flux_by_type_lw!(cache, t, BCs::NTuple{N,Any},
 end
 
 # terminate the type-stable iteration over tuples
-function calc_boundary_flux_by_type_lw!(cache, t, BCs::Tuple{}, BC_indices::Tuple{},
+function calc_boundary_flux_by_type_lw!(cache, cache_hyperbolic, t, BCs::Tuple{}, BC_indices::Tuple{},
    operator_type, mesh::P4estMesh, equations,
    surface_integral, dg::DG, scaling_factor)
    nothing
 end
 
-function calc_boundary_flux_lw!(cache, t,
+function calc_boundary_flux_lw!(cache, cache_hyperbolic, t,
    boundary_condition_parabolic, # works with Dict types
    boundary_condition_indices,
    operator_type, mesh::P4estMesh{2},
    equations_parabolic::AbstractEquationsParabolic,
    surface_integral, dg::DG, scaling_factor)
    (; boundaries) = cache
-   (; node_coordinates, surface_flux_values) = cache.elements
+   (; node_coordinates) = cache.elements
+   (; surface_flux_values) = cache_hyperbolic.elements
    (; contravariant_vectors) = cache.elements
    index_range = eachnode(dg)
 
@@ -587,9 +915,15 @@ function calc_boundary_flux_lw!(cache, t,
             x, t, operator_type, equations_parabolic, get_time_discretization(dg), scaling_factor)
 
          # Copy flux to element storage in the correct orientation
+         # print("Before update ")
+         # @show surface_flux_values[1, node_index, direction_index, element]
          for v in eachvariable(equations_parabolic)
             surface_flux_values[v, node_index, direction_index, element] -= flux_[v]
+            # @show surface_flux_values[v, node_index, direction_index, element]
+            # surface_flux_values[v, node_index, direction_index, element] = 1000.0
          end
+         # print("After update ")
+         # @show surface_flux_values[1, node_index, direction_index, element]
 
          i_node += i_node_step
          j_node += j_node_step

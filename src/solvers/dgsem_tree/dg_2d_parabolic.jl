@@ -96,6 +96,49 @@ function rhs!(du, u, t, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
    return nothing
 end
 
+function my_calc_surface_integral!(du, u,
+                                mesh::P4estMesh{2},
+                                equations,
+                                surface_integral::SurfaceIntegralWeakForm,
+                                dg::DGSEM, cache)
+    @unpack boundary_interpolation = dg.basis
+    @unpack surface_flux_values = cache.elements
+
+    # Note that all fluxes have been computed with outward-pointing normal vectors.
+    # Access the factors only once before beginning the loop to increase performance.
+    # We also use explicit assignments instead of `+=` to let `@muladd` turn these
+    # into FMAs (see comment at the top of the file).
+    factor_1 = boundary_interpolation[1, 1]
+    factor_2 = boundary_interpolation[nnodes(dg), 2]
+    @threaded for element in eachelement(dg, cache)
+        for l in eachnode(dg)
+            for v in eachvariable(equations)
+                # surface at -x
+                du[v, 1, l, element] = (du[v, 1, l, element] +
+                                        surface_flux_values[v, l, 1, element] *
+                                        factor_1)
+
+                # surface at +x
+                du[v, nnodes(dg), l, element] = (du[v, nnodes(dg), l, element] +
+                                                 surface_flux_values[v, l, 2, element] *
+                                                 factor_2)
+
+                # surface at -y
+                du[v, l, 1, element] = (du[v, l, 1, element] +
+                                        surface_flux_values[v, l, 3, element] *
+                                        factor_1)
+
+                # surface at +y
+                du[v, l, nnodes(dg), element] = (du[v, l, nnodes(dg), element] +
+                                                 surface_flux_values[v, l, 4, element] *
+                                                 factor_2)
+            end
+        end
+    end
+
+    return nothing
+end
+
 # Parabolic cache
 # TODO - Merge with hyperbolic cache
 function create_cache(mesh::Union{TreeMesh{2}, P4estMesh{2}},
@@ -113,7 +156,7 @@ function create_cache(mesh::Union{TreeMesh{2}, P4estMesh{2}},
    Fb = fill(nan_uEltype, (2, n_variables, n_nodes, n_interfaces))
 
    nt = Threads.nthreads()
-   cell_array_sizes = Dict(1 => 8, 2 => 14, 3 => 20, 4 => 22)
+   cell_array_sizes = Dict(1 => 12, 2 => 14, 3 => 20, 4 => 22)
    # big_eval_data_sizes = Dict(1 => 12, 2 => 32, 3 => 40, 4 => 56)
    # small_eval_data_sizes = Dict(1 => 4, 2 => 4, 3 => 4, 4 => 4)
    # if bflux_ind ==  extrapolate

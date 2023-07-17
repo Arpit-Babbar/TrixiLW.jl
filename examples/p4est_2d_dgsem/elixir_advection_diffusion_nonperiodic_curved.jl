@@ -26,6 +26,7 @@ function initial_condition_eriksson_johnson(x, t, equations)
       cos(pi * x[2]) * (exp(s1 * x[1]) - exp(r1 * x[1])) / (exp(-s1) - exp(-r1))
   return SVector{1}(u)
 end
+
 initial_condition = initial_condition_eriksson_johnson
 
 boundary_conditions = Dict(:x_neg => BoundaryConditionDirichlet(initial_condition),
@@ -40,7 +41,7 @@ boundary_conditions_parabolic = Dict(:x_neg => BoundaryConditionDirichlet(initia
 
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
 solver = DGSEM(polydeg=1, surface_flux=flux_lax_friedrichs,
-   volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
+               volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
 
 coordinates_min = (-1.0, -0.5)
 coordinates_max = ( 0.0,  0.5)
@@ -55,7 +56,7 @@ end
 
 trees_per_dimension = (4, 4)
 mesh = P4estMesh(trees_per_dimension,
-                 polydeg=1, initial_refinement_level=1,
+                 polydeg=1, initial_refinement_level=4,
                  mapping=mapping, periodicity=(false, false))
 
 # A semidiscretization collects data structures and functions for the spatial discretization
@@ -100,8 +101,7 @@ callbacks = (
 
 ###############################################################################
 # run the simulation
-callbacks
-cfl_number = 10.0
+cfl_number = 10000
 time_int_tol = 1e-8
 tolerances = (; abstol=time_int_tol, reltol=time_int_tol)
 dt_initial = 1.0
