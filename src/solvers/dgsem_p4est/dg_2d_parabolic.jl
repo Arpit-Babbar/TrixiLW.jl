@@ -266,7 +266,7 @@ function weak_form_kernel_2!(
 
    id = Threads.threadid()
 
-   F, G, fa, ga, cv_f, cv_g, ut, utt, U, up, um, S = cell_arrays[id]
+   cv_F, cv_G, fa, ga, cv_f, cv_g, ut, utt, U, up, um, S = cell_arrays[id]
 
    fv, gv, utx, uty, uttx, utty, upx, upy, umx, umy,
    u_np1, u_np1_low = cache_parabolic.lw_res_cache.cell_arrays[id]
@@ -317,8 +317,8 @@ function weak_form_kernel_2!(
       set_node_vars!(cv_f, cv_flux1, equations, dg, i, j)
       set_node_vars!(cv_g, cv_flux2, equations, dg, i, j)
 
-      set_node_vars!(F, cv_flux1, equations, dg, i, j)
-      set_node_vars!(G, cv_flux2, equations, dg, i, j)
+      set_node_vars!(cv_F, cv_flux1, equations, dg, i, j)
+      set_node_vars!(cv_G, cv_flux2, equations, dg, i, j)
 
       set_node_vars!(u_np1, u_node, equations, dg, i, j)
       set_node_vars!(u_np1_low, u_node, equations, dg, i, j)
@@ -420,27 +420,27 @@ function weak_form_kernel_2!(
       multiply_add_to_node_vars!(cache_parabolic.Fv, 0.5, ftv, equations, dg, 1, i, j, element)
       multiply_add_to_node_vars!(cache_parabolic.Fv, 0.5, gtv, equations, dg, 2, i, j, element)
 
-      ft = 0.5 * (cv_fp - cv_fm)
-      gt = 0.5 * (cv_gp - cv_gm)
-      multiply_add_to_node_vars!(F, 0.5, ft, equations, dg, i, j)
-      multiply_add_to_node_vars!(G, 0.5, gt, equations, dg, i, j)
+      cv_ft = 0.5 * (cv_fp - cv_fm)
+      cv_gt = 0.5 * (cv_gp - cv_gm)
+      multiply_add_to_node_vars!(cv_F, 0.5, cv_ft, equations, dg, i, j)
+      multiply_add_to_node_vars!(cv_G, 0.5, cv_gt, equations, dg, i, j)
 
       for ii in eachnode(dg)
          # res              += -lam * D * F for each variable
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-         multiply_add_to_node_vars!(utt, -dt * derivative_matrix[ii, i], ft, equations,
+         multiply_add_to_node_vars!(utt, -dt * derivative_matrix[ii, i], cv_ft, equations,
             dg, ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         multiply_add_to_node_vars!(utt, -dt * derivative_matrix[jj, j], gt, equations,
+         multiply_add_to_node_vars!(utt, -dt * derivative_matrix[jj, j], cv_gt, equations,
             dg, i, jj)
       end
    end
 
-   # Scale ut
+   # Scale utt
    for j in eachnode(dg), i in eachnode(dg)
       inv_jacobian = inverse_jacobian[i, j, element]
       for v in eachvariable(equations)
@@ -460,7 +460,7 @@ function weak_form_kernel_2!(
       multiply_add_to_node_vars!(utt, dt, st, equations, dg, i, j) # has no jacobian factor
    end
 
-   # Compute ∇u_tt
+   # Compute ∇utt
    for j in eachnode(dg), i in eachnode(dg)
       utt_node = get_node_vars(utt, equations, dg, i, j)
 
@@ -490,16 +490,16 @@ function weak_form_kernel_2!(
 
    for j in eachnode(dg), i in eachnode(dg)
       utt_node = get_node_vars(utt, equations, dg, i, j)
-      multiply_add_to_node_vars!(U, 1.0 / 6.0, utt_node, equations, dg, i, j)
 
-      uttx_node = get_node_vars(uttx, equations, dg, i, j)
-      utty_node = get_node_vars(utty, equations, dg, i, j)
+      multiply_add_to_node_vars!(U, 1.0 / 6.0, utt_node, equations, dg, i, j)
       multiply_add_to_node_vars!(up, 0.5, utt_node, equations, dg, i, j)
       multiply_add_to_node_vars!(um, 0.5, utt_node, equations, dg, i, j)
 
+      uttx_node = get_node_vars(uttx, equations, dg, i, j)
       multiply_add_to_node_vars!(upx, 0.5, uttx_node, equations, dg, i, j)
       multiply_add_to_node_vars!(umx, 0.5, uttx_node, equations, dg, i, j)
 
+      utty_node = get_node_vars(utty, equations, dg, i, j)
       multiply_add_to_node_vars!(upy, 0.5, utty_node, equations, dg, i, j)
       multiply_add_to_node_vars!(umy, 0.5, utty_node, equations, dg, i, j)
 
@@ -507,9 +507,6 @@ function weak_form_kernel_2!(
       ga_node = get_node_vars(ga, equations, dg, i, j)
       fv_node = get_node_vars(fv, equations, dg, i, j)
       gv_node = get_node_vars(gv, equations, dg, i, j)
-
-      cv_f_node = get_node_vars(cv_f, equations, dg, i, j)
-      cv_g_node = get_node_vars(cv_g, equations, dg, i, j)
 
       um_node = get_node_vars(um, equations, dg, i, j)
       up_node = get_node_vars(up, equations, dg, i, j)
@@ -532,12 +529,14 @@ function weak_form_kernel_2!(
       multiply_add_to_node_vars!(cache_parabolic.Fv, 1.0/6.0, fttv, equations, dg, 1, i, j, element)
       multiply_add_to_node_vars!(cache_parabolic.Fv, 1.0/6.0, gttv, equations, dg, 2, i, j, element)
 
-      ftt, gtt = cv_fp - 2.0 * cv_f_node + cv_fm, cv_gp - 2.0 * cv_g_node + cv_gm
-      multiply_add_to_node_vars!(F, 1.0/6.0, ftt, equations, dg, i, j)
-      multiply_add_to_node_vars!(G, 1.0/6.0, gtt, equations, dg, i, j)
+      cv_f_node = get_node_vars(cv_f, equations, dg, i, j)
+      cv_g_node = get_node_vars(cv_g, equations, dg, i, j)
+      cv_ftt, cv_gtt = cv_fp - 2.0 * cv_f_node + cv_fm, cv_gp - 2.0 * cv_g_node + cv_gm
+      multiply_add_to_node_vars!(cv_F, 1.0/6.0, cv_ftt, equations, dg, i, j)
+      multiply_add_to_node_vars!(cv_G, 1.0/6.0, cv_gtt, equations, dg, i, j)
 
-      F_node = get_node_vars(F, equations, dg, i, j)
-      G_node = get_node_vars(G, equations, dg, i, j)
+      F_node = get_node_vars(cv_F, equations, dg, i, j)
+      G_node = get_node_vars(cv_G, equations, dg, i, j)
 
       for ii in eachnode(dg)
          # res              += -lam * D * F for each variable
@@ -553,10 +552,17 @@ function weak_form_kernel_2!(
             dg, i, jj, element)
       end
 
+      # x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+      # st = calc_source_t_N12(up_node, um_node, x, t, dt, source_terms, equations,
+      #    dg, cache)
+      # multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
+
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
-      st = calc_source_t_N12(up_node, um_node, x, t, dt, source_terms, equations,
-         dg, cache)
-      multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
+      u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+      stt = calc_source_tt_N23(u_node, up_node, um_node, x, t, dt, source_terms,
+         equations, dg, cache)
+      Trixi.multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, equations, dg, i, j)
+
 
       # TODO - update to v1.8 and call with @inline
       # Give u1_ or U depending on dissipation model
