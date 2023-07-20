@@ -115,6 +115,23 @@ end
    return flux
 end
 
+@inline function boundary_condition_slip_wall_vertical(U_inner, F_inner, u_inner, outer_cache,
+   normal_direction,
+   x, t, dt,
+   surface_flux_function,
+   equations::CompressibleEulerEquations2D,
+   dg, time_discretization::AbstractLWTimeDiscretization, scaling_factor = 1)
+
+   F_outer = SVector(-F_inner[1], F_inner[2], -F_inner[3], -F_inner[4])
+   U_outer = SVector(U_inner[1], -U_inner[2], U_inner[3], U_inner[4])
+   u_outer = SVector(u_inner[1], -u_inner[2], u_inner[3], u_inner[4])
+
+   flux = surface_flux_function(F_inner, F_outer, u_inner, u_outer, U_inner, U_outer,
+   normal_direction, equations)
+
+   return flux
+end
+
 @inline function boundary_condition_slip_wall_horizontal(U_inner, F_inner, u_inner, outer_cache,
    orientation_or_normal, direction,
    x, t, dt,
