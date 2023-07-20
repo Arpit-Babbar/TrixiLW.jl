@@ -1436,18 +1436,21 @@ function weak_form_kernel_4!(du, u, t, dt, tolerances,
       Trixi.multiply_add_to_node_vars!(Ftilde, 1.0 / 6.0, ftilde_tt, equations, dg, i, j)
       Trixi.multiply_add_to_node_vars!(element_cache.F, 1.0 / 6.0, f_tt, equations, dg, 1, i, j, element)
       Trixi.multiply_add_to_node_vars!(Gtilde, 1.0 / 6.0, gtilde_tt, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(element_cache.F, 1.0 / 6.0, g_tt, equations, dg, 2, i, j, element)
+      Trixi.multiply_add_to_node_vars!(element_cache.F, 1.0 / 6.0, g_tt, equations, dg, 2, i, j,
+                                       element)
 
       for ii in eachnode(dg)
          # res              += -lam * D * F for each variable
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)
-         Trixi.multiply_add_to_node_vars!(uttt, -dt * derivative_matrix[ii, i], ftilde_tt, equations, dg, ii, j)
+         Trixi.multiply_add_to_node_vars!(uttt, -dt * derivative_matrix[ii, i], ftilde_tt,
+                                          equations, dg, ii, j)
       end
 
       for jj in eachnode(dg)
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(uttt, -dt * derivative_matrix[jj, j], gtilde_tt, equations, dg, i, jj)
+         Trixi.multiply_add_to_node_vars!(uttt, -dt * derivative_matrix[jj, j], gtilde_tt,
+                                          equations, dg, i, jj)
       end
    end
 
@@ -1465,8 +1468,11 @@ function weak_form_kernel_4!(du, u, t, dt, tolerances,
       u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
       um_node = Trixi.get_node_vars(um, equations, dg, i, j)
       up_node = Trixi.get_node_vars(up, equations, dg, i, j)
+      umm_node = Trixi.get_node_vars(umm, equations, dg, i, j)
+      upp_node = Trixi.get_node_vars(upp, equations, dg, i, j)
+
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
-      stt = calc_source_tt_N23(u_node, up_node, um_node, x, t, dt, source_terms,
+      stt = calc_source_tt_N4(u_node, up_node, upp_node, um_node, umm_node, x, t, dt, source_terms,
          equations, dg, cache)
       Trixi.multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, equations, dg, i, j)
       Trixi.multiply_add_to_node_vars!(uttt, dt, stt, equations, dg, i, j) # has no jacobian factor
