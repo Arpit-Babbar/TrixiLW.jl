@@ -35,7 +35,8 @@ function rhs!(du, u, t, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
 
    # Compute and store the viscous fluxes computed with S variable
    @trixi_timeit timer() "calculate viscous fluxes" calc_viscous_fluxes!(
-      flux_viscous, gradients, u_transformed, mesh, equations_parabolic, dg, cache, cache_parabolic)
+      flux_viscous, gradients, u_transformed, mesh, equations_parabolic, dg, cache,
+      cache_parabolic)
 
    # Reset du
    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
@@ -47,6 +48,7 @@ function rhs!(du, u, t, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
       dg.volume_integral, time_discretization, dg, cache, cache_parabolic)
 
    # # Prolong solution to interfaces
+   # TODO - This seems unnecessary because the next function also does this prolongation
    @trixi_timeit timer() "prolong2interfaces" prolong2interfaces!(
       cache, u, mesh, equations, dg.surface_integral, dg)
 
@@ -63,6 +65,10 @@ function rhs!(du, u, t, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
       dg.surface_integral, dg, cache, cache_parabolic)
 
    # Prolong u to boundaries
+   # Unlike the previous prolongation, here we do prolongation of advective
+   # and viscous parts separately and even add their contribution to surface_flux_values
+   # separately. First the advective part is handled and then the viscous part.
+
    @trixi_timeit timer() "prolong2boundaries" prolong2boundaries!(
       cache, u, mesh, equations, dg.surface_integral, time_discretization, dg)
 
@@ -92,7 +98,8 @@ end
 
 # Parabolic cache
 # TODO - Merge with hyperbolic cache
-function create_cache(mesh::TreeMesh{2}, equations::AbstractEquationsParabolic,
+function create_cache(mesh::Union{TreeMesh{2}, P4estMesh{2}},
+   equations::AbstractEquationsParabolic,
    time_discretization::AbstractLWTimeDiscretization, dg, RealT, uEltype, cache)
    nan_RealT = convert(RealT, NaN)
    nan_uEltype = convert(uEltype, NaN)
@@ -163,7 +170,7 @@ fluxes(u, grad_u::Tuple{<:Any,<:Any}, equations_parabolic::AbstractEquationsPara
 
 function calc_volume_integral!(
    du, flux_viscous, gradients, u_transformed, u, t, dt, tolerances::NamedTuple,
-   mesh::TreeMesh{2},
+   mesh::Union{TreeMesh{2}, P4estMesh{2}},
    have_nonconservative_terms, source_terms,
    equations, equations_parabolic::AbstractEquationsParabolic,
    volume_integral::VolumeIntegralFR, time_discretization::AbstractLWTimeDiscretization,
@@ -211,7 +218,7 @@ function calc_volume_integral!(
 
 end
 
-fluxes(u, grad_u, equations::AbstractEquations, equations_parabolic::AbstractEquationsParabolic
+fluxes(u, grad_u, equations::AbstractEquations{2}, equations_parabolic::AbstractEquationsParabolic{2}
 ) = (Trixi.flux(u, 1, equations),
 Trixi.flux(u, 2, equations)),
 (Trixi.flux(u, grad_u, 1, equations_parabolic),
@@ -232,7 +239,7 @@ function weak_form_kernel_1!(
    @unpack node_coordinates = cache.elements
 
    @unpack lw_res_cache = cache
-   @unpack cell_arrays, eval_data = lw_res_cache
+   @unpack cell_arrays = lw_res_cache
 
    inv_jacobian = cache.elements.inverse_jacobian[element]
 
@@ -402,10 +409,10 @@ function weak_form_kernel_1!(
 
       # Ub = UT * V
       # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
-      set_node_vars!(cache.U, U_node, equations, dg, i, j, element)
-      set_node_vars!(cache.F, Fa_node, equations, dg, 1, i, j, element)
+      set_node_vars!(cache.element_cache.U, U_node, equations, dg, i, j, element)
+      set_node_vars!(cache.element_cache.F, Fa_node, equations, dg, 1, i, j, element)
       set_node_vars!(cache_parabolic.Fv, Fv_node, equations, dg, 1, i, j, element)
-      set_node_vars!(cache.F, Ga_node, equations, dg, 2, i, j, element)
+      set_node_vars!(cache.element_cache.F, Ga_node, equations, dg, 2, i, j, element)
       set_node_vars!(cache_parabolic.Fv, Gv_node, equations, dg, 2, i, j, element)
 
       S_node = get_node_vars(S, equations, dg, i, j)
@@ -444,7 +451,7 @@ function weak_form_kernel_2!(
 
    refresh!(arr) = fill!(arr, zero(eltype(u)))
 
-   refresh!.((ut, utx, uty, uttx, utty))
+   refresh!.((ut, utx, uty, utt, uttx, utty))
 
    # Calculate volume terms in one element
 
@@ -938,10 +945,14 @@ function weak_form_kernel_3!(
    # Add source term contribution to utt and some to S
    for j in eachnode(dg), i in eachnode(dg)
       # Add source term contribution to ut
+      u_node = get_node_vars(u, equations, dg, i, j, element)
       um_node = get_node_vars(um, equations, dg, i, j)
+      umm_node = get_node_vars(umm, equations, dg, i, j)
       up_node = get_node_vars(up, equations, dg, i, j)
+      upp_node = get_node_vars(upp, equations, dg, i, j)
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
-      st = calc_source_t_N12(up_node, um_node, x, t, dt, source_terms,
+      st = calc_source_t_N34(u_node, up_node, upp_node, um_node, umm_node,
+         x, t, dt, source_terms,
          equations, dg, cache)
       multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
       multiply_add_to_node_vars!(utt, dt, st, equations, dg, i, j) # has no jacobian factor
@@ -1403,10 +1414,14 @@ function weak_form_kernel_4!(
    # Add source term contribution to utt and some to S
    for j in eachnode(dg), i in eachnode(dg)
       # Add source term contribution to ut
+      u_node = get_node_vars(u, equations, dg, i, j, element)
       um_node = get_node_vars(um, equations, dg, i, j)
+      umm_node = get_node_vars(umm, equations, dg, i, j)
       up_node = get_node_vars(up, equations, dg, i, j)
+      upp_node = get_node_vars(upp, equations, dg, i, j)
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
-      st = calc_source_t_N12(up_node, um_node, x, t, dt, source_terms,
+      st = calc_source_t_N34(u_node, up_node, upp_node, um_node, umm_node,
+         x, t, dt, source_terms,
          equations, dg, cache)
       multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
       multiply_add_to_node_vars!(utt, dt, st, equations, dg, i, j) # has no jacobian factor
@@ -1533,14 +1548,17 @@ function weak_form_kernel_4!(
       u_node = get_node_vars(u, equations, dg, i, j, element)
       um_node = get_node_vars(um, equations, dg, i, j)
       up_node = get_node_vars(up, equations, dg, i, j)
+      umm_node = get_node_vars(umm, equations, dg, i, j)
+      upp_node = get_node_vars(upp, equations, dg, i, j)
+
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
-      stt = calc_source_tt_N23(u_node, up_node, um_node, x, t, dt, source_terms,
+      stt = calc_source_tt_N4(u_node, up_node, upp_node, um_node, umm_node, x, t, dt, source_terms,
          equations, dg, cache)
       multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, equations, dg, i, j)
       multiply_add_to_node_vars!(uttt, dt, stt, equations, dg, i, j) # has no jacobian factor
    end
 
-   # Compute ∇u_ttt
+   # Compute ∇uttt
    for j in eachnode(dg), i in eachnode(dg)
       uttt_node = get_node_vars(uttt, equations, dg, i, j)
 
@@ -1658,7 +1676,7 @@ function weak_form_kernel_4!(
       multiply_add_to_node_vars!(utttt, dt, sttt, equations, dg, i, j) # has no jacobian factor
    end
 
-   # Compute ∇u_tttt
+   # Compute ∇utttt
    for j in eachnode(dg), i in eachnode(dg)
       utttt_node = get_node_vars(utttt, equations, dg, i, j)
 
@@ -1852,6 +1870,8 @@ function weak_form_kernel_4!(
    return nothing
 end
 
+# This does ALL the prolongation at once.
+# The previous prolong2interfaces! function can be ignored
 function prolong2interfaces_lw_parabolic!(cache, cache_parabolic, u,
    mesh::TreeMesh{2}, equations, surface_integral, dg::DG)
 
