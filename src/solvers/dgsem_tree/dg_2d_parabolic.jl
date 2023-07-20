@@ -2056,7 +2056,7 @@ function calc_boundary_flux_by_direction_divergence_lw!(surface_flux_values::Abs
          # NoSlipWall/Adiabatic boundary conditions for CompressibleNavierStokesDiffusion2D as of 2022-6-27.
          # It will not work with implementations which utilize `u_inner` to impose boundary conditions.
          flux = boundary_condition(flux_inner, nothing, get_unsigned_normal_vector_2d(direction),
-            x, t, Divergence(), equations_parabolic, get_time_discretization(dg))
+            x, t, Divergence(), equations_parabolic, get_time_discretization(dg), scaling_factor)
 
          # Copy flux to left and right element storage
          for v in eachvariable(equations_parabolic)

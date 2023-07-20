@@ -51,7 +51,7 @@ end
 @inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:NoSlip,<:Adiabatic})(
    flux_inner, u_inner, normal::AbstractVector, x, t, operator_type::Divergence,
    equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
-   ::AbstractLWTimeDiscretization)
+   ::AbstractLWTimeDiscretization, scaling_factor = 1)
    # rho, v1, v2, _ = u_inner
    normal_heat_flux = boundary_condition.boundary_condition_heat_flux.boundary_value_normal_flux_function(x, t, equations)
    v1, v2 = boundary_condition.boundary_condition_velocity.boundary_value_function(x, t, equations)
@@ -62,7 +62,7 @@ end
 
 @inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:NoSlip,<:Isothermal})(flux_inner, u_inner, normal::AbstractVector,
    x, t, operator_type::Gradient,
-   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative})
+   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative}, scaling_factor = 1)
    v1, v2 = boundary_condition.boundary_condition_velocity.boundary_value_function(x, t, equations)
    T = boundary_condition.boundary_condition_heat_flux.boundary_value_function(x, t, equations)
    # TODO - FIXME - URGENT - THIS IS WRONG, THESE ARE PRIMITIVE VARIABLES!
@@ -72,7 +72,7 @@ end
 @inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:NoSlip,<:Isothermal})(
    flux_inner, u_inner, normal::AbstractVector,
    x, t, operator_type::Divergence,
-   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative})
+   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative}, scaling_factor=1)
    return flux_inner
 end
 
@@ -80,7 +80,7 @@ end
 
 @inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:NoSlip,<:Adiabatic})(flux_inner, u_inner, normal::AbstractVector,
    x, t, operator_type::Gradient,
-   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative})
+   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative}, scaling_factor = 1)
    v1, v2 = boundary_condition.boundary_condition_velocity.boundary_value_function(x, t, equations)
    rho = u_inner[1]
    p = pressure(u_inner, equations)
