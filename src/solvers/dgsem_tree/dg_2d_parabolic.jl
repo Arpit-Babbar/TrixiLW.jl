@@ -954,8 +954,8 @@ function weak_form_kernel_3!(
       st = calc_source_t_N34(u_node, up_node, upp_node, um_node, umm_node,
          x, t, dt, source_terms,
          equations, dg, cache)
-      Trixi.multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(utt, dt, st, equations, dg, i, j) # has no jacobian factor
+      multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
+      multiply_add_to_node_vars!(utt, dt, st, equations, dg, i, j) # has no jacobian factor
    end
 
    # Compute ∇u_tt
@@ -1423,8 +1423,8 @@ function weak_form_kernel_4!(
       st = calc_source_t_N34(u_node, up_node, upp_node, um_node, umm_node,
          x, t, dt, source_terms,
          equations, dg, cache)
-      Trixi.multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(utt, dt, st, equations, dg, i, j) # has no jacobian factor
+      multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
+      multiply_add_to_node_vars!(utt, dt, st, equations, dg, i, j) # has no jacobian factor
    end
 
    # Compute ∇u_tt
@@ -1554,8 +1554,8 @@ function weak_form_kernel_4!(
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       stt = calc_source_tt_N4(u_node, up_node, upp_node, um_node, umm_node, x, t, dt, source_terms,
          equations, dg, cache)
-      Trixi.multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, equations, dg, i, j)
-      Trixi.multiply_add_to_node_vars!(uttt, dt, stt, equations, dg, i, j) # has no jacobian factor
+      multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, equations, dg, i, j)
+      multiply_add_to_node_vars!(uttt, dt, stt, equations, dg, i, j) # has no jacobian factor
    end
 
    # Compute ∇uttt
