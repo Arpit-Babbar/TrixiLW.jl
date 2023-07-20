@@ -33,7 +33,7 @@ semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver
 # ODE solvers, callbacks etc.
 
 tspan = (0.0, 1.0)
-# ode = semidiscretize(semi, tspan);
+;
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 analysis_interval = 100

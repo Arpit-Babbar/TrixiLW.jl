@@ -79,7 +79,7 @@ end
     # Use the free slip wall BC otherwise
     # flux = boundary_condition_slip_wall(u_inner, normal_direction, x, t, surface_flux_function, equations)
     flux = TrixiLW.boundary_condition_slip_wall_horizontal(U_inner, F_inner, u_inner, outer_cache, normal_direction,
-				        x, t, dt, surface_flux_function, equations, dg, 
+				        x, t, dt, surface_flux_function, equations, dg,
 					time_discretization, scaling_factor)
   end
 
@@ -141,7 +141,6 @@ semi = TrixiLW.SemidiscretizationHyperbolic(mesh,get_time_discretization(solver)
 # ODE solvers, callbacks etc.
 
 tspan = (0.0, 0.2)
-# ode = semidiscretize(semi, tspan)
 lw_update = TrixiLW.semidiscretize(semi,get_time_discretization(solver), tspan);
 
 summary_callback = SummaryCallback()

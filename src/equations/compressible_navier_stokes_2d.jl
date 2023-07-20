@@ -92,7 +92,7 @@ end
 end
 
 
-function max_dt(u, t, mesh::TreeMesh{2}, equations_parabolic::CompressibleNavierStokesDiffusion2D,
+function max_dt(u, t, mesh::Union{TreeMesh{2}, P4estMesh{2}}, equations_parabolic::CompressibleNavierStokesDiffusion2D,
    dg, cache)
    N = polydeg(dg)
    max_diffusion = nextfloat(zero(t))
