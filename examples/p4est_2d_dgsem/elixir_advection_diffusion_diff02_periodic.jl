@@ -98,6 +98,3 @@ sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
    time_step_computation=TrixiLW.CFLBased(cfl_number)
 );
 summary_callback()
-
-
-# 3.24296243e-04

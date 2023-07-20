@@ -103,8 +103,8 @@ function weak_form_kernel_1!(
       set_node_vars!(F, cv_flux1, equations, dg, i, j)
       set_node_vars!(G, cv_flux2, equations, dg, i, j)
 
-      Trixi.set_node_vars!(u_np1, u_node, equations, dg, i, j)
-      Trixi.set_node_vars!(u_np1_low, u_node, equations, dg, i, j)
+      set_node_vars!(u_np1, u_node, equations, dg, i, j)
+      set_node_vars!(u_np1_low, u_node, equations, dg, i, j)
 
       set_node_vars!(um, u_node, equations, dg, i, j)
       set_node_vars!(up, u_node, equations, dg, i, j)
@@ -404,8 +404,6 @@ function calc_interface_flux_hyperbolic_parabolic!(surface_flux_values, mesh::P4
       end
 
       for node in eachnode(dg)
-         # We prolong the viscous flux dotted with respect the outward normal on the
-         # primary element. We assume a BR-1 type of flux.
          U_ll, U_rr = get_surface_node_vars(interface_cache.U, equations_parabolic, dg, node,
                                             interface)
          u_ll, u_rr = get_surface_node_vars(u, equations_parabolic, dg, node, interface)
