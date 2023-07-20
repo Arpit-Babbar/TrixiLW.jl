@@ -1890,6 +1890,31 @@ using LoopVectorization: @turbo
       return zero(eltype(u_ll))
    end
 
+
+   function compute_alp(
+      u_ll, u_rr, primary_element_index, secondary_element_index, Jl, Jr, dt,
+      fn, Fn, fn_inner_ll, fn_inner_rr, primary_node_index, equations, dg, volume_integral::VolumeIntegralFRShockCapturing, mesh::TreeMesh)
+      @unpack alpha = volume_integral.indicator.cache
+      @unpack weights = dg.basis
+      alp = 0.5 * (alpha[primary_element_index] + alpha[secondary_element_index])
+
+      Fn = (1.0 - alp) * Fn_ + alp * fn
+      λx, λy = 0.5, 0.5 # blending flux factors (TODO - Do this correctly)
+      # u_ll = get_node_vars(ul, equations, dg, nnodes(dg))
+      lower_order_update = u_ll - dt * Jl / (weights[nnodes(dg)] * λx) * (Fn - fn_inner_ll)
+      if is_admissible(lower_order_update, equations) == false
+         return 1.0
+      end
+
+      λx, λy = 0.5, 0.5 # blending flux factors (TODO - Do this correctly)
+      # u_rr = get_node_vars(ur, equations, dg, 1)
+      lower_order_update = u_rr - dt * Jr / (weights[1] * λx) * (fn_inner_rr - Fn)
+      if is_admissible(lower_order_update, equations) == false
+         return 1.0
+      end
+      return alp
+   end
+
    function calc_interface_flux!(surface_flux_values, mesh::TreeMesh{2},
       nonconservative_terms::False,
       equations,
