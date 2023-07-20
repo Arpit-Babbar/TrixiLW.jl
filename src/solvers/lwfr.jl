@@ -181,7 +181,7 @@ function compute_dt(semi::SemidiscretizationHyperbolic,
 end
 
 function compute_dt(semi::SemidiscretizationHyperbolicParabolic,
-   mesh::TreeMesh, time_step_computation::CFLBased,
+   mesh::Union{TreeMesh, P4estMesh}, time_step_computation::CFLBased,
    integrator)
    t = integrator.t
    u_ode = integrator.u

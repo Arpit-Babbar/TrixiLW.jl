@@ -1,7 +1,7 @@
 using Trixi: LaplaceDiffusion2D, TreeMesh, Divergence
 import Trixi: max_dt, BoundaryConditionDirichlet
 
-function max_dt(u, t, mesh::TreeMesh{2}, equations_parabolic::LaplaceDiffusion2D, dg, cache)
+function max_dt(u, t, mesh::Union{TreeMesh{2}, P4estMesh{2}}, equations_parabolic::LaplaceDiffusion2D, dg, cache)
    max_diffusion = nextfloat(zero(t))
    N = polydeg(dg)
    mu = equations_parabolic.diffusivity
@@ -14,15 +14,9 @@ function max_dt(u, t, mesh::TreeMesh{2}, equations_parabolic::LaplaceDiffusion2D
    dim = 2
 
    equations = equations_parabolic.equations_hyperbolic
-   # compute max_lam_v
 
+   max_λ1, max_λ2 = max_abs_speeds(equations)
    for element in eachelement(dg, cache)
-      max_λ1 = max_λ2 = zero(max_lam_a)
-      for j in eachnode(dg), i in eachnode(dg)
-         λ1, λ2 = max_abs_speeds(equations)
-         max_λ1 = max(max_λ1, λ1)
-         max_λ2 = max(max_λ2, λ2)
-      end
       inv_jacobian = cache.elements.inverse_jacobian[element]
       max_lam_a = max(max_lam_a, inv_jacobian * (max_λ1 + max_λ2))
    end
@@ -37,18 +31,14 @@ function max_dt(u, t, mesh::TreeMesh{2}, equations_parabolic::LaplaceDiffusion2D
 
    max_lam_v *= 2.0 * (2.0 * N + 1.0)
 
-
    dt = 1.0 / ((max_lam_a + max_lam_v) * (dim * (2.0 * N + 1.0)))
 
    return dt
-
-
    # CGSEM style
    # for element in eachelement(dg, cache)
    #   inv_jacobian = cache.elements.inverse_jacobian[element]
    #   max_diffusion = max(max_diffusion, inv_jacobian^2 * mu)
    # end
-
    # return 1/(N^4 * max_diffusion)
 end
 

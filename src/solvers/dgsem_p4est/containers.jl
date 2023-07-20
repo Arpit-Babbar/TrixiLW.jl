@@ -57,3 +57,7 @@ function create_mortar_cache(mesh::P4estMesh, equations, dg, uEltype, RealT, cac
       _U, _F, _fn_low, _inverse_jacobian,
       (; U_threaded, F_threaded, fn_low_threaded))
 end
+
+function create_mortar_cache(mesh::P4estMesh, equations::AbstractEquationsParabolic, dg, uEltype, RealT, cache, time_discretization::AbstractLWTimeDiscretization)
+   return (;)
+end
