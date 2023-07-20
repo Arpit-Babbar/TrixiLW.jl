@@ -1618,6 +1618,7 @@ function weak_form_kernel_4!(
       utttt_node = get_node_vars(utttt, equations, dg, i, j)
       uttttx_node = get_node_vars(uttttx, equations, dg, i, j)
       utttty_node = get_node_vars(utttty, equations, dg, i, j)
+      
       multiply_add_to_node_vars!(U, 1.0 / 120.0, utttt_node, equations, dg, i, j)
       multiply_add_to_node_vars!(um, 1.0 / 24.0, utttt_node, equations, dg, i, j)
       multiply_add_to_node_vars!(up, 1.0 / 24.0, utttt_node, equations, dg, i, j)

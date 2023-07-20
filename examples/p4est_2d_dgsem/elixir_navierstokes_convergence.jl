@@ -195,7 +195,7 @@ semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
 # ###############################################################################
 # # ODE solvers, callbacks etc.
 
-tspan = (0.0, 0.2)
+tspan = (0.0, 1.0)
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 summary_callback = SummaryCallback()
@@ -234,5 +234,3 @@ sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
    time_step_computation=TrixiLW.CFLBased(cfl_number)
 );
 summary_callback()
-# level 2, cfl_number 18, error = 3.48005424e-05, Δt: 3.0374e-05
-2.96637498e-05

@@ -88,7 +88,7 @@ alive_callback = AliveCallback(alive_interval=100)
 analysis_interval = 5000
 analysis_callback = AnalysisCallback(semi, interval=analysis_interval)
 
-visualization_callback = VisualizationCallback(interval=1000,
+visualization_callback = VisualizationCallback(interval=10000,
    save_initial_solution=true,
    save_final_solution=true)
 
@@ -107,6 +107,6 @@ tolerances = (;abstol = time_int_tol, reltol = time_int_tol)
 dt_initial = 2.5e-01
 cfl_number = 10
 sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
-                        time_step_computation = TrixiLW.CFLBased(cfl_number),
-                        # time_step_computation = TrixiLW.Adaptive(),
+                         time_step_computation = TrixiLW.CFLBased(cfl_number),
+                         # time_step_computation = TrixiLW.Adaptive(),
                         );
