@@ -386,7 +386,7 @@ using LoopVectorization: @turbo
 
       id = Threads.threadid()
 
-      f, g, F, G, ut, U, up, um, ft, gt, S = cell_arrays[id]
+      F, G, ut, U, up, um, ft, gt, S = cell_arrays[id]
 
       refresh!(arr) = fill!(arr, zero(eltype(u)))
 
