@@ -13,7 +13,7 @@ equations_parabolic = TrixiLW.CompressibleNavierStokesDiffusion2D(equations, mu=
 
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
 solver = TrixiLW.DGSEM(polydeg=3, surface_flux=flux_lax_friedrichs,
-  volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
+  volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.MDRK()))
 
 coordinates_min = (-1.0, -1.0) # minimum coordinates (min(x), min(y))
 coordinates_max = (1.0, 1.0) # maximum coordinates (max(x), max(y))
@@ -236,7 +236,7 @@ semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
 # ODE solvers, callbacks etc.
 
 # Create ODE problem with time span `tspan`
-tspan = (0.0, 1.0)
+tspan = (0.0, 0.5)
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 summary_callback = SummaryCallback()
