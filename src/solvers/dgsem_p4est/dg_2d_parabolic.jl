@@ -560,7 +560,7 @@ function calc_boundary_flux_lw!(cache, cache_hyperbolic, t,
          normal_direction = get_normal_direction(direction_index, contravariant_vectors,
             i_node, j_node, element)
 
-         # TODO: revisit if we want more general boundary treatments.
+         # TODO: (Trixi.jl comment) revisit if we want more general boundary treatments.
          # This assumes the gradient numerical flux at the boundary is the gradient variable,
          # which is consistent with BR1, LDG.
          flux_inner = u_inner
