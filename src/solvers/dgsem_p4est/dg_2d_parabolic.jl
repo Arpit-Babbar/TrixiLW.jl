@@ -16,7 +16,6 @@ function contravariant_fluxes(u, grad_u, i, j, element, contravariant_vectors,
    cv_f = cv_fa - cv_fv
    cv_g = cv_ga - cv_gv
 
-   # TODO - Remove other cv terms?
    return fa, ga, fv, gv, cv_f, cv_g
 end
 
@@ -34,7 +33,6 @@ function contravariant_fluxes(u, grad_u, Ja,
    cv_f = cv_fa - cv_fv
    cv_g = cv_ga - cv_gv
 
-   # TODO - Remove other cv terms?
    return fa, ga, fv, gv, cv_f, cv_g
 end
 
@@ -288,18 +286,6 @@ function prolong2interfaces_lw_parabolic!(cache, cache_parabolic, u,
          for v in eachvariable(equations)
             interface_cache.u[1, v, i, interface] = u[v, i_primary, j_primary, primary_element]
             interface_cache.U[1, v, i, interface] = U[v, i_primary, j_primary, primary_element]
-
-            # TODO - Try with get_flux_vars instead?
-            # flux_advectv = SVector(F[v, 1, i_primary, j_primary, primary_element],
-            #                        F[v, 2, i_primary, j_primary, primary_element])
-            # flux_viscous = SVector(Fv[v, 1, i_primary, j_primary, primary_element],
-            #                        Fv[v, 2, i_primary, j_primary, primary_element])
-
-            # fn_adv = dot(flux_advectv, normal_direction)
-            # fn_visc = dot(flux_viscous, normal_direction)
-
-            # interface_cache.f[1, v, i, interface] = dot(flux_advectv, normal_direction)
-            # cache_parabolic.Fb[1, v, i, interface] = dot(flux_viscous, normal_direction)
 
             interface_cache.f[1, v, i, interface] = fn_adv[v]
             cache_parabolic.Fb[1, v, i, interface] = fn_visc[v]
@@ -587,15 +573,9 @@ function calc_boundary_flux_lw!(cache, cache_hyperbolic, t,
             x, t, operator_type, equations_parabolic, get_time_discretization(dg), scaling_factor)
 
          # Copy flux to element storage in the correct orientation
-         # print("Before update ")
-         # @show surface_flux_values[1, node_index, direction_index, element]
          for v in eachvariable(equations_parabolic)
             surface_flux_values[v, node_index, direction_index, element] -= flux_[v]
-            # @show surface_flux_values[v, node_index, direction_index, element]
-            # surface_flux_values[v, node_index, direction_index, element] = 1000.0
          end
-         # print("After update ")
-         # @show surface_flux_values[1, node_index, direction_index, element]
 
          i_node += i_node_step
          j_node += j_node_step
