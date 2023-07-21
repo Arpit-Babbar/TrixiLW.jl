@@ -101,7 +101,7 @@ callbacks = (
 
 ###############################################################################
 # run the simulation
-cfl_number = 10000
+cfl_number = 22000
 time_int_tol = 1e-8
 tolerances = (; abstol=time_int_tol, reltol=time_int_tol)
 dt_initial = 1.0

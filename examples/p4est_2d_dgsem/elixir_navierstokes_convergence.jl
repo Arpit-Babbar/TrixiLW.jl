@@ -12,7 +12,7 @@ equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu=mu(), Pr
                                                           gradient_variables=TrixiLW.GradientVariablesConservative())
 
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
-solver = DGSEM(polydeg=4, surface_flux=flux_lax_friedrichs,
+solver = DGSEM(polydeg=1, surface_flux=flux_lax_friedrichs,
                volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
 
 coordinates_min = (-1.0, -1.0) # minimum coordinates (min(x), min(y))
@@ -20,7 +20,7 @@ coordinates_max = ( 1.0,  1.0) # maximum coordinates (max(x), max(y))
 
 trees_per_dimension = (4, 4)
 mesh = P4estMesh(trees_per_dimension,
-                 polydeg=4, initial_refinement_level=2,
+                 polydeg=1, initial_refinement_level=4,
                  coordinates_min=coordinates_min, coordinates_max=coordinates_max,
                  periodicity=(true, false))
 
@@ -195,7 +195,7 @@ semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
 # ###############################################################################
 # # ODE solvers, callbacks etc.
 
-tspan = (0.0, 1.0)
+tspan = (0.0, 0.5)
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 summary_callback = SummaryCallback()
@@ -225,7 +225,7 @@ callbacks = (
 
 ###############################################################################
 # run the simulation
-cfl_number = 18
+cfl_number = 1000
 time_int_tol = 1e-8
 tolerances = (; abstol=time_int_tol, reltol=time_int_tol)
 dt_initial = 1.0

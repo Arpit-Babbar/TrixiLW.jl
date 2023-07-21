@@ -45,7 +45,7 @@ end
 
 trees_per_dimension = (4, 4)
 mesh = P4estMesh(trees_per_dimension,
-                 polydeg=1, initial_refinement_level=1,
+                 polydeg=1, initial_refinement_level=3,
                  mapping=mapping,
                  periodicity=true)
 
@@ -69,13 +69,13 @@ lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan)
 summary_callback = SummaryCallback()
 
 # The AnalysisCallback allows to analyse the solution in regular intervals and prints the results
-analysis_interval = 100
+analysis_interval = 1000
 analysis_callback = AnalysisCallback(semi, interval=analysis_interval)
 
 # The AliveCallback prints short status information in regular intervals
 alive_callback = AliveCallback(analysis_interval=analysis_interval)
 
-visualization_callback = VisualizationCallback(interval=100,
+visualization_callback = VisualizationCallback(interval=1000,
    save_initial_solution=true,
    save_final_solution=true)
 
@@ -92,7 +92,7 @@ callbacks = (
 # run the simulation
 
 # OrdinaryDiffEq's `solve` method evolves the solution in time and executes the passed callbacks
-cfl_number = 4.0
+cfl_number = 0.5
 time_int_tol = 1e-8
 tolerances = (; abstol=time_int_tol, reltol=time_int_tol)
 dt_initial = 1.0
