@@ -323,16 +323,7 @@ function prolong2interfaces_lw_parabolic!(cache, cache_parabolic, u,
          for v in eachvariable(equations)
             interface_cache.u[2, v, i, interface] = u[v, i_secondary, j_secondary, secondary_element]
             interface_cache.U[2, v, i, interface] = U[v, i_secondary, j_secondary, secondary_element]
-
-            # flux_advectv = SVector(F[v, 1, i_secondary, j_secondary, secondary_element],
-            #                        F[v, 2, i_secondary, j_secondary, secondary_element])
-            # flux_viscous = SVector(Fv[v, 1, i_secondary, j_secondary, secondary_element],
-            #                        Fv[v, 2, i_secondary, j_secondary, secondary_element])
-
-            # store the normal flux with respect to the primary normal direction
-            # interface_cache.f[2, v, i, interface] = -dot(flux_advectv, normal_direction)
-            # cache_parabolic.Fb[2, v, i, interface] = -dot(flux_viscous, normal_direction)
-
+   
             interface_cache.f[2, v, i, interface]  = -fn_adv[v]
             cache_parabolic.Fb[2, v, i, interface] = -fn_visc[v]
          end
