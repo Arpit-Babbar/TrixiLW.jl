@@ -8,9 +8,9 @@ using LinearAlgebra
 using Printf
 # plotlyjs()
 gr()
-include(joinpath(utils_dir(), "mpl.jl"))
+include(joinpath(utils_dir(), "reproducibility/mpl.jl"))
 
-include(joinpath(utils_dir(), "reproduce_base.jl"))
+include(joinpath(utils_dir(), "reproducibility/reproduce_base.jl"))
 
 function my_save_fig_python(test_case, figure, name)
    fig_dir = joinpath(rep_dir(), "figures", test_case)
