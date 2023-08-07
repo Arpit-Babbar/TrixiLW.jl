@@ -7,7 +7,7 @@ semi_dir()     = joinpath(src_dir(),"semidiscretization")
 solvers_dir()  = joinpath(src_dir(),"solvers")
 aux_dir()      = joinpath(src_dir(),"auxiliary")
 callback_dir() = joinpath(src_dir(),"callbacks")
-utils_dir() = joinpath(base_dir, "utils")
+utils_dir() = joinpath(base_dir(), "utils")
 
 examples_dir_trixilw() = joinpath(base_dir(), "examples")
 
