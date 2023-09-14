@@ -44,11 +44,22 @@ initial_condition = initial_condition_su2
    return flux
 end
 
+@inline function boundary_condition_outflow(U_inner, f_inner, u_inner,
+   outer_cache,
+   normal_direction::AbstractVector, x, t, dt,
+   surface_flux_function, equations::CompressibleEulerEquations2D,
+   dg, time_discretization, scaling_factor = 1)
+   # flux = Trixi.flux(u_inner, normal_direction, equations)
+
+   # return flux
+   return f_inner
+end
+
 boundary_conditions = Dict(
    :Left => boundary_condition_supersonic_inflow,
-   :Right => TrixiLW.boundary_condition_outflow,
-   :Top => TrixiLW.boundary_condition_outflow,
-   :Bottom => TrixiLW.boundary_condition_outflow,
+   :Right => boundary_condition_outflow,
+   :Top => boundary_condition_outflow,
+   :Bottom => boundary_condition_outflow,
    :AirfoilBottom => TrixiLW.slip_wall_approximate,
    :AirfoilTop => TrixiLW.slip_wall_approximate)
 
@@ -89,7 +100,7 @@ semi = TrixiLW.SemidiscretizationHyperbolic(mesh,
 ###############################################################################
 # ODE solvers
 
-tspan = (0.0, 10.0)
+tspan = (0.0, 6.6)
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 # Callbacks
