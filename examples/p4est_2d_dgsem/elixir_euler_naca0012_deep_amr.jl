@@ -143,7 +143,7 @@ stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds=(5.0e-7, 1.0e-6)
 
 ###############################################################################
 # run the simulation
-time_int_tol = 1e-6
+time_int_tol = 1e-4
 tolerances = (; abstol=time_int_tol, reltol=time_int_tol);
 dt_initial = 1e-8;
 cfl_number = 0.14

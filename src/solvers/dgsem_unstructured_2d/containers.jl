@@ -28,8 +28,8 @@ function create_boundary_cache(mesh::Union{UnstructuredMesh2D,P4estMesh{2}}, equ
    n_variables = nvariables(equations)
    n_nodes = nnodes(dg)
    nan_uEltype = convert(uEltype, NaN)
-   _U, _u, _f = (fill(nan_uEltype, n_variables * n_nodes * n_boundaries) for _ in 1:3)
+   _U, _U_low, _u, _f, _f_low = (fill(nan_uEltype, n_variables * n_nodes * n_boundaries) for _ in 1:5)
    wrap_(u) = unsafe_wrap(Array, pointer(u), (n_variables, n_nodes, n_boundaries))
-   U, u, f = wrap_.((_U, _u, _f))
-   return LWBoundariesContainer(U, u, f, _U, _u, _f, outer_cache)
+   U, U_low, u, f, f_low = wrap_.((_U, _U_low, _u, _f, _f_low))
+   return LWBoundariesContainer(U, U_low, u, f, f_low, _U, _U_low, _u, _f, _f_low, outer_cache)
 end

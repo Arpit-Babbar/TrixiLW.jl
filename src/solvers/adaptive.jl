@@ -56,6 +56,21 @@ end
    return epsilon
 end
 
+@inline function load_temporal_errors_global!(epsilon, total_temporal_error, redo)
+
+   # epsilon[i] = 1/total_temporal_error[i]
+   # epsilon[1] contains the prediction of the upcoming time
+   # while the epsilon[0], epsilon[-1] contain previous info
+   if !redo # If it is a redo, we have already put correct previous epsilons
+      epsilon[-1], epsilon[0] = epsilon[0], epsilon[1]
+   end
+
+   tol = 1e-12
+   epsilon[1] = 1.0 / (total_temporal_error + tol)
+
+   return epsilon
+end
+
 @inline function compute_and_load_temporal_errors!(u_ode, u_low_ode, semi, epsilon, ndofs, tolerances, redo)
    @unpack mesh, equations, solver, cache = semi
    dg = solver
@@ -103,12 +118,13 @@ end
 function perform_step!(integrator, limiters, callbacks, lw_update,
    time_step_computation::Adaptive, time_discretization::LW, redo=false)
    semi = integrator.p
+
+   @unpack _U = semi.cache.element_cache
    @unpack tolerances, controller = integrator.opts
    @unpack u, uprev, epsilon = integrator
    @unpack rhs!, soln_arrays = lw_update
    @unpack du_ode, u0_ode = soln_arrays         # Vectors form for compability with callbacks
    @.. uprev = u
-
    domain_valid = true # Checks for domain errors
    error_valid = true # Checks if factor is large / small
    @unpack t, dt = integrator
@@ -130,8 +146,26 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
    domain_valid = min(domain_valid, test_updated_solution(u, semi))
 
    # put appropriate temporal errors in epsilon
-   epsilon = load_temporal_errors!(epsilon, temporal_errors,
-      Trixi.ndofs(semi), redo)
+   # epsilon = load_temporal_errors!(epsilon, temporal_errors,
+   #    Trixi.ndofs(semi), redo)
+
+   @unpack abstol, reltol = tolerances
+   temporal_error = 0.0
+   for v in eachindex(_U)
+      error = (
+         abs(_U[v] - u[v])
+         /
+         ( abstol + reltol * max( abs(_U[v]), abs(u[v]) ) )
+      )^2
+      temporal_error += error
+      # if temporal_error > 1.0
+      #    @show _U[v], u[v], temporal_error, abs(_U[v] - u[v]), error
+      #    @assert false
+      # end
+   end
+   total_temporal_error = sqrt(temporal_error / Trixi.ndofs(semi))
+
+   epsilon = load_temporal_errors_global!(epsilon, total_temporal_error, redo)
    # Use epsilon to compute dt_factor
    factor = dt_factor(epsilon, Trixi.nnodes(semi.solver), controller)
 
@@ -155,6 +189,7 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
       # Go back to beginning of function
       perform_step!(integrator, limiters, callbacks, lw_update, time_step_computation,
          time_discretization, redo)
+
       return nothing
    end
 

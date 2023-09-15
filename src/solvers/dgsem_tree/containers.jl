@@ -67,10 +67,16 @@ end
 mutable struct LWElementContainer{uEltype<:Real, NDIMSP2, NDIMSP3, MDRKCache}
    U::Array{uEltype,NDIMSP2}      # [variables, i, j, k, element]
    F::Array{uEltype,NDIMSP3}      # [variables, coordinate, i, j, k, element]
+   U_low::Array{uEltype,NDIMSP2}
+   F_low::Array{uEltype,NDIMSP3}
    fn_low::Array{uEltype,NDIMSP2} # [variable, i, j, left/right/bottom/top, elements]
    _U::Vector{uEltype}
    _F::Vector{uEltype}
+   _U_low::Vector{uEltype}
+   _F_low::Vector{uEltype}
    _fn_low::Vector{uEltype}
+   surface_flux_values_low::Array{uEltype, 4}
+   du_low::Array{uEltype, NDIMSP2}
    mdrk_cache::MDRKCache
 end
 
@@ -89,26 +95,34 @@ mutable struct MDRKElementCache{uEltype<:Real, NDIMSP2, NDIMSP3}
    _F2::Vector{uEltype}
 end
 
-mutable struct LWInterfaceContainer{RealT,uEltype,NDIMS,NDIMSP2}
+mutable struct LWInterfaceContainer{RealT, uEltype, NDIMS, NDIMSP2}
    u::Array{uEltype,NDIMSP2}      # [left/right, variables, i, j, k, interface]
    U::Array{uEltype,NDIMSP2}      # [left/right, variables, i, j, k, interface]
+   U_low::Array{uEltype,NDIMSP2}      # [left/right, variables, i, j, k, interface]
    f::Array{uEltype,NDIMSP2}      # [left/right, variables, i, j, k, interface]
+   f_low::Array{uEltype,NDIMSP2}      # [left/right, variables, i, j, k, interface]
    fn_low::Array{uEltype,NDIMSP2} # [left/right, variables, i, j, k, interface]
    inverse_jacobian::Array{RealT,NDIMS} # [i, j, interface]
    _u::Vector{uEltype}
    _U::Vector{uEltype}
+   _U_low::Vector{uEltype}
    _f::Vector{uEltype}
+   _f_low::Vector{uEltype}
    _fn_low::Vector{uEltype}
    _inverse_jacobian::Vector{RealT}
 end
 
 mutable struct LWBoundariesContainer{uEltype<:Real,D,OuterCache}
    U::Array{uEltype,D}  # [variables, i, boundaries]
+   U_low::Array{uEltype,D}  # [variables, i, boundaries]
    u::Array{uEltype,D}  # [variables, i, boundaries]
    f::Array{uEltype,D}  # [variables, i, boundaries]
+   f_low::Array{uEltype,D}  # [variables, i, boundaries]
    _U::Vector{uEltype}
+   _U_low::Vector{uEltype}
    _u::Vector{uEltype}
    _f::Vector{uEltype}
+   _f_low::Vector{uEltype}
    outer_cache::OuterCache
 end
 
@@ -119,7 +133,9 @@ function create_element_cache(::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D
    _us = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
    _u_low = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
    _U = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
+   _U_low = deepcopy(_U)
    _F = fill(nan_uEltype, n_variables * NDIMS * n_nodes^NDIMS * n_elements)
+   _F_low = deepcopy(_F)
    _F2 = fill(nan_uEltype, n_variables * NDIMS * n_nodes^NDIMS * n_elements)
    _U2 = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
    _S2 = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
@@ -133,24 +149,32 @@ function create_element_cache(::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D
                    (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
    U = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_U),
                    (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
+   U_low = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_U_low),
+                   (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
    U2 = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_U2),
                    (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
    S2 = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_S2),
                    (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
    F = unsafe_wrap(Array{uEltype,NDIMS + 3}, pointer(_F),
                    (n_variables, NDIMS, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
+   F_low = unsafe_wrap(Array{uEltype,NDIMS + 3}, pointer(_F_low),
+                   (n_variables, NDIMS, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
    F2 = unsafe_wrap(Array{uEltype,NDIMS + 3}, pointer(_F2),
                    (n_variables, NDIMS, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
 
+   surface_flux_values_low = zeros(n_variables, n_nodes, 2*NDIMS, n_elements)
+   surface_flux_values_low .= nan_uEltype
    if isa(time_discretization, MDRK)
       # TODO - This is too much storage. Can some be avoided?
       mdrk_cache = MDRKElementCache(us, u_low, U2, S2, F, F2, _us, _u_low, _U2, _S2, _F, _F2)
    else
       mdrk_cache = (;)
    end
+   du_low = deepcopy(U)
    fn_low = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_fn_low),
                         (n_variables, ntuple(_ -> n_nodes, NDIMS - 1)..., 2^NDIMS, n_elements))
-   return LWElementContainer(U, F, fn_low, _U, _F, _fn_low, mdrk_cache)
+   return LWElementContainer(U, F, U_low, F_low, fn_low, _U, _U_low, _F, _F_low, _fn_low,
+                             surface_flux_values_low, du_low, mdrk_cache)
 end
 
 mutable struct L2MortarContainer_lw_Tree{uEltype<:Real,Temp} <: AbstractContainer

@@ -1506,6 +1506,7 @@ function weak_form_kernel_4!(du, u, t, dt, tolerances,
       Trixi.multiply_add_to_node_vars!(element_cache.F, 1.0 / 24.0, gttt, equations, dg, 2, i, j, element)
       Trixi.multiply_add_to_node_vars!(Gtilde, 1.0 / 24.0, gtilde_ttt, equations, dg, i, j)
 
+
       for ii in eachnode(dg)
          # ut              += -lam * D * ft for each variable
          # i.e.,  ut[ii,j] += -lam * Dm[ii,i] ft[i,j] (sum over i)
@@ -1544,6 +1545,8 @@ function weak_form_kernel_4!(du, u, t, dt, tolerances,
 
    for j in eachnode(dg), i in eachnode(dg)
       utttt_node = Trixi.get_node_vars(utttt, equations, dg, i, j)
+      U_low = get_node_vars(U, equations, dg, i, j)
+      set_node_vars!(element_cache.U_low, U_low, equations, dg, i, j, element)
       Trixi.multiply_add_to_node_vars!(U, 1.0 / 120.0, utttt_node, equations, dg, i, j)
       Trixi.multiply_add_to_node_vars!(um, 1.0 / 24.0, utttt_node, equations, dg, i, j)
       Trixi.multiply_add_to_node_vars!(up, 1.0 / 24.0, utttt_node, equations, dg, i, j)
@@ -1579,6 +1582,8 @@ function weak_form_kernel_4!(du, u, t, dt, tolerances,
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
          Trixi.multiply_add_to_node_vars!(u_np1_low, -dt * inv_jacobian * derivative_matrix[ii, i],
             F_, equations, dg, ii, j)
+         Trixi.multiply_add_to_node_vars!(element_cache.du_low, alpha * derivative_dhat[ii, i],
+            F_, equations, dg, ii, j, element)
       end
 
       for jj in eachnode(dg)
@@ -1587,11 +1592,19 @@ function weak_form_kernel_4!(du, u, t, dt, tolerances,
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
          Trixi.multiply_add_to_node_vars!(u_np1_low, -dt * inv_jacobian * derivative_matrix[jj, j],
             G_, equations, dg, i, jj)
+
+         Trixi.multiply_add_to_node_vars!(element_cache.du_low, alpha * derivative_dhat[jj, j],
+            G_, equations, dg, i, jj, element)
       end
 
       # TODO - Check the source term contribution
       S_node = Trixi.get_node_vars(S, equations, dg, i, j)
       Trixi.multiply_add_to_node_vars!(u_np1_low, 1.0, S_node, equations, dg, i, j)
+
+      F_low = get_node_vars(element_cache.F, equations, dg, 1, i, j, element)
+      G_low = get_node_vars(element_cache.F, equations, dg, 2, i, j, element)
+      set_node_vars!(element_cache.F_low, F_low, equations, dg, 1, i, j, element)
+      set_node_vars!(element_cache.F_low, G_low, equations, dg, 2, i, j, element)
 
       # UPDATING u_np1_low ENDS!!!
 
@@ -1656,11 +1669,18 @@ function weak_form_kernel_4!(du, u, t, dt, tolerances,
       u_np1_low_node = Trixi.get_node_vars(u_np1_low, equations, dg, i, j)
       # u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
       for v in eachvariable(equations)
-         temporal_errors[element] += (
-            (u_np1_node[v] - u_np1_low_node[v])
-            /
-            (abstol + reltol * max(abs(u_np1_node[v]), abs(u_np1_low_node[v])))
-         )^2
+         error = ( (u_np1_node[v] - u_np1_low_node[v])
+         /
+         (abstol + reltol * max(abs(u_np1_node[v]), abs(u_np1_low_node[v])))
+      )^2
+         temporal_errors[element] += error
+
+         # _U = u_np1_node
+         # _u = u_np1_low_node
+         # if temporal_errors[element] > 1.0
+         #    @show _U[v], _u[v], temporal_errors[element], abs(_U[v] - _u[v]), error
+         #    @assert false
+         # end
       end
    end
 

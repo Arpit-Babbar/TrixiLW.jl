@@ -9,7 +9,7 @@ function prolong2interfaces!(cache, u,
    mesh::P4estMesh{2},
    equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
    @unpack interfaces, elements, interface_cache, element_cache = cache
-   @unpack U, F, fn_low = element_cache
+   @unpack U, U_low, F, F_low, fn_low = element_cache
    @unpack contravariant_vectors = elements
    index_range = eachnode(dg)
 
@@ -30,14 +30,18 @@ function prolong2interfaces!(cache, u,
       j_primary = j_primary_start
       for i in eachnode(dg)
          f = get_flux_vars(F, equations, dg, i_primary, j_primary, primary_element)
+         f_low = get_flux_vars(F_low, equations, dg, i_primary, j_primary, primary_element)
          normal_direction = get_normal_direction(primary_direction, contravariant_vectors,
             i_primary, j_primary, primary_element)
          fn_node = normal_product(f, equations, normal_direction)
+         fn_node_low = normal_product(f_low, equations, normal_direction)
 
          for v in eachvariable(equations)
             interface_cache.u[1, v, i, interface] = u[v, i_primary, j_primary, primary_element]
             interface_cache.U[1, v, i, interface] = U[v, i_primary, j_primary, primary_element]
             interface_cache.f[1, v, i, interface] = fn_node[v]
+            interface_cache.U_low[1, v, i, interface] = U_low[v, i_primary, j_primary, primary_element]
+            interface_cache.f_low[1, v, i, interface] = fn_node_low[v]
          end
          i_primary += i_primary_step
          j_primary += j_primary_step
@@ -56,14 +60,18 @@ function prolong2interfaces!(cache, u,
       j_secondary = j_secondary_start
       for i in eachnode(dg)
          f = get_flux_vars(F, equations, dg, i_secondary, j_secondary, secondary_element)
+         f_low = get_flux_vars(F_low, equations, dg, i_secondary, j_secondary, secondary_element)
          normal_direction = -get_normal_direction(secondary_direction, contravariant_vectors,
             i_secondary, j_secondary, secondary_element)
          fn_node = normal_product(f, equations, normal_direction)
+         fn_node_low = normal_product(f_low, equations, normal_direction)
 
          for v in eachvariable(equations)
             interface_cache.u[2, v, i, interface] = u[v, i_secondary, j_secondary, secondary_element]
             interface_cache.U[2, v, i, interface] = U[v, i_secondary, j_secondary, secondary_element]
             interface_cache.f[2, v, i, interface] = fn_node[v]
+            interface_cache.U_low[2, v, i, interface] = U_low[v, i_secondary, j_secondary, secondary_element]
+            interface_cache.f_low[2, v, i, interface] = fn_node_low[v]
          end
          i_secondary += i_secondary_step
          j_secondary += j_secondary_step
@@ -148,17 +156,26 @@ end
    interface_index, normal_direction,
    primary_node_index, primary_direction_index, primary_element_index,
    secondary_node_index, secondary_direction_index, secondary_element_index)
-   @unpack u, f, fn_low, U = cache.interface_cache
+   @unpack element_cache = cache
+   @unpack surface_flux_values_low = element_cache
+   @unpack u, f, f_low, fn_low, U, U_low = cache.interface_cache
    @unpack surface_flux = surface_integral
 
    U_ll, U_rr = get_surface_node_vars(U, equations, dg, primary_node_index, interface_index)
    u_ll, u_rr = get_surface_node_vars(u, equations, dg, primary_node_index, interface_index)
    f_ll, f_rr = get_surface_node_vars(f, equations, dg, primary_node_index, interface_index)
+
+   U_low_ll, U_low_rr = get_surface_node_vars(U_low, equations, dg, primary_node_index, interface_index)
+   f_low_ll, f_low_rr = get_surface_node_vars(f_low, equations, dg, primary_node_index, interface_index)
+
    fn_inner_ll, fn_inner_rr = get_surface_node_vars(fn_low, equations, dg, primary_node_index, interface_index)
 
    # flux_ = surface_flux(u_ll, u_rr, normal_direction, equations)
    Fn = surface_flux(f_ll, f_rr, u_ll, u_rr, U_ll, U_rr, normal_direction,
       equations)
+
+   Fn_low = surface_flux(f_low_ll, f_low_rr, u_ll, u_rr, U_low_ll, U_low_rr,
+      normal_direction, equations)
 
    fn = surface_flux(u_ll, u_rr, normal_direction, equations)
 
@@ -175,6 +192,15 @@ end
       )
       surface_flux_values[v, secondary_node_index, secondary_direction_index, secondary_element_index] = -(
          alp * fn[v] + (1.0 - alp) * Fn[v]
+         # Fn[v]
+      )
+
+      surface_flux_values_low[v, primary_node_index, primary_direction_index, primary_element_index] = (
+         alp * fn[v] + (1.0 - alp) * Fn_low[v]
+         # Fn[v]
+      )
+      surface_flux_values_low[v, secondary_node_index, secondary_direction_index, secondary_element_index] = -(
+         alp * fn[v] + (1.0 - alp) * Fn_low[v]
          # Fn[v]
       )
    end
@@ -215,7 +241,7 @@ function prolong2boundaries!(cache, u,
    mesh::P4estMesh{2},
    equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
    @unpack boundaries, boundary_cache, elements, element_cache = cache
-   @unpack U, F = element_cache
+   @unpack U, U_low, F, F_low = element_cache
    @unpack contravariant_vectors = elements
    index_range = eachnode(dg)
 
@@ -233,13 +259,18 @@ function prolong2boundaries!(cache, u,
       j_node = j_node_start
       for i in eachnode(dg)
          f = get_flux_vars(F, equations, dg, i_node, j_node, element)
+         f_low = get_flux_vars(F_low, equations, dg, i_node, j_node, element)
          normal_direction = get_normal_direction(direction, contravariant_vectors,
             i_node, j_node, element)
          fn_node = normal_product(f, equations, normal_direction)
+         fn_node_low = normal_product(f_low, equations, normal_direction)
          for v in eachvariable(equations)
             boundary_cache.u[v, i, boundary] = u[v, i_node, j_node, element]
             boundary_cache.U[v, i, boundary] = U[v, i_node, j_node, element]
             boundary_cache.f[v, i, boundary] = fn_node[v]
+
+            boundary_cache.U_low[v, i, boundary] = U_low[v, i_node, j_node, element]
+            boundary_cache.f_low[v, i, boundary] = fn_node_low[v]
          end
          i_node += i_node_step
          j_node += j_node_step
@@ -293,7 +324,8 @@ end
    surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG, cache,
    i_index, j_index,
    node_index, direction_index, element_index, boundary_index, scaling_factor)
-   @unpack boundaries, boundary_cache = cache
+   @unpack boundaries, boundary_cache, element_cache = cache
+   @unpack surface_flux_values_low = element_cache
    @unpack outer_cache = boundary_cache
    @unpack node_coordinates, contravariant_vectors = cache.elements
    @unpack surface_flux = surface_integral
@@ -302,6 +334,9 @@ end
    u_inner = Trixi.get_node_vars(boundary_cache.u, equations, dg, node_index, boundary_index)
    U_inner = Trixi.get_node_vars(boundary_cache.U, equations, dg, node_index, boundary_index)
    f_inner = Trixi.get_node_vars(boundary_cache.f, equations, dg, node_index, boundary_index)
+
+   U_inner_low = Trixi.get_node_vars(boundary_cache.U_low, equations, dg, node_index, boundary_index)
+   f_inner_low = Trixi.get_node_vars(boundary_cache.f_low, equations, dg, node_index, boundary_index)
 
    # Outward-pointing normal direction (not normalized)
    normal_direction = get_normal_direction(direction_index, contravariant_vectors,
@@ -315,9 +350,13 @@ end
    flux_ = boundary_condition(U_inner, f_inner, u_inner, outer_cache, normal_direction, x, t, dt,
       surface_flux, equations, dg, time_discretization, scaling_factor)
 
+   flux_low = boundary_condition(U_inner_low, f_inner_low, u_inner, outer_cache, normal_direction, x, t, dt,
+      surface_flux, equations, dg, time_discretization, scaling_factor)
+
    # Copy flux to element storage in the correct orientation
    for v in eachvariable(equations)
       surface_flux_values[v, node_index, direction_index, element_index] = flux_[v]
+      surface_flux_values_low[v, node_index, direction_index, element_index] = flux_low[v]
    end
 end
 
