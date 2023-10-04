@@ -2,11 +2,15 @@ using Trixi: get_node_vars
 
 @inline function test_rhs!(du_ode, u_ode, semi, t, integrator, tolerances, rhs! = rhs!)
    # TODO - Does this try catch block cause a performance issue?
+   max_retries = 25
    try
       rhs!(du_ode, u_ode, semi, t, tolerances) # Compute du = u^{n+1}-dt*u^n
    catch e
       if isa(e, DomainError) || isa(e, TaskFailedException) # Second exception is for multithreading. TODO - Get a more specific second exception
-
+         if integrator.n_fail_it > max_retries
+            println("Domain error not fixed in $max_retries retries, rethrowing...")
+            rethrow(e)
+         end
          println("Adjusting time step to maintain admissibility")
          domain_valid = false
          return domain_valid
@@ -146,6 +150,7 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
    # end
 
    if !(domain_valid && error_valid)
+      integrator.n_fail_it += 1
       dt = min(factor, 0.95) * dt
       println("Redoing time step to decrease $(integrator.dt) to $dt")
       @show domain_valid, error_valid
@@ -157,6 +162,9 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
          time_discretization, redo)
       return nothing
    end
+
+   integrator.n_fail_it_total += integrator.n_fail_it
+   integrator.n_fail_it = 0
 
    dt_next = min(factor, 1.5) * dt
 

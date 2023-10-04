@@ -1,3 +1,4 @@
+import PyPlot as plt
 rcParams = plt.PyDict(plt.matplotlib["rcParams"]) # Otherwise, the dictionary will be copied
 # as is default in PyClaw. See
 # https://github.com/JuliaPy/PyPlot.jl/issues/417#issuecomment-452382111

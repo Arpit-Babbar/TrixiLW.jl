@@ -61,6 +61,8 @@ mutable struct LWIntegrator{
    old_ninterfaces::Int
    old_nboundaries::Int
    old_nmortars::Int
+   n_fail_it::Int
+   n_fail_it_total::Int
    alg::Algorithm
 end
 
@@ -161,9 +163,12 @@ function LWIntegrator(lw_update::LWUpdate, time_discretization, sol, callbacks, 
    n_interfaces = ninterfaces(semi.mesh, semi.solver, semi.cache, time_discretization)
    n_boundaries = nboundaries(semi.mesh, semi.solver, semi.cache, time_discretization)
    n_mortars = 1
+   n_fail_it = 0
+   n_fail_it_total = 0
    LWIntegrator(semi, sol, u, u0_ode, integrator_cache, iter, t, tspan, dt, f,
       dtpropose, dtcache, stats, epsilon,
-      opts, n_elements, n_interfaces, n_boundaries, n_mortars, time_discretization)
+      opts, n_elements, n_interfaces, n_boundaries, n_mortars,
+      n_fail_it, n_fail_it_total, time_discretization)
 end
 
 function compute_dt(semi::SemidiscretizationHyperbolic,
@@ -218,6 +223,12 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
    return nothing
 end
 
+function adaptivity_cache()
+   n_fail_total = zeros(1)
+   n_fail = zeros(1)
+   return (;n_fail_total, n_fail)
+end
+
 # This will allow both LW and FR. For debugging, we rewrite the RKFR from Trixi.
 
 function solve_lwfr(lw_update, callbacks, dt_initial, tolerances;
@@ -244,6 +255,8 @@ function solve_lwfr(lw_update, callbacks, dt_initial, tolerances;
       apply_limiters!(limiters, integrator)
       apply_callbacks!(callbacks, integrator)
    end
+
+   println("Total failed iterators = ", integrator.n_fail_it_total)
 
    return sol
 end

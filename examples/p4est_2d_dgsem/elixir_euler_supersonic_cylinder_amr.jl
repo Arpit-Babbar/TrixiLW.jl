@@ -43,7 +43,7 @@ initial_condition = initial_condition_mach3_flow
   outer_cache,
   normal_direction::AbstractVector, x, t, dt,
   surface_flux_function, equations::CompressibleEulerEquations2D,
-  dg, time_discretization)
+  dg, time_discretization, scaling_factor = 1)
 
   u_boundary = initial_condition_mach3_flow(x, t, equations)
   flux = Trixi.flux(u_boundary, normal_direction, equations)
