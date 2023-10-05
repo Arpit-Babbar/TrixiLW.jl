@@ -252,8 +252,8 @@ function solve_lwfr(lw_update, callbacks, dt_initial, tolerances;
    while !(isfinished(integrator)) # Check t < final_time
       perform_step!(integrator, limiters, callbacks, lw_update, time_step_computation,
                     time_discretization)
-      apply_limiters!(limiters, integrator)
       apply_callbacks!(callbacks, integrator)
+      apply_limiters!(limiters, integrator)
    end
 
    println("Total failed iterators = ", integrator.n_fail_it_total)

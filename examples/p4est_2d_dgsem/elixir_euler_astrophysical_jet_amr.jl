@@ -103,7 +103,7 @@ lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan)
 # and resets the timers
 summary_callback = SummaryCallback()
 
-analysis_interval = 10000
+analysis_interval = 100
 analysis_callback = AnalysisCallback(semi, interval=analysis_interval,
                                      extra_analysis_integrals=(entropy,))
 
@@ -114,19 +114,8 @@ save_solution = SaveSolutionCallback(interval=1000,
                                      save_final_solution=true,
                                      solution_variables=cons2prim)
 
-amr_indicator = IndicatorLöhner(semi, variable=Trixi.density)
-
-amr_controller = ControllerThreeLevel(semi, amr_indicator,
-                                      base_level=0,
-                                      med_level=3, med_threshold=0.05,
-                                      max_level=5, max_threshold=0.1)
-
-amr_callback = AMRCallback(semi, amr_controller,
-                           interval=1,
-                           adapt_initial_condition=true,
-                           adapt_initial_condition_only_refine=true)
 callbacks = (;analysis_callback, alive_callback,
-              save_solution, amr_callback
+              save_solution
               )
 
 # positivity limiter necessary for this example with strong shocks

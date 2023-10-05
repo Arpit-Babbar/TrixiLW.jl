@@ -61,6 +61,8 @@ include(solvers_dir() * "/dgsem_p4est/containers.jl")
 # AMR
 include(callback_dir() * "/amr.jl")
 
-export get_time_discretization, SurfaceIntegralDiffusive
+include(src_dir() * "/callbacks/callbacks_stage/positivity_zhang_shu.jl")
+
+export get_time_discretization, SurfaceIntegralDiffusive, MyPositivityPreservingLimiterZhangShu
 
 end # module

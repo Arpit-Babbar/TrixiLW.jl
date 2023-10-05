@@ -2,7 +2,7 @@ using Trixi: get_node_vars
 
 @inline function test_rhs!(du_ode, u_ode, semi, t, integrator, tolerances, rhs! = rhs!)
    # TODO - Does this try catch block cause a performance issue?
-   max_retries = 25
+   max_retries = 25 # TODO - This doesn't work, fix it please.
    try
       rhs!(du_ode, u_ode, semi, t, tolerances) # Compute du = u^{n+1}-dt*u^n
    catch e
