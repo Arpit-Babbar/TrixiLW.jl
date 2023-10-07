@@ -1,36 +1,14 @@
-using Trixi: AbstractSemidiscretization, mesh_equations_solver_cache
+using Trixi: AbstractSemidiscretization, mesh_equations_solver_cache,
+             PositivityPreservingLimiterZhangShu
+using TrixiLW: LWIntegrator
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
 # we need to opt-in explicitly.
 # See https://ranocha.de/blog/Optimizing_EC_Trixi for further details.
 @muladd begin
 
-
-"""
-      PositivityPreservingLimiterZhangShu(; threshold, variables)
-
-The fully-discrete positivity-preserving limiter of
-- Zhang, Shu (2011)
-   Maximum-principle-satisfying and positivity-preserving high-order schemes
-   for conservation laws: survey and new developments
-   [doi: 10.1098/rspa.2011.0153](https://doi.org/10.1098/rspa.2011.0153)
-The limiter is applied to all scalar `variables` in their given order
-using the associated `thresholds` to determine the minimal acceptable values.
-The order of the `variables` is important and might have a strong influence
-on the robustness.
-"""
-struct MyPositivityPreservingLimiterZhangShu{N,Thresholds<:NTuple{N,<:Real},Variables<:NTuple{N,Any}}
-   thresholds::Thresholds
-   variables::Variables
-end
-
-function MyPositivityPreservingLimiterZhangShu(; thresholds, variables)
-   MyPositivityPreservingLimiterZhangShu(thresholds, variables)
-end
-
-
-function (limiter!::MyPositivityPreservingLimiterZhangShu)(
-   u_ode, integrator, semi::AbstractSemidiscretization, t)
+function (limiter!::PositivityPreservingLimiterZhangShu)(
+   u_ode, integrator::LWIntegrator, semi::AbstractSemidiscretization, t)
    u = wrap_array(u_ode, semi)
    @trixi_timeit timer() "positivity-preserving limiter" my_limiter_zhang_shu!(
       u, limiter!.thresholds, limiter!.variables, mesh_equations_solver_cache(semi)...)
