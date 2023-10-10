@@ -168,14 +168,19 @@ end
       fn, Fn, fn_inner_ll, fn_inner_rr, primary_node_index,
       equations, dg, dg.volume_integral)
 
+   Fn_corr = get_blended_flux(u_ll, u_rr, primary_element_index, secondary_element_index,
+      Jl, Jr, dt,
+      fn, Fn, fn_inner_ll, fn_inner_rr, primary_node_index,
+      equations, dg, dg.volume_integral)
+
    for v in eachvariable(equations)
       surface_flux_values[v, primary_node_index, primary_direction_index, primary_element_index] = (
-         alp * fn[v] + (1.0 - alp) * Fn[v]
-         # Fn[v]
+         # alp * fn[v] + (1.0 - alp) * Fn[v]
+         Fn_corr[v]
       )
       surface_flux_values[v, secondary_node_index, secondary_direction_index, secondary_element_index] = -(
-         alp * fn[v] + (1.0 - alp) * Fn[v]
-         # Fn[v]
+         # alp * fn[v] + (1.0 - alp) * Fn[v]
+         Fn_corr[v]
       )
    end
 end
@@ -184,6 +189,60 @@ function compute_alp(
    u_ll, u_rr, primary_element_index, secondary_element_index, Jl, Jr, dt,
    fn, Fn, fn_inner_ll, fn_inner_rr, primary_node_index, equations, dg, volume_integral::VolumeIntegralFR)
    return zero(eltype(u_ll))
+end
+
+function zhang_shu_flux_fix(eq::CompressibleEulerEquations2D,
+                            uprev,    # Solution at previous time level
+                            ulow,     # low order update
+                            Fn,       # Blended flux candidate
+                            fn_inner, # Inner part of flux
+                            fn,       # low order flux
+                            c         # c is such that unew = u - c(fr-fl)
+                            )
+   uhigh = uprev - c * (Fn-fn_inner) # First candidate for high order update
+   ρ_low, ρ_high = Trixi.density(ulow, eq), Trixi.density(uhigh, eq)
+   eps = 0.1*ρ_low
+   ratio = abs(eps-ρ_low)/(abs(ρ_high-ρ_low)+1e-13)
+   theta = min(ratio, 1.0)
+   if theta < 1.0
+      Fn = theta*Fn + (1.0-theta)*fn # Second candidate for flux
+   end
+   uhigh = uprev - c * (Fn - fn_inner) # Second candidate for uhigh
+   p_low, p_high = Trixi.pressure(ulow, eq), Trixi.pressure(uhigh, eq)
+   eps = 0.1*p_low
+   ratio = abs(eps-p_low)/(abs(p_high-p_low) + 1e-13)
+   theta = min(ratio, 1.0)
+   if theta < 1.0
+      Fn = theta*Fn + (1.0-theta)*fn # Final flux
+   end
+   return Fn
+end
+
+function get_blended_flux(
+   u_ll, u_rr, primary_element_index, secondary_element_index, Jl, Jr, dt,
+   fn, Fn_, fn_inner_ll, fn_inner_rr, primary_node_index, equations, dg,
+   volume_integral::VolumeIntegralFRShockCapturing)
+   @unpack alpha = volume_integral.indicator.cache
+   @unpack weights = dg.basis
+   alp = 0.5 * (alpha[primary_element_index] + alpha[secondary_element_index])
+
+   Fn = (1.0 - alp) * Fn_ + alp * fn
+   λx = λy = 0.5 # blending flux factors (TODO - Do this correctly)
+   # u_ll = get_node_vars(ul, equations, dg, nnodes(dg))
+   c_ll = dt * Jl / (weights[nnodes(dg)] * λx) # Coefficient of update
+   lower_order_update = u_ll - c_ll * (Fn - fn_inner_ll)
+   if is_admissible(lower_order_update, equations) == false
+      Fn = zhang_shu_flux_fix(equations, u_ll, lower_order_update, Fn, fn_inner_ll, fn, c_ll)
+   end
+ 
+   λx = λy = 0.5 # blending flux factors (TODO - Do this correctly)
+   # u_rr = get_node_vars(ur, equations, dg, 1)
+   c_rr = dt * Jr / (weights[1] * λx)
+   lower_order_update = u_rr - c_rr * (fn_inner_rr - Fn)
+   if is_admissible(lower_order_update, equations) == false
+      Fn = zhang_shu_flux_fix(equations, u_rr, lower_order_update, Fn, fn_inner_rr, fn, c_rr)
+   end
+   return Fn
 end
 
 function compute_alp(
@@ -195,14 +254,14 @@ function compute_alp(
    alp = 0.5 * (alpha[primary_element_index] + alpha[secondary_element_index])
 
    Fn = (1.0 - alp) * Fn_ + alp * fn
-   λx, λy = 0.5, 0.5 # blending flux factors (TODO - Do this correctly)
+   λx = λy = 0.5 # blending flux factors (TODO - Do this correctly)
    # u_ll = get_node_vars(ul, equations, dg, nnodes(dg))
    lower_order_update = u_ll - dt * Jl / (weights[nnodes(dg)] * λx) * (Fn - fn_inner_ll)
    if is_admissible(lower_order_update, equations) == false
       return 1.0
    end
-
-   λx, λy = 0.5, 0.5 # blending flux factors (TODO - Do this correctly)
+ 
+   λx = λy = 0.5 # blending flux factors (TODO - Do this correctly)
    # u_rr = get_node_vars(ur, equations, dg, 1)
    lower_order_update = u_rr - dt * Jr / (weights[1] * λx) * (fn_inner_rr - Fn)
    if is_admissible(lower_order_update, equations) == false
@@ -520,8 +579,14 @@ end
    alp = compute_alp(u_ll, u_rr, element_small, element_large,
       Jl, Jr, dt, fn, Fn, fn_inner_ll, fn_inner_rr, node_index, equations, dg, dg.volume_integral)
 
+   Fn_corr = get_blended_flux(u_ll, u_rr, element_small, element_large,
+   Jl, Jr, dt,
+   fn, Fn, fn_inner_ll, fn_inner_rr, node_index,
+   equations, dg, dg.volume_integral)
    # Copy flux to buffer
-   Trixi.set_node_vars!(fstar[position_index], alp * fn + (1-alp) * Fn,
+   Trixi.set_node_vars!(fstar[position_index], 
+                        # alp * fn + (1-alp) * Fn,
+                        Fn_corr,
                         equations, dg, node_index)
 end
 
