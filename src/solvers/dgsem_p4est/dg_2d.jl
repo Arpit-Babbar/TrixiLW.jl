@@ -308,10 +308,10 @@ function prolong2boundaries!(cache, u,
    return nothing
 end
 
-function calc_boundary_flux!(cache, t, dt, boundary_condition, boundary_indexing::Vector,
+function calc_boundary_flux!(cache, t, dt, boundary_condition::BC, boundary_indexing::Vector,
    mesh::P4estMesh{2},
    equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG,
-   scaling_factor)
+   scaling_factor) where {BC}
    @unpack boundaries = cache
    @unpack surface_flux_values = cache.elements
    index_range = eachnode(dg)
