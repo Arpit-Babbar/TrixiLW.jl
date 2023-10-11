@@ -228,19 +228,19 @@ function get_blended_flux(
 
    Fn = (1.0 - alp) * Fn_ + alp * fn
    λx = λy = 0.5 # blending flux factors (TODO - Do this correctly)
-   # u_ll = get_node_vars(ul, equations, dg, nnodes(dg))
    c_ll = dt * Jl / (weights[nnodes(dg)] * λx) # Coefficient of update
-   lower_order_update = u_ll - c_ll * (Fn - fn_inner_ll)
-   if is_admissible(lower_order_update, equations) == false
-      Fn = zhang_shu_flux_fix(equations, u_ll, lower_order_update, Fn, fn_inner_ll, fn, c_ll)
+   test_update = u_ll - c_ll * (Fn - fn_inner_ll)
+   low_update = u_ll - c_ll * (fn - fn_inner_ll)
+   if is_admissible(test_update, equations) == false
+      Fn = zhang_shu_flux_fix(equations, u_ll, low_update, Fn, fn_inner_ll, fn, c_ll)
    end
  
    λx = λy = 0.5 # blending flux factors (TODO - Do this correctly)
-   # u_rr = get_node_vars(ur, equations, dg, 1)
-   c_rr = dt * Jr / (weights[1] * λx)
-   lower_order_update = u_rr - c_rr * (fn_inner_rr - Fn)
-   if is_admissible(lower_order_update, equations) == false
-      Fn = zhang_shu_flux_fix(equations, u_rr, lower_order_update, Fn, fn_inner_rr, fn, c_rr)
+   c_rr = -dt * Jr / (weights[1] * λx)
+   test_update = u_rr - c_rr * (Fn - fn_inner_rr)
+   low_update = u_rr - c_rr * (fn - fn_inner_rr)
+   if is_admissible(test_update, equations) == false
+      Fn = zhang_shu_flux_fix(equations, u_rr, low_update, Fn, fn_inner_rr, fn, c_rr)
    end
    return Fn
 end
