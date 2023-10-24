@@ -4,6 +4,7 @@ struct LWSolution{uType, tType, Problem}
    u::uType
    prob::Problem
    t::tType
+   stats::DiffEqBase.DEStats
 end
 
 struct LWProblem{F,uType,tType,SemiDiscretization}
@@ -31,22 +32,29 @@ mutable struct LWOptions{tType,CallBacks}
    callback::CallBacks
 end
 
+mutable struct AMRSizes
+   old_nelements::Int
+   old_ninterfaces::Int
+   old_nboundaries::Int
+   old_nmortars::Int
+end
+
 # To enable usage with Trixi's callbacks
 mutable struct LWIntegrator{
    SemiDiscretization,
-   SolType,
-   Solution,
+   uType,
+   Solution <: LWSolution,
    CacheType,
    tType,
    F,
-   Algorithm,
-   CallBacks
+   CallBacks,
+   LWTimeDiscretization <: AbstractLWTimeDiscretization
    }
-   p::SemiDiscretization # Prolly p = parameters in ODE integrators
+   p::SemiDiscretization # p = parameters in ODE integrators
    sol::Solution
-   u::SolType
-   uprev::SolType
-   cache::CacheType
+   u::uType
+   uprev::uType
+   cache::CacheType #
    iter::Int
    t::tType
    tspan::Tuple{tType,tType}
@@ -55,15 +63,10 @@ mutable struct LWIntegrator{
    dtpropose::tType
    dtcache::tType
    stats::DiffEqBase.DEStats
-   epsilon::OffsetVector{tType, Vector{tType}}
+   epsilon::OffsetVector{tType, Vector{tType}} # Error estimates
    opts::LWOptions{tType, CallBacks} # OrdinaryDiffEq.DEOptions originally
-   old_nelements::Int
-   old_ninterfaces::Int
-   old_nboundaries::Int
-   old_nmortars::Int
-   n_fail_it::Int
-   n_fail_it_total::Int
-   alg::Algorithm
+   amr_sizes::AMRSizes
+   alg::LWTimeDiscretization
 end
 
 # For some callbacks from Trixi
@@ -104,20 +107,30 @@ function set_t_and_iter!(integrator::LWIntegrator, dt) # TODO - Remove dt from a
    return nothing
 end
 
-function initialize_callbacks!(callbacks, integrator::LWIntegrator)
-   # TODO - iterating over tuple of functions is not type stable
-   for callback in callbacks
-      callback.initialize(callback, integrator.u, 0.0, integrator)
-   end
+function initialize_callbacks!(callbacks::NTuple{N, Any}, integrator::LWIntegrator) where {N}
+   # Type stable iteration over tuples learnt from Trixi.jl
+   callback = first(callbacks)
+   remaining_callbacks = Base.tail(callbacks)
+   callback.initialize(callback, integrator.u, 0.0, integrator)
+   initialize_callbacks!(remaining_callbacks, integrator)
 end
 
-function apply_callbacks!(callbacks, integrator::LWIntegrator)
-   # TODO - iterating over tuple of functions is not type stable
-   for callback in callbacks # run callbacks
-      if callback.condition(integrator.u, integrator.t, integrator)
-         callback.affect!(integrator)
-      end
+function initialize_callbacks!(callbacks::Tuple{}, integrator::LWIntegrator)
+   nothing
+end
+
+function apply_callbacks!(callbacks::NTuple{N, Any}, integrator::LWIntegrator) where {N}
+   # Type stable iteration over tuples learnt from Trixi.jl
+   callback = first(callbacks)
+   remaining_callbacks = Base.tail(callbacks)
+   if callback.condition(integrator.u, integrator.t, integrator)
+      callback.affect!(integrator)
    end
+   apply_callbacks!(remaining_callbacks, integrator)
+end
+
+function apply_callbacks!(callbacks::Tuple{}, integrator::LWIntegrator)
+   nothing
 end
 
 function apply_limiters!(limiters, integrator::LWIntegrator, u_ode = integrator.u)
@@ -145,11 +158,11 @@ function LWIntegrator(lw_update::LWUpdate, time_discretization, sol, callbacks, 
    @unpack u0_ode, du_ode = soln_arrays # Previous time level solution and residual
    integrator_cache = (du_ode,) # Don't know what else to put here.
    u = sol.u[1]
+   stats = sol.stats
    iter = 0
    t = first(tspan)
    tType = typeof(t)
    dt = dtpropose = dtcache = zero(tType)
-   stats = DiffEqBase.DEStats(0)
 
    controller = (; β1=0.6, β2=-0.2, β3=0.0)
    @unpack abstol, reltol = tolerances
@@ -163,12 +176,11 @@ function LWIntegrator(lw_update::LWUpdate, time_discretization, sol, callbacks, 
    n_interfaces = ninterfaces(semi.mesh, semi.solver, semi.cache, time_discretization)
    n_boundaries = nboundaries(semi.mesh, semi.solver, semi.cache, time_discretization)
    n_mortars = 1
-   n_fail_it = 0
-   n_fail_it_total = 0
+   amr_sizes = AMRSizes(n_elements, n_interfaces, n_boundaries, n_mortars,)
    LWIntegrator(semi, sol, u, u0_ode, integrator_cache, iter, t, tspan, dt, f,
       dtpropose, dtcache, stats, epsilon,
-      opts, n_elements, n_interfaces, n_boundaries, n_mortars,
-      n_fail_it, n_fail_it_total, time_discretization)
+      opts, amr_sizes,
+      time_discretization)
 end
 
 function compute_dt(semi::SemidiscretizationHyperbolic,
@@ -237,7 +249,7 @@ function solve_lwfr(lw_update, callbacks, dt_initial, tolerances;
    @unpack du_ode, u0_ode = soln_arrays            # Vectors form for compability with callbacks
    prob = LWProblem(rhs!, u0_ode, semi, tspan)     # Would be an ODE problem in Trixi
    u = compute_coefficients(first(tspan), semi)    # u satisfying initial condition
-   sol = LWSolution([u], prob, [0.0])
+   sol = LWSolution([u], prob, [0.0], DiffEqBase.Stats(0))
    @unpack solver = semi
    time_discretization = get_time_discretization(solver)
    integrator = LWIntegrator(lw_update, time_discretization, sol, callbacks, tolerances,
@@ -256,7 +268,7 @@ function solve_lwfr(lw_update, callbacks, dt_initial, tolerances;
       apply_limiters!(limiters, integrator)
    end
 
-   println("Total failed iterators = ", integrator.n_fail_it_total)
+   println("Total failed time steps = ", integrator.stats.nreject)
 
    return sol
 end

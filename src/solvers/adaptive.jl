@@ -44,13 +44,13 @@ function test_updated_solution(u_ode, semi)
    return domain_valid
 end
 
-@inline function load_temporal_errors!(epsilon, temporal_errors, ndofs, redo)
+@inline function load_temporal_errors!(epsilon, temporal_errors, ndofs, n_fail_it)
    total_temporal_error = sqrt(sum(temporal_errors) / ndofs)
 
    # epsilon[i] = 1/total_temporal_error[i]
    # epsilon[1] contains the prediction of the upcoming time
    # while the epsilon[0], epsilon[-1] contain previous info
-   if !redo # If it is a redo, we have already put correct previous epsilons
+   if n_fail_it == 0 # If it is a retry , we have already put correct previous epsilons
       epsilon[-1], epsilon[0] = epsilon[0], epsilon[1]
    end
 
@@ -60,7 +60,7 @@ end
    return epsilon
 end
 
-@inline function compute_and_load_temporal_errors!(u_ode, u_low_ode, semi, epsilon, ndofs, tolerances, redo)
+@inline function compute_and_load_temporal_errors!(u_ode, u_low_ode, semi, epsilon, ndofs, tolerances, n_fail_it)
    @unpack mesh, equations, solver, cache = semi
    dg = solver
 
@@ -74,7 +74,7 @@ end
          u_node = get_node_vars(u, equations, dg, i, j, element)
          u_low_node = get_node_vars(u_low, equations, dg, i, j, element)
          for v in eachvariable(equations)
-            local_error = u_node[v] - u_low_node[v]
+            ocal_error = u_node[v] - u_low_node[v]
             normalizing_factor = abstol + reltol * max(abs(u_node[v]), abs(u_low_node[v]))
             temporal_error += (local_error / normalizing_factor)^2
          end
@@ -87,7 +87,7 @@ end
    # epsilon[i] = 1/total_temporal_error[i]
    # epsilon[1] contains the prediction of the upcoming time
    # while the epsilon[0], epsilon[-1] contain previous info
-   if !redo # If it is a redo, we have already put correct previous epsilons
+   if n_fail_it == 0 # If it is a retry, we have already put correct previous epsilons
       epsilon[-1], epsilon[0] = epsilon[0], epsilon[1]
    end
 
@@ -105,7 +105,9 @@ function dt_factor(epsilon, k, controller)
 end
 
 function perform_step!(integrator, limiters, callbacks, lw_update,
-   time_step_computation::Adaptive, time_discretization::LW, redo=false)
+   time_step_computation::Adaptive, time_discretization::LW,
+   n_fail_it = 0 # Keep track of number of recursive calls
+   )
    semi = integrator.p
    @unpack tolerances, controller = integrator.opts
    @unpack u, uprev, epsilon = integrator
@@ -135,7 +137,7 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
 
    # put appropriate temporal errors in epsilon
    epsilon = load_temporal_errors!(epsilon, temporal_errors,
-      Trixi.ndofs(semi), redo)
+      Trixi.ndofs(semi), n_fail_it)
    # Use epsilon to compute dt_factor
    factor = dt_factor(epsilon, Trixi.nnodes(semi.solver), controller)
 
@@ -150,21 +152,19 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
    # end
 
    if !(domain_valid && error_valid)
-      integrator.n_fail_it += 1
+      n_fail_it += 1
       dt = min(factor, 0.95) * dt
-      println("Redoing time step to decrease $(integrator.dt) to $dt")
+      println("#failures = $n_fail_it; dt : $dt -> $(integrator.dt)")
       @show domain_valid, error_valid
       set_dt!(integrator, dt)
-      redo = true
       @.. u = uprev
       # Go back to beginning of function
       perform_step!(integrator, limiters, callbacks, lw_update, time_step_computation,
-         time_discretization, redo)
+         time_discretization, n_fail_it)
       return nothing
    end
 
-   integrator.n_fail_it_total += integrator.n_fail_it
-   integrator.n_fail_it = 0
+   integrator.stats.nreject += n_fail_it
 
    dt_next = min(factor, 1.5) * dt
 
@@ -178,7 +178,7 @@ end
 
 
 function perform_step!(integrator, limiters, callbacks, lw_update,
-                       time_step_computation::Adaptive, time_discretization::MDRK, redo=false)
+                       time_step_computation::Adaptive, time_discretization::MDRK, n_fail_it = 0)
    semi = integrator.p
    @unpack mesh, cache = semi
    @unpack tolerances, controller = integrator.opts
@@ -231,7 +231,7 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
 
    # put appropriate temporal errors in epsilon
    @unpack _u_low = cache.element_cache.mdrk_cache
-   epsilon = compute_and_load_temporal_errors!(u, _u_low, semi, epsilon, Trixi.ndofs(semi), tolerances, redo)
+   epsilon = compute_and_load_temporal_errors!(u, _u_low, semi, epsilon, Trixi.ndofs(semi), tolerances, n_fail_it)
 
    # Use epsilon to compute dt_factor
    factor = dt_factor(epsilon, Trixi.nnodes(semi.solver)-1, controller)
@@ -246,15 +246,17 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
       println("Redoing time step to decrease $(integrator.dt) to $dt")
       @show domain_valid, error_valid
       set_dt!(integrator, dt)
-      redo = true
+      n_fail_it += 1
       @.. u = uprev
       # Go back to beginning of function
       perform_step!(integrator, limiters, callbacks, lw_update, time_step_computation,
-         time_discretization, redo)
+         time_discretization, n_fail_it)
       return nothing
    end
 
    dt_next = min(factor, 1.5) * dt
+
+   integrator.stats.nreject += n_fail_it
 
    set_t_and_iter!(integrator, dt)
 

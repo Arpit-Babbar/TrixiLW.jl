@@ -63,6 +63,6 @@ include(callback_dir() * "/amr.jl")
 
 include(src_dir() * "/callbacks/callbacks_stage/positivity_zhang_shu.jl")
 
-export get_time_discretization, SurfaceIntegralDiffusive, MyPositivityPreservingLimiterZhangShu
+export get_time_discretization, SurfaceIntegralDiffusive
 
 end # module
