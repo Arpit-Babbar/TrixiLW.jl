@@ -244,7 +244,7 @@ analysis_interval = 100
 alive_callback = AliveCallback(alive_interval=analysis_interval)
 analysis_callback = AnalysisCallback(semi, interval=10 * analysis_interval)
 
-callbacks = (;
+callbacks = (
   alive_callback,
   analysis_callback,
   summary_callback

@@ -109,7 +109,7 @@ save_solution = SaveSolutionCallback(interval=100,
   save_final_solution=true,
   solution_variables=cons2prim)
 
-callbacks = (; analysis_callback, alive_callback, save_solution)
+callbacks = ( analysis_callback, alive_callback, save_solution)
 
 # positivity limiter necessary for this example with strong shocks. Very sensitive
 # to the order of the limiter variables, pressure must come first.

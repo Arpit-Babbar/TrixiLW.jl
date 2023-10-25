@@ -46,7 +46,7 @@ save_solution = SaveSolutionCallback(interval=3,
                                      solution_variables=cons2prim)
 
 
-callbacks = (; analysis_callback, alive_callback,
+callbacks = ( analysis_callback, alive_callback,
                 save_solution);
 ###############################################################################
 # run the simulation

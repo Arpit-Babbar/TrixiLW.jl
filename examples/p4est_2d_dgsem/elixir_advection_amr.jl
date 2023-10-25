@@ -63,7 +63,7 @@ amr_callback = AMRCallback(semi, amr_controller,
 
 # Create a CallbackSet to collect all callbacks such that they can be passed to the ODE solver
 summary_callback = SummaryCallback()
-callbacks = (; analysis_callback, save_solution, alive_callback,
+callbacks = ( analysis_callback, save_solution, alive_callback,
                amr_callback, summary_callback
             )
 

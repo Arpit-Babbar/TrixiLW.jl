@@ -86,7 +86,7 @@ alive_callback = AliveCallback(analysis_interval=analysis_interval)
 save_solution = SaveSolutionCallback(interval=300,
                                      save_initial_solution=true,
                                      save_final_solution=true)
-callbacks = (;analysis_callback, alive_callback, save_solution)
+callbacks = (analysis_callback, alive_callback, save_solution)
 
 ###############################################################################
 # run the simulation

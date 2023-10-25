@@ -107,7 +107,7 @@ visualization_callback = VisualizationCallback(interval=100,
    solution_variables=cons2prim)
 
 summary_callback = SummaryCallback()
-callbacks = (; analysis_callback, alive_callback, save_solution, summary_callback,
+callbacks = ( analysis_callback, alive_callback, save_solution, summary_callback,
                visualization_callback)
 
 # positivity limiter necessary for this example with strong shocks

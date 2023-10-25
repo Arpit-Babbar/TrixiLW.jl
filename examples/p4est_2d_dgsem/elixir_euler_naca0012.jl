@@ -181,7 +181,7 @@ save_solution = SaveSolutionCallback(interval=1000,
 
 stepsize_callback = StepsizeCallback(cfl=0.15)
 
-callbacks = (; # analysis_callback,
+callbacks = ( # analysis_callback,
    alive_callback,
    # save_solution
    )

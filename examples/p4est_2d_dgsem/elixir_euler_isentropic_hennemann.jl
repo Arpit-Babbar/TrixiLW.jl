@@ -77,7 +77,7 @@ save_solution = SaveSolutionCallback(interval=100,
                                      save_final_solution=true,
                                      solution_variables=cons2prim)
 
-callbacks = (; analysis_callback, alive_callback, save_restart,
+callbacks = ( analysis_callback, alive_callback, save_restart,
                save_solution,
                # visualization_callback
             );

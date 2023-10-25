@@ -111,7 +111,7 @@ amr_callback = AMRCallback(semi, amr_controller,
                            adapt_initial_condition=true,
                            adapt_initial_condition_only_refine=true)
 
-callbacks = (;
+callbacks = (
    # analysis_callback,
    alive_callback,
    # save_solution

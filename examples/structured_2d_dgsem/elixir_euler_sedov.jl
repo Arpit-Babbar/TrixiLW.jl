@@ -99,7 +99,7 @@ save_solution = SaveSolutionCallback(interval=300,
 stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds=(5.0e-6, 5.0e-6),
                                                      variables=(Trixi.density, Trixi.pressure))
 
-callbacks = (; analysis_callback, alive_callback,   save_solution)
+callbacks = ( analysis_callback, alive_callback,   save_solution)
 time_int_tol = 1e-6
 tolerances = (;abstol = time_int_tol, reltol = time_int_tol);
 dt_initial = 1e-2;

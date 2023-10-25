@@ -113,7 +113,7 @@ amr_callback = AMRCallback(semi, amr_controller,
    adapt_initial_condition=true,
    adapt_initial_condition_only_refine=true)
 
-callbacks = (; analysis_callback, alive_callback, save_solution, amr_callback)
+callbacks = ( analysis_callback, alive_callback, save_solution, amr_callback)
 
 # positivity limiter necessary for this example with strong shocks
 stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds=(5.0e-6, 5.0e-6),

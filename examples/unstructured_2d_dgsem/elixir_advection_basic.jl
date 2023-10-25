@@ -54,7 +54,7 @@ analysis_callback = AnalysisCallback(semi, interval=analysis_interval)
 save_solution = SaveSolutionCallback(interval=100,
                                      solution_variables=cons2prim)
 
-callbacks = (; analysis_callback, save_solution, alive_callback)
+callbacks = ( analysis_callback, save_solution, alive_callback)
 
 ###############################################################################
 # run the simulation

@@ -43,7 +43,7 @@ save_solution = SaveSolutionCallback(interval=100,
                                      save_initial_solution=true,
                                      save_final_solution=true,
                                      solution_variables=cons2prim)
-callbacks = (;
+callbacks = (
                analysis_callback, alive_callback,
                save_solution
             )
