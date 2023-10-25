@@ -967,7 +967,7 @@ end
    end
 end
 
-function weak_form_kernel_1!(du, u, t, dt, tolerances,
+function lw_volume_kernel_1!(du, u, t, dt, tolerances,
    element, mesh::Union{StructuredMesh{2},UnstructuredMesh2D,P4estMesh{2}},
    nonconservative_terms::False, source_terms, equations,
    dg::DGSEM, cache, alpha=true)
@@ -1147,7 +1147,7 @@ function weak_form_kernel_1!(du, u, t, dt, tolerances,
    return nothing
 end
 
-function weak_form_kernel_2!(du, u, t, dt, tolerances,
+function lw_volume_kernel_2!(du, u, t, dt, tolerances,
    element, mesh::Union{StructuredMesh{2},UnstructuredMesh2D,P4estMesh{2}},
    nonconservative_terms::False, source_terms, equations,
    dg::DGSEM, cache, alpha=true)
@@ -1377,7 +1377,7 @@ function weak_form_kernel_2!(du, u, t, dt, tolerances,
    return nothing
 end
 
-function weak_form_kernel_3!(du, u, t, dt, tolerances,
+function lw_volume_kernel_3!(du, u, t, dt, tolerances,
    element, mesh::Union{StructuredMesh{2},UnstructuredMesh2D,P4estMesh{2}},
    nonconservative_terms::False, source_terms, equations,
    dg::DGSEM, cache, alpha=true)
@@ -1685,7 +1685,7 @@ function weak_form_kernel_3!(du, u, t, dt, tolerances,
    return nothing
 end
 
-function weak_form_kernel_4!(du, u, t, dt, tolerances,
+function lw_volume_kernel_4!(du, u, t, dt, tolerances,
    element, mesh::Union{StructuredMesh{2},UnstructuredMesh2D,P4estMesh{2}},
    nonconservative_terms::False, source_terms, equations, dg::DGSEM, cache, alpha=true)
 

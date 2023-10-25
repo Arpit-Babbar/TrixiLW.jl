@@ -36,7 +36,7 @@ function contravariant_fluxes(u, grad_u, Ja,
    return fa, ga, fv, gv, cv_f, cv_g
 end
 
-function weak_form_kernel_1!(
+function lw_volume_kernel_1!(
    du, flux_viscous, gradients, u_transformed, u, t, dt,
    tolerances, mesh::P4estMesh{2},
    have_nonconservative_terms, source_terms,
@@ -244,7 +244,7 @@ function weak_form_kernel_1!(
    return nothing
 end
 
-function weak_form_kernel_2!(
+function lw_volume_kernel_2!(
    du, flux_viscous, gradients, u_transformed, u, t, dt,
    tolerances, mesh::P4estMesh{2},
    have_nonconservative_terms, source_terms,
@@ -573,7 +573,7 @@ function weak_form_kernel_2!(
    return nothing
 end
 
-function weak_form_kernel_3!(
+function lw_volume_kernel_3!(
    du, flux_viscous, gradients, u_transformed, u, t, dt,
    tolerances, mesh::P4estMesh{2},
    have_nonconservative_terms, source_terms,
@@ -1070,7 +1070,7 @@ function weak_form_kernel_3!(
    return nothing
 end
 
-function weak_form_kernel_4!(
+function lw_volume_kernel_4!(
    du, flux_viscous, gradients, u_transformed, u, t, dt,
    tolerances, mesh::P4estMesh{2},
    have_nonconservative_terms, source_terms,

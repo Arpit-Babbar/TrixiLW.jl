@@ -180,7 +180,7 @@ function calc_volume_integral!(
 
    if degree == 1
       @threaded for element in eachelement(dg, cache)
-         weak_form_kernel_1!(du, flux_viscous, gradients, u_transformed, u, t, dt,
+         lw_volume_kernel_1!(du, flux_viscous, gradients, u_transformed, u, t, dt,
             tolerances, mesh,
             have_nonconservative_terms, source_terms,
             equations, equations_parabolic,
@@ -189,7 +189,7 @@ function calc_volume_integral!(
       end
    elseif degree == 2
       @threaded for element in eachelement(dg, cache)
-         weak_form_kernel_2!(du, flux_viscous, gradients, u_transformed, u, t, dt,
+         lw_volume_kernel_2!(du, flux_viscous, gradients, u_transformed, u, t, dt,
             tolerances, mesh,
             have_nonconservative_terms, source_terms,
             equations, equations_parabolic,
@@ -198,7 +198,7 @@ function calc_volume_integral!(
       end
    elseif degree == 3
       @threaded for element in eachelement(dg, cache)
-         weak_form_kernel_3!(du, flux_viscous, gradients, u_transformed, u, t, dt,
+         lw_volume_kernel_3!(du, flux_viscous, gradients, u_transformed, u, t, dt,
             tolerances, mesh,
             have_nonconservative_terms, source_terms,
             equations, equations_parabolic,
@@ -207,7 +207,7 @@ function calc_volume_integral!(
       end
    else
       @threaded for element in eachelement(dg, cache)
-         weak_form_kernel_4!(du, flux_viscous, gradients, u_transformed, u, t, dt,
+         lw_volume_kernel_4!(du, flux_viscous, gradients, u_transformed, u, t, dt,
             tolerances, mesh,
             have_nonconservative_terms, source_terms,
             equations, equations_parabolic,
@@ -224,7 +224,7 @@ Trixi.flux(u, 2, equations)),
 (Trixi.flux(u, grad_u, 1, equations_parabolic),
 Trixi.flux(u, grad_u, 2, equations_parabolic))
 
-function weak_form_kernel_1!(
+function lw_volume_kernel_1!(
    du, flux_viscous, gradients, u_transformed, u, t, dt,
    tolerances, mesh::TreeMesh{2},
    have_nonconservative_terms, source_terms,
@@ -423,7 +423,7 @@ function weak_form_kernel_1!(
    return nothing
 end
 
-function weak_form_kernel_2!(
+function lw_volume_kernel_2!(
    du, flux_viscous, gradients, u_transformed, u, t, dt,
    tolerances, mesh::TreeMesh{2},
    have_nonconservative_terms, source_terms,
@@ -735,7 +735,7 @@ function weak_form_kernel_2!(
    return nothing
 end
 
-function weak_form_kernel_3!(
+function lw_volume_kernel_3!(
    du, flux_viscous, gradients, u_transformed, u, t, dt,
    tolerances, mesh::TreeMesh{2},
    have_nonconservative_terms, source_terms,
@@ -1201,7 +1201,7 @@ function weak_form_kernel_3!(
    return nothing
 end
 
-function weak_form_kernel_4!(
+function lw_volume_kernel_4!(
    du, flux_viscous, gradients, u_transformed, u, t, dt,
    tolerances, mesh::TreeMesh{2},
    have_nonconservative_terms::False, source_terms,

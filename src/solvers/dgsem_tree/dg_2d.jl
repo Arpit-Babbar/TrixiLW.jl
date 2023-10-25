@@ -189,28 +189,28 @@ using LoopVectorization: @turbo
       degree = polydeg(dg)
       if degree == 1
          @threaded for element in eachelement(dg, cache)
-            weak_form_kernel_1!(du, u,
+            lw_volume_kernel_1!(du, u,
                t, dt, tolerances, element, mesh,
                nonconservative_terms, source_terms, equations,
                dg, cache)
          end
       elseif degree == 2
          @threaded for element in eachelement(dg, cache)
-            weak_form_kernel_2!(du, u,
+            lw_volume_kernel_2!(du, u,
                t, dt, tolerances, element, mesh,
                nonconservative_terms, source_terms, equations,
                dg, cache)
          end
       elseif degree == 3
          @threaded for element in eachelement(dg, cache)
-            weak_form_kernel_3!(du, u,
+            lw_volume_kernel_3!(du, u,
                t, dt, tolerances, element, mesh,
                nonconservative_terms, source_terms, equations,
                dg, cache)
          end
       else
          @threaded for element in eachelement(dg, cache)
-            weak_form_kernel_4!(du, u,
+            lw_volume_kernel_4!(du, u,
                t, dt, tolerances, element, mesh,
                nonconservative_terms, source_terms, equations,
                dg, cache)
@@ -369,7 +369,7 @@ using LoopVectorization: @turbo
 
    fluxes(u, equations::AbstractEquations{2}) = (Trixi.flux(u, 1, equations), Trixi.flux(u, 2, equations))
 
-   @inline function weak_form_kernel_1!(du, u,
+   @inline function lw_volume_kernel_1!(du, u,
       t, dt,
       element, mesh::TreeMesh{2},
       nonconservative_terms::False, source_terms, equations,
@@ -494,7 +494,7 @@ using LoopVectorization: @turbo
       return nothing
    end
 
-   @inline function weak_form_kernel_2!(du, u,
+   @inline function lw_volume_kernel_2!(du, u,
       t, dt,
       element, mesh::TreeMesh{2},
       nonconservative_terms::False, source_terms, equations,
@@ -673,7 +673,7 @@ using LoopVectorization: @turbo
       return nothing
    end
 
-   @inline function weak_form_kernel_3!(du, u,
+   @inline function lw_volume_kernel_3!(du, u,
       t, dt, tolerances,
       element, mesh::TreeMesh{2},
       nonconservative_terms::False, source_terms, equations,
@@ -915,7 +915,7 @@ using LoopVectorization: @turbo
       return nothing
    end
 
-   @inline function weak_form_kernel_4!(du, u,
+   @inline function lw_volume_kernel_4!(du, u,
       t, dt, tolerances,
       element, mesh::TreeMesh{2},
       nonconservative_terms::False,
@@ -1675,7 +1675,7 @@ using LoopVectorization: @turbo
             alpha_element = alpha[element]
 
             # Calculate DG volume integral contribution
-            weak_form_kernel_1!(du, u, t, dt, element, mesh,
+            lw_volume_kernel_1!(du, u, t, dt, element, mesh,
                nonconservative_terms, equations,
                dg, cache, 1 - alpha_element)
 
@@ -1692,7 +1692,7 @@ using LoopVectorization: @turbo
             alpha_element = alpha[element]
 
             # Calculate DG volume integral contribution
-            weak_form_kernel_1!(du, u, t, dt, element, mesh,
+            lw_volume_kernel_1!(du, u, t, dt, element, mesh,
                nonconservative_terms, equations,
                dg, cache, 1 - alpha_element)
 
@@ -1708,7 +1708,7 @@ using LoopVectorization: @turbo
             alpha_element = alpha[element]
 
             # Calculate DG volume integral contribution
-            weak_form_kernel_2!(du, u, t, dt, tolerances, element, mesh,
+            lw_volume_kernel_2!(du, u, t, dt, tolerances, element, mesh,
                nonconservative_terms, source_terms, equations,
                dg, cache, 1 - alpha_element)
 
@@ -1725,7 +1725,7 @@ using LoopVectorization: @turbo
             alpha_element = alpha[element]
 
             # Calculate DG volume integral contribution
-            weak_form_kernel_2!(du, u, t, dt, tolerances, element, mesh,
+            lw_volume_kernel_2!(du, u, t, dt, tolerances, element, mesh,
                nonconservative_terms, source_terms, equations,
                dg, cache, 1 - alpha_element)
 
@@ -1741,7 +1741,7 @@ using LoopVectorization: @turbo
             alpha_element = alpha[element]
 
             # Calculate DG volume integral contribution
-            weak_form_kernel_3!(du, u, t, dt, tolerances, element, mesh,
+            lw_volume_kernel_3!(du, u, t, dt, tolerances, element, mesh,
                nonconservative_terms, source_terms, equations,
                dg, cache, 1 - alpha_element)
 
@@ -1758,7 +1758,7 @@ using LoopVectorization: @turbo
             alpha_element = alpha[element]
 
             # Calculate DG volume integral contribution
-            weak_form_kernel_3!(du, u, t, dt, tolerances, element, mesh,
+            lw_volume_kernel_3!(du, u, t, dt, tolerances, element, mesh,
                nonconservative_terms, source_terms, equations,
                dg, cache, 1 - alpha_element)
 
@@ -1774,7 +1774,7 @@ using LoopVectorization: @turbo
             alpha_element = alpha[element]
 
             # Calculate DG volume integral contribution
-            weak_form_kernel_4!(du, u, t, dt, tolerances, element, mesh,
+            lw_volume_kernel_4!(du, u, t, dt, tolerances, element, mesh,
                nonconservative_terms, source_terms, equations,
                dg, cache, 1 - alpha_element)
 
@@ -1791,7 +1791,7 @@ using LoopVectorization: @turbo
             alpha_element = alpha[element]
 
             # Calculate DG volume integral contribution
-            weak_form_kernel_4!(du, u, t, dt, tolerances, element, mesh,
+            lw_volume_kernel_4!(du, u, t, dt, tolerances, element, mesh,
                nonconservative_terms, source_terms, equations,
                dg, cache, 1 - alpha_element)
 
@@ -1803,7 +1803,7 @@ using LoopVectorization: @turbo
          # for element in eachelement(dg, cache)
          #    alpha_element = alpha[element]
          #    # Calculate DG volume integral contribution
-         #    weak_form_kernel_4!(du, u, t, dt, tolerances, element, mesh,
+         #    lw_volume_kernel_4!(du, u, t, dt, tolerances, element, mesh,
          #       nonconservative_terms, source_terms, equations,
          #       dg, cache, 1 - alpha_element)
 
