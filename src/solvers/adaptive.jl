@@ -74,7 +74,7 @@ end
          u_node = get_node_vars(u, equations, dg, i, j, element)
          u_low_node = get_node_vars(u_low, equations, dg, i, j, element)
          for v in eachvariable(equations)
-            ocal_error = u_node[v] - u_low_node[v]
+            local_error = u_node[v] - u_low_node[v]
             normalizing_factor = abstol + reltol * max(abs(u_node[v]), abs(u_low_node[v]))
             temporal_error += (local_error / normalizing_factor)^2
          end
