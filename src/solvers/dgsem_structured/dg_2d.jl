@@ -1290,6 +1290,16 @@ function weak_form_kernel_4!(du, u, t, dt, tolerances,
    f, g, ftilde, gtilde, Ftilde, Gtilde, ut, utt, uttt, utttt, U,
    up, um, upp, umm, S, u_np1, u_np1_low = cell_arrays[id]
    refresh!.((ut, utt, uttt, utttt))
+   u_element = @view u[:,:,:,element]
+   @.. begin
+   u_np1     = u_element
+   u_np1_low = u_element
+   um        = u_element
+   up        = u_element
+   umm       = u_element
+   upp       = u_element
+   U         = u_element
+   end
    for j in eachnode(dg), i in eachnode(dg)
       u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
 
@@ -1317,15 +1327,6 @@ function weak_form_kernel_4!(du, u, t, dt, tolerances,
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
          Trixi.multiply_add_to_node_vars!(ut, -dt * derivative_matrix[jj, j], cv_flux2, equations, dg, i, jj)
       end
-
-      Trixi.set_node_vars!(u_np1, u_node, equations, dg, i, j)
-      Trixi.set_node_vars!(u_np1_low, u_node, equations, dg, i, j)
-
-      Trixi.set_node_vars!(um, u_node, equations, dg, i, j)
-      Trixi.set_node_vars!(up, u_node, equations, dg, i, j)
-      Trixi.set_node_vars!(umm, u_node, equations, dg, i, j)
-      Trixi.set_node_vars!(upp, u_node, equations, dg, i, j)
-      Trixi.set_node_vars!(U, u_node, equations, dg, i, j)
    end
    # Scale ut
    for j in eachnode(dg), i in eachnode(dg)

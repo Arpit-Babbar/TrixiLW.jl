@@ -245,6 +245,13 @@ function get_blended_flux(
    return Fn
 end
 
+function get_blended_flux(
+   u_ll, u_rr, primary_element_index, secondary_element_index, Jl, Jr, dt,
+   fn, Fn_, fn_inner_ll, fn_inner_rr, primary_node_index, equations, dg,
+   volume_integral::VolumeIntegralFR)
+   return Fn_
+end
+
 function compute_alp(
    u_ll, u_rr, primary_element_index, secondary_element_index, Jl, Jr, dt,
    fn, Fn_, fn_inner_ll, fn_inner_rr, primary_node_index, equations, dg,

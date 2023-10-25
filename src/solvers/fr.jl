@@ -1,7 +1,7 @@
 using Trixi: AbstractVolumeIntegral, DG, summary_header, summary_line,
    increment_indent, summary_footer,
    TreeMesh, StructuredMesh, UnstructuredMesh2D, P4estMesh,
-   AbstractIndicator, False
+   AbstractIndicator, False, get_node_vars, set_node_vars!, multiply_add_to_node_vars!
 import Trixi: create_cache, isfinished, get_element_variables!
 import Trixi
 import DiffEqBase

@@ -61,6 +61,14 @@ mutable struct LWIntegrator{
    opts::LWOptions{tType, CallBacks} # isadaptive, tolerances, controller, etc
    alg::LWTimeDiscretization # time_discretization, used by summary callback
 end
+# Remark - It may seem natural to use the same Integrator struct that Trixi.jl uses. And, if needed
+# Use its a subfield of LWIntegrator and make additions as needed, following
+# https://github.com/JuliaLang/julia/issues/4935#issuecomment-877302452. 
+# There are two problems with it
+# (a) Trixi.jl uses the ODEIntegrator from OrdinaryDiffEq.jl, that is a heavy Library
+# (b) ODEIntegrator requires the algorithm type to be <: Union{OrdinaryDiffEqAlgorithm, DAEAlgorithm},
+# that is unnatural to put here.
+# Thus, some code repetition is currently happening, even though it could be improved at a later stage
 
 # For some callbacks from Trixi
 DiffEqBase.get_tmp_cache(integrator::LWIntegrator) = integrator.cache
@@ -161,14 +169,10 @@ function LWIntegrator(lw_update::LWUpdate, time_discretization, sol, callbacks, 
    @unpack abstol, reltol = tolerances
    opts = LWOptions(isadaptive(time_step_computation), dtpropose,
       tolerances, abstol, reltol, controller,
-      callbacks # Is this really the right way to pass callbacks?
+      callbacks # TODO - Is this really the right way to pass callbacks? Why are they needed here?
    )
    epsilon = OffsetArray(ones(tType, 3), OffsetArrays.Origin(-1))
-   f = (u, v, w, t) -> 0.0 # TODO - What is this supposed to be?
-   n_elements = nelements(semi.solver, semi.cache)
-   n_interfaces = ninterfaces(semi.mesh, semi.solver, semi.cache, time_discretization)
-   n_boundaries = nboundaries(semi.mesh, semi.solver, semi.cache, time_discretization)
-   n_mortars = 1
+   f = lw_update.rhs! # TODO - Trixi.jl wants it to be more generally chosen by the user
    LWIntegrator(semi, sol, u, u0_ode, integrator_cache, iter, t, tspan, dt, f,
       dtpropose, dtcache, stats, epsilon,
       opts, 

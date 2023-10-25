@@ -10,7 +10,7 @@ advection_velocity = (0.2, -0.7)
 equations = LinearScalarAdvectionEquation2D(advection_velocity)
 
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
-solver = DGSEM(polydeg=3, surface_flux=flux_lax_friedrichs,
+solver = DGSEM(polydeg=4, surface_flux=flux_lax_friedrichs,
                volume_integral = TrixiLW.VolumeIntegralFR(TrixiLW.MDRK()))
 
 coordinates_min = (-1.0, -1.0) # minimum coordinates (min(x), min(y))
@@ -19,7 +19,7 @@ coordinates_max = ( 1.0,  1.0) # maximum coordinates (max(x), max(y))
 trees_per_dimension = (1, 1)
 
 # Create P4estMesh with 8 x 8 trees and 16 x 16 elements (because level = 1)
-mesh = P4estMesh(trees_per_dimension, polydeg=3,
+mesh = P4estMesh(trees_per_dimension, polydeg=4,
                  coordinates_min=coordinates_min, coordinates_max=coordinates_max,
                  initial_refinement_level=5)
 
@@ -54,7 +54,7 @@ save_solution = SaveSolutionCallback(interval=100,
 
 
 callbacks = ( analysis_callback, save_solution,
-               alive_callback,
+               alive_callback, summary_callback
             )
 
 
