@@ -25,14 +25,12 @@ using LoopVectorization: @turbo
    # we need to opt-in explicitly.
    # See https://ranocha.de/blog/Optimizing_EC_Trixi for further details.
 
-   function rhs!(du, u, t, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
+   function rhs!(du, u, t, dt, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
       initial_condition, boundary_conditions, source_terms, dg::DG,
       time_discretization::AbstractLWTimeDiscretization, cache, tolerances::NamedTuple)
 
       # Reset du
       @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
-
-      dt = cache.dt[1]
 
       # Update dt in cache and the callback will just take it from there
 
@@ -1799,19 +1797,6 @@ using LoopVectorization: @turbo
                nonconservative_terms, equations, volume_flux_fv,
                dg, cache, element, alpha_element)
          end
-
-         # for element in eachelement(dg, cache)
-         #    alpha_element = alpha[element]
-         #    # Calculate DG volume integral contribution
-         #    lw_volume_kernel_4!(du, u, t, dt, tolerances, element, mesh,
-         #       nonconservative_terms, source_terms, equations,
-         #       dg, cache, 1 - alpha_element)
-
-         #    fv_kernel!(du, u, dt, volume_integral.reconstruction, mesh,
-         #       nonconservative_terms, equations, volume_flux_fv,
-         #       dg, cache, element, alpha_element)
-         # end
-
       end
 
       return alpha

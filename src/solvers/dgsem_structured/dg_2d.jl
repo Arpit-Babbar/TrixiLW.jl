@@ -14,15 +14,13 @@ using Trixi: @threaded
 
 @muladd begin
 
-function rhs!(du, u, t,
+function rhs!(du, u, t, dt,
    mesh::StructuredMesh{2}, equations,
    initial_condition, boundary_conditions, source_terms,
    dg::DG, time_discretization::AbstractLWTimeDiscretization, cache, tolerances::NamedTuple)
 
    # Reset du
    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
-
-   dt = cache.dt[1]
 
    # Calculate volume integral
    alpha = @trixi_timeit timer() "volume integral" calc_volume_integral!(

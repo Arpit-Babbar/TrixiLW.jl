@@ -10,7 +10,7 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t, tolerances =
    # TODO: Taal decide, do we need to pass the mesh?
    time_start = time_ns()
    @trixi_timeit timer() "rhs!" rhs!(du, u,
-   t, mesh, equations, initial_condition, boundary_conditions, source_terms, solver,
+   t, cache.dt[1], mesh, equations, initial_condition, boundary_conditions, source_terms, solver,
    get_time_discretization(solver),
    cache, tolerances)
    runtime = time_ns() - time_start

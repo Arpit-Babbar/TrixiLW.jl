@@ -28,7 +28,7 @@ function rhs!(du_ode, u_ode,
 
   # TODO: Taal decide, do we need to pass the mesh?
   time_start = time_ns()
-  @trixi_timeit timer() "rhs!" rhs!(du, u, t, mesh, equations, equations_parabolic,
+  @trixi_timeit timer() "rhs!" rhs!(du, u, t, cache.dt[1], mesh, equations, equations_parabolic,
     initial_condition, boundary_conditions,
     boundary_conditions_parabolic, source_terms, solver,
     solver_parabolic,

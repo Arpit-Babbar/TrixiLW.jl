@@ -12,7 +12,7 @@ using MuladdMacro
 @muladd begin
 
 # TODO: Taal discuss/refactor timer, allowing users to pass a custom timer?
-function rhs!(du, u, t, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
+function rhs!(du, u, t, dt, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
    equations_parabolic::AbstractEquationsParabolic, initial_condition,
    boundary_conditions, boundary_conditions_parabolic, source_terms,
    dg::DG, parabolic_scheme, time_discretization::AbstractLWTimeDiscretization, cache,
@@ -21,8 +21,6 @@ function rhs!(du, u, t, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
    # Reset du
    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
    @unpack u_transformed, gradients, flux_viscous = cache_parabolic
-
-   dt = cache.dt[1]
 
    # Convert conservative variables to a form more suitable for viscous flux calculations
    @trixi_timeit timer() "transform variables" transform_variables!(
