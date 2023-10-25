@@ -1,7 +1,5 @@
 # Called in AMR callback
 function DiffEqBase.resize!(integrator::LWIntegrator, i::Int)
-   @unpack amr_sizes = integrator
-   @unpack old_nelements, old_ninterfaces, old_nboundaries, old_nmortars = amr_sizes
    for c in integrator.cache
       c !== nothing && Base.resize!(c, i)
    end
@@ -20,10 +18,6 @@ function DiffEqBase.resize!(integrator::LWIntegrator, i::Int)
    resize_mortar_cache!(mesh, equations, solver, cache)
    resize_boundary_cache!(mesh, equations, solver, cache)
 
-   # TODO - Maybe these can be removed now
-   amr_sizes.old_nboundaries = n_boundaries
-   amr_sizes.old_ninterfaces = n_interfaces
-   amr_sizes.old_nelements = n_elements
 end
 
 resize_element_cache!(

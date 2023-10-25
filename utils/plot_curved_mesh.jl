@@ -28,7 +28,7 @@ function plot_mesh(semi, mesh::P4estMesh{2}, dg::DG; nvisnodes = 10,
    # ylims!(p, ylimits)
 
    plotter! = plot!
-   linewidth = 1.0
+   linewidth = 0.5
 
    nodes_array = zeros(2, nnodes(dg))
    for interface in eachinterface(dg, cache)

@@ -56,7 +56,7 @@ function Base.show(io::IO, mime::MIME"text/plain", dg::DG{<:Any,<:Any,<:Any,<:Vo
 end
 
 
-struct VolumeIntegralFRShockCapturing{TimeDiscretization,VolumeFluxFV,Indicator,Reconstruction}
+struct VolumeIntegralFRShockCapturing{TimeDiscretization,VolumeFluxFV,Indicator,Reconstruction} <: AbstractVolumeIntegral
    volume_integralFR::VolumeIntegralFR{TimeDiscretization} # Keeping the previous struct
    volume_flux_fv::VolumeFluxFV                            # Typically Rusanov's flux
    indicator::Indicator                                    # HG's indicator with chosen parameters or something else

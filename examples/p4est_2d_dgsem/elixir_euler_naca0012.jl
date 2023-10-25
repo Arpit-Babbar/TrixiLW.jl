@@ -147,6 +147,7 @@ solver = DGSEM(polydeg=polydeg, surface_flux=surface_flux,
 
 # Get the unstructured quad mesh from a file (downloads the file if not available locally)
 default_mesh_file = joinpath(@__DIR__, "NACA0012.inp")
+default_mesh_file = joinpath(@__DIR__, "NACA0012_refined.inp")
 isfile(default_mesh_file) || download("https://gist.githubusercontent.com/Arpit-Babbar/8e44898b95ea7edad054044aa63671e6/raw/ea3d59e435132f7fcca74d42aa1a77303452d0e6/NACA0012.inp",
    default_mesh_file)
 mesh_file = default_mesh_file
@@ -201,3 +202,6 @@ sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
    limiters=(; stage_limiter!)
 );
 summary_callback() # print the timer summary
+
+
+plot_mesh(semi, mesh, solver, xlimits = (-.5,1.25), ylimits = (-0.25, 0.25))

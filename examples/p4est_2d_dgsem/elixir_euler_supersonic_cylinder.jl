@@ -43,7 +43,7 @@ initial_condition = initial_condition_mach3_flow
   outer_cache,
   normal_direction::AbstractVector, x, t, dt,
   surface_flux_function, equations::CompressibleEulerEquations2D,
-  dg, time_discretization)
+  dg, time_discretization, scaling_factor = 1)
 
   u_boundary = initial_condition_mach3_flow(x, t, equations)
   flux = Trixi.flux(u_boundary, normal_direction, equations)
@@ -69,7 +69,7 @@ shock_indicator = IndicatorHennemannGassner(equations, basis,
   variable=density_pressure)
 volume_integral = TrixiLW.VolumeIntegralFRShockCapturing(
   shock_indicator;
-  
+
   volume_flux_fv=surface_flux,
   # reconstruction = TrixiLW.FirstOrderReconstruction(),
   reconstruction=TrixiLW.MUSCLReconstruction()
@@ -93,7 +93,7 @@ semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver
 ###############################################################################
 # ODE solvers
 
-tspan = (0.0, 2.0)
+tspan = (0.0, 0.1)
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 # Callbacks
@@ -104,7 +104,6 @@ analysis_interval = 1000
 analysis_callback = AnalysisCallback(semi, interval=analysis_interval)
 
 alive_callback = AliveCallback(analysis_interval=10)
-
 save_solution = SaveSolutionCallback(interval=100,
   save_initial_solution=true,
   save_final_solution=true,

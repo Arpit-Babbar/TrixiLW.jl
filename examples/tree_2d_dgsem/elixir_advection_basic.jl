@@ -7,10 +7,10 @@ using Trixi
 advection_velocity = (0.2, -0.7)
 equations = LinearScalarAdvectionEquation2D(advection_velocity)
 
-polydeg = 3
+polydeg = 4
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
 solver = DGSEM(polydeg=polydeg, surface_flux=flux_lax_friedrichs,
-               volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.MDRK()))
+               volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
 
 coordinates_min = (-1.0, -1.0) # minimum coordinates (min(x), min(y))
 coordinates_max = ( 1.0,  1.0) # maximum coordinates (max(x), max(y))
@@ -31,7 +31,7 @@ get_time_discretization(solver), equations,
 
 # Create ODE problem with time span from 0.0 to 1.0
 # ode = semidiscretize(semi, (0.0, 1.0));
-tspan = (0.0, 1.0)
+tspan = (0.0, 10.0)
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 # The AnalysisCallback allows to analyse the solution in regular intervals and prints the results
@@ -43,7 +43,7 @@ save_solution = SaveSolutionCallback(interval=1000,
 
 summary_callback = SummaryCallback()
 # Create a CallbackSet to collect all callbacks such that they can be passed to the ODE solver
-callbacks = (;
+callbacks = (
              analysis_callback, save_solution, summary_callback
             );
 
@@ -53,15 +53,15 @@ callbacks = (;
 
 # OrdinaryDiffEq's `solve` method evolves the solution in time and executes the passed callbacks
 
-time_int_tol = 1e-5
+time_int_tol = 1e-6
 tolerances = (;abstol = time_int_tol, reltol = time_int_tol);
-dt_initial = 1e-3;
+dt_initial = 0.1;
 # 0.9 works for 2-staged
 cfl_number = TrixiLW.trixi2lw(0.71, solver)
 sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
-                     #  time_step_computation = TrixiLW.Adaptive(),
-                      time_step_computation = TrixiLW.CFLBased(cfl_number),
-                      );
+                         time_step_computation = TrixiLW.Adaptive(),
+                        #  time_step_computation = TrixiLW.CFLBased(cfl_number),
+                        );
 
 # Print the timer summary
 summary_callback()

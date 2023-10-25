@@ -91,7 +91,7 @@ semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver
 ###############################################################################
 # ODE solvers
 
-tspan = (0.0, 2.0)
+tspan = (0.0, 0.005)
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 # Callbacks
@@ -120,8 +120,9 @@ amr_callback = AMRCallback(semi, amr_controller,
                            adapt_initial_condition=true,
                            adapt_initial_condition_only_refine=true)
 
-callbacks = (; analysis_callback, alive_callback, save_solution,
-               amr_callback
+callbacks = ( analysis_callback, alive_callback, save_solution,
+              amr_callback, 
+              summary_callback
             )
 
 # positivity limiter necessary for this example with strong shocks. Very sensitive
@@ -131,7 +132,7 @@ stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds=(5.0e-7, 1.0e-6)
 
 ###############################################################################
 # run the simulation
-time_int_tol = 1e-6
+time_int_tol = 1e-5 # Works best, it seems
 tolerances = (; abstol=time_int_tol, reltol=time_int_tol);
 dt_initial = 1e-6;
 cfl_number = 0.15

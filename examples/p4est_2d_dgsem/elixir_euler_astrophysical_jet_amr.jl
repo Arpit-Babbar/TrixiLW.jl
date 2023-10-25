@@ -119,7 +119,7 @@ callbacks = (;analysis_callback, alive_callback,
               )
 
 # positivity limiter necessary for this example with strong shocks
-stage_limiter! = MyPositivityPreservingLimiterZhangShu(thresholds=(5.0e-6, 5.0e-6),
+stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds=(5.0e-6, 5.0e-6),
                                                      variables=(Trixi.density, pressure))
 
 ###############################################################################

@@ -1,4 +1,5 @@
 using Trixi: SemidiscretizationHyperbolic, SemidiscretizationHyperbolicParabolic, initialize!, SummaryCallback, timer, have_constant_speed
+import DiffEqBase
 
 struct LWSolution{uType, tType, Problem}
    u::uType
@@ -32,13 +33,6 @@ mutable struct LWOptions{tType,CallBacks}
    callback::CallBacks
 end
 
-mutable struct AMRSizes
-   old_nelements::Int
-   old_ninterfaces::Int
-   old_nboundaries::Int
-   old_nmortars::Int
-end
-
 # To enable usage with Trixi's callbacks
 mutable struct LWIntegrator{
    SemiDiscretization,
@@ -46,27 +40,26 @@ mutable struct LWIntegrator{
    Solution <: LWSolution,
    CacheType,
    tType,
-   F,
+   RHS,
    CallBacks,
    LWTimeDiscretization <: AbstractLWTimeDiscretization
    }
-   p::SemiDiscretization # p = parameters in ODE integrators
+   p::SemiDiscretization # p = parameters
    sol::Solution
    u::uType
    uprev::uType
-   cache::CacheType #
+   cache::CacheType # "universal" cache in Trixi.jl
    iter::Int
    t::tType
    tspan::Tuple{tType,tType}
    dt::tType
-   f::F
+   f::RHS
    dtpropose::tType
    dtcache::tType
-   stats::DiffEqBase.DEStats
-   epsilon::OffsetVector{tType, Vector{tType}} # Error estimates
-   opts::LWOptions{tType, CallBacks} # OrdinaryDiffEq.DEOptions originally
-   amr_sizes::AMRSizes
-   alg::LWTimeDiscretization
+   stats::DiffEqBase.DEStats # number of accepted, rejected time steps
+   epsilon::OffsetVector{tType, Vector{tType}} # error estimates
+   opts::LWOptions{tType, CallBacks} # isadaptive, tolerances, controller, etc
+   alg::LWTimeDiscretization # time_discretization, used by summary callback
 end
 
 # For some callbacks from Trixi
@@ -176,10 +169,9 @@ function LWIntegrator(lw_update::LWUpdate, time_discretization, sol, callbacks, 
    n_interfaces = ninterfaces(semi.mesh, semi.solver, semi.cache, time_discretization)
    n_boundaries = nboundaries(semi.mesh, semi.solver, semi.cache, time_discretization)
    n_mortars = 1
-   amr_sizes = AMRSizes(n_elements, n_interfaces, n_boundaries, n_mortars,)
    LWIntegrator(semi, sol, u, u0_ode, integrator_cache, iter, t, tspan, dt, f,
       dtpropose, dtcache, stats, epsilon,
-      opts, amr_sizes,
+      opts, 
       time_discretization)
 end
 
@@ -235,14 +227,7 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
    return nothing
 end
 
-function adaptivity_cache()
-   n_fail_total = zeros(1)
-   n_fail = zeros(1)
-   return (;n_fail_total, n_fail)
-end
-
-# This will allow both LW and FR. For debugging, we rewrite the RKFR from Trixi.
-
+# This will allow both LW and FR. For debugging, we plant to rewrite the RKFR from Trixi.
 function solve_lwfr(lw_update, callbacks, dt_initial, tolerances;
    time_step_computation=CFLBased(), limiters=(;))
    @unpack rhs!, soln_arrays, tspan, semi = lw_update

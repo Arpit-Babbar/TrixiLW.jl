@@ -57,18 +57,17 @@ end
    return f_inner
 end
 
-boundary_conditions = Dict( :Bottom => boundary_condition_outflow,
-                            :Top    => boundary_condition_outflow,
-                            :Right  => boundary_condition_outflow,
-                            :Left   => boundary_condition_supersonic_inflow   )
-volume_flux = flux_central
+boundary_conditions = Dict( :y_neg => boundary_condition_outflow,
+                            :y_pos  => boundary_condition_outflow,
+                            :x_pos  => boundary_condition_outflow,
+                            :x_neg  => boundary_condition_supersonic_inflow   )
 surface_flux = flux_lax_friedrichs
 
 polydeg = 4
 basis = LobattoLegendreBasis(polydeg)
 shock_indicator = IndicatorHennemannGassner(equations, basis,
-                                            alpha_max=0.3,
-                                            alpha_min=0.001,
+                                            alpha_max=1.0,
+                                            alpha_min=0.0001,
                                             alpha_smooth=true,
                                             variable=density_pressure)
 volume_integral = TrixiLW.VolumeIntegralFRShockCapturing(
@@ -80,11 +79,22 @@ volume_integral = TrixiLW.VolumeIntegralFRShockCapturing(
 )
 solver = DGSEM(polydeg=polydeg, surface_flux=surface_flux, volume_integral=volume_integral)
 
+
+coordinates_min = (0.0, -0.5) # minimum coordinates (min(x), min(y))
+coordinates_max = (1.0,  0.5) # maximum coordinates (max(x), max(y))
+
 mesh_file = joinpath(@__DIR__, "M2000.inp")
 isfile(mesh_file) || download("https://gist.githubusercontent.com/Arpit-Babbar/88216acbd3d6a257b12f3d03e03c3584/raw/db2b7a23767276a5afc4ca145ecf25aae6ea8e19/M2000.inp", mesh_file)
 #                              mesh_file)isfile(mesh_file) || download("https://gist.githubusercontent.com/Arpit-Babbar/627f19ef40127b84624429b2f0b9e7f0/raw/c0f4adc777bd5eda7c38002f57f09de9277659f3/M2000_bigger.inp",
 #                              mesh_file)
-mesh = P4estMesh{2}(mesh_file, initial_refinement_level = 0)
+# mesh = P4estMesh{2}(mesh_file, initial_refinement_level = 0)
+
+trees_per_dimension = (2, 2)
+
+# Create P4estMesh with 8 x 8 trees and 16 x 16 elements (because level = 1)
+mesh = P4estMesh(trees_per_dimension, polydeg=4,
+                 coordinates_min=coordinates_min, coordinates_max=coordinates_max,
+                 initial_refinement_level=6, periodicity = (false, false))
 
 # A semidiscretization collects data structures and functions for the spatial discretization
 cfl_number = 0.1
@@ -96,7 +106,7 @@ semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver
 # ODE solvers, callbacks etc.
 
 # Create ODE problem with time span from 0.0 to 0.001
-tspan =(0.0, 0.001)
+tspan = (0.0, 0.001)
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 # At the beginning of the main loop, the SummaryCallback prints a summary of the simulation setup
@@ -114,12 +124,23 @@ save_solution = SaveSolutionCallback(interval=1000,
                                      save_final_solution=true,
                                      solution_variables=cons2prim)
 
-amr_indicator = IndicatorLöhner(semi, variable=Trixi.density)
+# amr_indicator = IndicatorLöhner(semi, variable=Trixi.density)
+
+amr_indicator = IndicatorHennemannGassner(semi,
+                                          alpha_max=1.0,
+                                          alpha_min=0.0001,
+                                          alpha_smooth=false,
+                                          variable=Trixi.density)
+
+# amr_controller = ControllerThreeLevel(semi, amr_indicator,
+#                                       base_level=0,
+#                                       med_level=3, med_threshold=0.05,
+#                                       max_level=5, max_threshold=0.1)
 
 amr_controller = ControllerThreeLevel(semi, amr_indicator,
-                                      base_level=0,
-                                      med_level=3, med_threshold=0.05,
-                                      max_level=5, max_threshold=0.1)
+                                      base_level=2,
+                                      med_level=0, med_threshold=0.0003,
+                                      max_level=8, max_threshold=0.003)
 
 amr_callback = AMRCallback(semi, amr_controller,
                            interval=1,
@@ -130,7 +151,7 @@ callbacks = (;analysis_callback, alive_callback,
               )
 
 # positivity limiter necessary for this example with strong shocks
-stage_limiter! = MyPositivityPreservingLimiterZhangShu(thresholds=(5.0e-6, 5.0e-6),
+stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds=(5.0e-6, 5.0e-6),
                                                      variables=(Trixi.density, pressure))
 
 ###############################################################################
