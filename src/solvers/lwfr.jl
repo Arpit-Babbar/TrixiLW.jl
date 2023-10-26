@@ -63,7 +63,7 @@ mutable struct LWIntegrator{
 end
 # Remark - It may seem natural to use the same Integrator struct that Trixi.jl uses. And, if needed
 # Use its a subfield of LWIntegrator and make additions as needed, following
-# https://github.com/JuliaLang/julia/issues/4935#issuecomment-877302452. 
+# https://github.com/JuliaLang/julia/issues/4935#issuecomment-877302452.
 # There are two problems with it
 # (a) Trixi.jl uses the ODEIntegrator from OrdinaryDiffEq.jl, that is a heavy Library
 # (b) ODEIntegrator requires the algorithm type to be <: Union{OrdinaryDiffEqAlgorithm, DAEAlgorithm},
@@ -175,7 +175,7 @@ function LWIntegrator(lw_update::LWUpdate, time_discretization, sol, callbacks, 
    f = lw_update.rhs! # TODO - Trixi.jl wants it to be more generally chosen by the user
    LWIntegrator(semi, sol, u, u0_ode, integrator_cache, iter, t, tspan, dt, f,
       dtpropose, dtcache, stats, epsilon,
-      opts, 
+      opts,
       time_discretization)
 end
 

@@ -65,18 +65,20 @@ end
                                        RealT=real(solver), uEltype=RealT,
                                        initial_cache=NamedTuple())
 
-   cache = (; create_cache(mesh, equations, solver, RealT, uEltype)..., initial_cache...)
+  # From Trixi.jl
+  cache = (; create_cache(mesh, equations, solver, RealT, uEltype)..., initial_cache...)
 
-   cache = (; create_cache(mesh, equations, time_discretization, solver, RealT, uEltype, cache)...,
-              cache...) # LW additions
+  # From TrixiLW.jl
+  cache = (; create_cache(mesh, equations, time_discretization, solver, RealT, uEltype, cache)...,
+             cache...)
 
-   # TODO - Should I reuse similar constructor from Trixi passing new cache objects
-   # to initial_cache?
-   _boundary_conditions = digest_boundary_conditions(boundary_conditions, mesh, solver, cache)
 
-   semi = SemidiscretizationHyperbolic{typeof(mesh), typeof(equations), typeof(initial_condition), typeof(_boundary_conditions), typeof(source_terms), typeof(solver), typeof(cache)}(
+  _boundary_conditions = digest_boundary_conditions(boundary_conditions, mesh, solver, cache)
+
+  # Now call the main constructor
+  semi = SemidiscretizationHyperbolic{typeof(mesh), typeof(equations), typeof(initial_condition), typeof(_boundary_conditions), typeof(source_terms), typeof(solver), typeof(cache)}(
      mesh, equations, initial_condition, _boundary_conditions, source_terms, solver, cache)
 
-   return semi
+  return semi
 
  end
