@@ -2,6 +2,8 @@ using Trixi: AbstractEquations
 
 import Trixi: flux_central, FluxPlusDissipation, DissipationLocalLaxFriedrichs
 
+# TODO - This is type piracy?
+
 @inline function flux_central(f_ll, f_rr, u_ll, u_rr,
   orientation_or_normal_direction,
   eq::AbstractEquations)

@@ -58,7 +58,7 @@ function create_cache(mesh::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D,P4e
    N4() = NamedTuple{(:f, :g, :ftilde, :gtilde, :Ftilde, :Gtilde, :ut, :utt, :uttt, :utttt,
                       :U, :up, :um, :upp, :umm, :S, :u_np1, :u_np1_low)}((MArr(undef) for _=1:18))
 
-   if degree == 4
+   if degree >= 4
       nt = Threads.nthreads()
       cell_arrays = SVector{Threads.nthreads()}([N4() for _ in 1:Threads.nthreads()])
    else

@@ -62,6 +62,7 @@ include(solvers_dir() * "/dgsem_p4est/containers.jl")
 include(callback_dir() * "/amr.jl")
 
 include(src_dir() * "/callbacks/callbacks_stage/positivity_zhang_shu.jl")
+include(src_dir() * "/callbacks/callbacks_step/analysis_dg2d.jl")
 
 export get_time_discretization, SurfaceIntegralDiffusive
 

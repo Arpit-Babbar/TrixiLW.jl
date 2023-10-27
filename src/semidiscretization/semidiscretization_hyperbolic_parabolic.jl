@@ -17,6 +17,8 @@ function semidiscretize(semi::SemidiscretizationHyperbolicParabolic,
   return LWUpdate(rhs!, soln_arrays, tspan, semi)
 end
 
+# rhs! function is not doing multiple dispatch. We have not imported the rhs! function
+# of Trixi.jl
 function rhs!(du_ode, u_ode,
    semi::SemidiscretizationHyperbolicParabolic,
    t, tolerances = (;abstol = 0.0, reltol = 0.0))

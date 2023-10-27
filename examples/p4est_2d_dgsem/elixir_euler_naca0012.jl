@@ -33,7 +33,7 @@ initial_condition = initial_condition_mach3_flow
 @inline function boundary_condition_supersonic_inflow(u_inner, U_inner, f_inner,
    outer_cache, normal_direction::AbstractVector, x, t, dt,
    surface_flux_function, equations::CompressibleEulerEquations2D,
-   dg, time_discretization)
+   dg, time_discretization, scaling_factor = 1)
    u_boundary = initial_condition_mach3_flow(x, t, equations)
    flux = Trixi.flux(u_boundary, normal_direction, equations)
 
@@ -48,7 +48,7 @@ end
    outer_cache,
    normal_direction::AbstractVector, x, t, dt,
    surface_flux_function, equations::CompressibleEulerEquations2D,
-   dg, time_discretization)
+   dg, time_discretization, scaling_factor = 1)
    # flux = Trixi.flux(u_inner, normal_direction, equations)
 
    # return flux
@@ -60,7 +60,7 @@ end
    x, t, dt,
    surface_flux_function,
    equations::CompressibleEulerEquations2D,
-   dg, time_discretization)
+   dg, time_discretization, scaling_factor = 1)
 
    u_outer = Trixi.get_reflection(u_inner, normal_direction, equations)
 
@@ -75,7 +75,7 @@ end
    x, t, dt,
    surface_flux_function,
    equations::CompressibleEulerEquations2D,
-   dg, time_discretization)
+   dg, time_discretization, scaling_factor = 1)
 
    norm_ = norm(normal_direction)
    # Normalize the vector without using `normalize` since we need to multiply by the `norm_` later
@@ -146,15 +146,15 @@ solver = DGSEM(polydeg=polydeg, surface_flux=surface_flux,
    volume_integral=volume_integral)
 
 # Get the unstructured quad mesh from a file (downloads the file if not available locally)
-default_mesh_file = joinpath(@__DIR__, "NACA0012.inp")
-default_mesh_file = joinpath(@__DIR__, "NACA0012_refined.inp")
+default_mesh_file = joinpath(@__DIR__, "NACA0012_N6.inp")
+# default_mesh_file = joinpath(@__DIR__, "NACA0012_refined.inp")
 isfile(default_mesh_file) || download("https://gist.githubusercontent.com/Arpit-Babbar/8e44898b95ea7edad054044aa63671e6/raw/ea3d59e435132f7fcca74d42aa1a77303452d0e6/NACA0012.inp",
    default_mesh_file)
 mesh_file = default_mesh_file
 
 mesh = P4estMesh{2}(mesh_file, initial_refinement_level=0)
 
-cfl_number = 0.14
+cfl_number = 0.1
 semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver),
    equations, initial_condition, solver, boundary_conditions=boundary_conditions,
    initial_cache=(; cfl_number, dt=zeros(1)))
@@ -162,15 +162,19 @@ semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver
 ###############################################################################
 # ODE solvers
 
-tspan = (0.0, 1.0)
+tspan = (0.0, 10.0)
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 # Callbacks
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 1000
-analysis_callback = AnalysisCallback(semi, interval=analysis_interval)
+analysis_interval = 10
+analysis_callback = AnalysisCallback(semi, interval=analysis_interval,
+                                     extra_analysis_errors = (:residual,),
+                                     output_directory = "analysis_results", save_analysis = true,
+                                     analysis_integrals = (TrixiLW.RhoRes(),TrixiLW.CFLComputation(),
+                                     TrixiLW.CFLComputationMax()))
 
 alive_callback = AliveCallback(analysis_interval=analysis_interval)
 
@@ -180,9 +184,12 @@ save_solution = SaveSolutionCallback(interval=1000,
    solution_variables=cons2prim)
 
 stepsize_callback = StepsizeCallback(cfl=0.15)
+summary_callback = SummaryCallback()
 
-callbacks = ( # analysis_callback,
+callbacks = (
+   analysis_callback,
    alive_callback,
+   summary_callback
    # save_solution
    )
 
@@ -193,15 +200,15 @@ stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds=(5.0e-7, 1.0e-6)
 
 ###############################################################################
 # run the simulation
-time_int_tol = 1e-5
+time_int_tol = 1e-6
 tolerances = (; abstol=time_int_tol, reltol=time_int_tol);
 dt_initial = 1e-4;
 sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
-    time_step_computation=TrixiLW.Adaptive(),
-   # time_step_computation=TrixiLW.CFLBased(cfl_number),
+   #  time_step_computation=TrixiLW.Adaptive(),
+   time_step_computation=TrixiLW.CFLBased(cfl_number),
    limiters=(; stage_limiter!)
 );
 summary_callback() # print the timer summary
 
 
-plot_mesh(semi, mesh, solver, xlimits = (-.5,1.25), ylimits = (-0.25, 0.25))
+# plot_mesh(semi, mesh, solver, xlimits = (-.5,1.25), ylimits = (-0.25, 0.25))

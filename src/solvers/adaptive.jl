@@ -146,15 +146,10 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
       error_valid = false
    end
 
-   # Reject solution if obtained u^{n+1} is inadmissible
-   # if !(is_admissible(u, semi.equations))
-   #    domain_valid = false
-   # end
-
    if !(domain_valid && error_valid)
       n_fail_it += 1
       dt = min(factor, 0.95) * dt
-      println("#failures = $n_fail_it; dt : $dt -> $(integrator.dt)")
+      println("#failures = $n_fail_it; dt : $(integrator.dt) -> $dt")
       @show domain_valid, error_valid
       set_dt!(integrator, dt)
       @.. u = uprev
