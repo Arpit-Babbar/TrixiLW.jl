@@ -17,6 +17,7 @@ using Downloads: download
 using Trixi
 using TrixiLW
 using LinearAlgebra
+using TrixiLW: lift_force, drag_force
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations
@@ -99,7 +100,13 @@ lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan)
 summary_callback = SummaryCallback()
 
 analysis_interval = 1000
-analysis_callback = AnalysisCallback(semi, interval=analysis_interval)
+lift_computation = TrixiLW.AnalysisSurfaceIntegral(semi.boundary_conditions.boundary_indices[2],
+                                           lift_force)
+drag_computation = TrixiLW.AnalysisSurfaceIntegral(semi.boundary_conditions.boundary_indices[2],
+                                           drag_force)
+analysis_callback = AnalysisCallback(semi, interval=analysis_interval,
+output_directory = "analysis_results", save_analysis = true,
+analysis_integrals = (lift_computation,drag_computation))
 
 alive_callback = AliveCallback(analysis_interval=10)
 
@@ -121,7 +128,7 @@ amr_callback = AMRCallback(semi, amr_controller,
                            adapt_initial_condition_only_refine=true)
 
 callbacks = ( analysis_callback, alive_callback, save_solution,
-              amr_callback, 
+              amr_callback,
               summary_callback
             )
 

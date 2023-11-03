@@ -2,6 +2,7 @@ using Downloads: download
 using TrixiLW
 using Trixi
 using LinearAlgebra
+using TrixiLW: lift_force
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations
@@ -162,7 +163,7 @@ semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver
 ###############################################################################
 # ODE solvers
 
-tspan = (0.0, 10.0)
+tspan = (0.0, 0.1)
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 # Callbacks
@@ -170,11 +171,14 @@ lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan)
 summary_callback = SummaryCallback()
 
 analysis_interval = 10
+# Chooose boundary indices by looking at semi.boundary_conditions.boundary_condition_types.
+# If they are not clear, rename the functions in used to define boundary_conditions before.
+lift_computation = TrixiLW.AnalysisSurfaceIntegral(cache -> cache.boundary_conditions.boundary_indices[2],
+                                           lift_force)
 analysis_callback = AnalysisCallback(semi, interval=analysis_interval,
                                      extra_analysis_errors = (:residual,),
                                      output_directory = "analysis_results", save_analysis = true,
-                                     analysis_integrals = (TrixiLW.RhoRes(),TrixiLW.CFLComputation(),
-                                     TrixiLW.CFLComputationMax()))
+                                     analysis_integrals = (lift_computation,))
 
 alive_callback = AliveCallback(analysis_interval=analysis_interval)
 
@@ -209,6 +213,3 @@ sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
    limiters=(; stage_limiter!)
 );
 summary_callback() # print the timer summary
-
-
-# plot_mesh(semi, mesh, solver, xlimits = (-.5,1.25), ylimits = (-0.25, 0.25))

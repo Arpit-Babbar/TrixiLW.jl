@@ -75,6 +75,8 @@ end
 
   _boundary_conditions = digest_boundary_conditions(boundary_conditions, mesh, solver, cache)
 
+  cache = (;boundary_conditions = _boundary_conditions, cache...)
+
   # Now call the main constructor
   semi = SemidiscretizationHyperbolic{typeof(mesh), typeof(equations), typeof(initial_condition), typeof(_boundary_conditions), typeof(source_terms), typeof(solver), typeof(cache)}(
      mesh, equations, initial_condition, _boundary_conditions, source_terms, solver, cache)
