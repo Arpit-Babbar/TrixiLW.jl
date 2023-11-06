@@ -5,7 +5,7 @@ struct LWSolution{uType, tType, Problem}
    u::uType
    prob::Problem
    t::tType
-   stats::DiffEqBase.DEStats
+   stats::DiffEqBase.Stats
 end
 
 struct LWProblem{F,uType,tType,SemiDiscretization}
@@ -56,7 +56,7 @@ mutable struct LWIntegrator{
    f::RHS
    dtpropose::tType
    dtcache::tType
-   stats::DiffEqBase.DEStats # number of accepted, rejected time steps
+   stats::DiffEqBase.Stats # number of accepted, rejected time steps
    epsilon::OffsetVector{tType, Vector{tType}} # error estimates
    opts::LWOptions{tType, CallBacks} # isadaptive, tolerances, controller, etc
    alg::LWTimeDiscretization # time_discretization, used by summary callback
