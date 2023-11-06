@@ -15,12 +15,12 @@ end
 
 function lift_force(u, normal_direction, equations::CompressibleEulerEquations2D)
     p = pressure(u, equations)
-    return p * normal_direction[2]
+    return p * normal_direction[2] / norm(normal_direction)
 end
 
 function drag_force(u, normal_direction, equations::CompressibleEulerEquations2D)
     p = pressure(u, equations)
-    return p * normal_direction[1]
+    return p * normal_direction[1]  / norm(normal_direction)
 end
 
 function analyze(lift_computation::AnalysisSurfaceIntegral, du, u, t,
@@ -30,6 +30,7 @@ function analyze(lift_computation::AnalysisSurfaceIntegral, du, u, t,
     @unpack surface_flux_values, node_coordinates, contravariant_vectors = cache.elements
     @unpack weights = dg.basis
     @unpack indices, variable = lift_computation
+    # TODO - Use initialize callbacks to move boundary_conditions to cache
     indices_ = indices(cache)
 
     surface_integral = zero(eltype(u))
@@ -55,8 +56,8 @@ function analyze(lift_computation::AnalysisSurfaceIntegral, du, u, t,
                                                   element)
 
           # L2 norm of normal direction is the surface element
-          dA = 0.5 * weights[node_index] * norm(normal_direction)
-          surface_integral += variable(u_node, normal_direction, equations) * dA
+          dS = 0.5 * weights[node_index] * norm(normal_direction)
+          surface_integral += variable(u_node, normal_direction, equations) * dS
 
           i_node += i_node_step
           j_node += j_node_step
