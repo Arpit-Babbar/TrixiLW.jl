@@ -14,7 +14,7 @@ function semidiscretize(semi::SemidiscretizationHyperbolicParabolic,
 
   soln_arrays = (;u0_ode, du_ode)
 
-  return LWUpdate(rhs!, soln_arrays, tspan, semi)
+  return LWUpdate(rhs!, u0_ode, soln_arrays, tspan, semi)
 end
 
 # rhs! function is not doing multiple dispatch. We have not imported the rhs! function
@@ -30,7 +30,7 @@ function rhs!(du_ode, u_ode,
 
   # TODO: Taal decide, do we need to pass the mesh?
   time_start = time_ns()
-  @trixi_timeit timer() "rhs!" rhs!(du, u, t, mesh, equations, equations_parabolic,
+  @trixi_timeit timer() "rhs!" rhs!(du, u, t, cache.dt[1], mesh, equations, equations_parabolic,
     initial_condition, boundary_conditions,
     boundary_conditions_parabolic, source_terms, solver,
     solver_parabolic,

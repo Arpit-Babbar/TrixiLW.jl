@@ -34,6 +34,8 @@ end
 
 function create_mortar_cache(mesh::P4estMesh, equations, dg, uEltype, RealT, cache, time_discretization::AbstractLWTimeDiscretization)
    @unpack mortars, u_threaded = cache
+   n_mortars = nmortars(dg, cache)
+   n_nodes = nnodes(dg)
 
    # Create arrays of sizes (leftright, n_variables, updown, n_nodes, n_mortars)
    @unpack _u, u = mortars
@@ -48,9 +50,9 @@ function create_mortar_cache(mesh::P4estMesh, equations, dg, uEltype, RealT, cac
    U, F, fn_low = wrap_.((_U, _F, _fn_low))
 
    NDIMS = ndims(equations)
-   _inverse_jacobian = zeros(1)
+   _inverse_jacobian = zeros(n_nodes * n_mortars)
    inverse_jacobian = unsafe_wrap(Array{RealT,NDIMS}, pointer(_inverse_jacobian),
-      (1, 1))
+      (n_nodes, n_mortars))
 
    L2MortarContainer_lw_P4est(
       U, F, fn_low, inverse_jacobian,

@@ -2,6 +2,7 @@ using Downloads: download
 using TrixiLW
 using Trixi
 using LinearAlgebra
+using Plots
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations
@@ -87,8 +88,6 @@ semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver
 
 tspan = (0.0, 1.0)
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
-
-summary_callback = SummaryCallback()
 
 analysis_interval = 1000
 analysis_callback = AnalysisCallback(semi, interval=analysis_interval,

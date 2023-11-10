@@ -234,7 +234,7 @@ function get_blended_flux(
    if is_admissible(test_update, equations) == false
       Fn = zhang_shu_flux_fix(equations, u_ll, low_update, Fn, fn_inner_ll, fn, c_ll)
    end
- 
+
    λx = λy = 0.5 # blending flux factors (TODO - Do this correctly)
    c_rr = -dt * Jr / (weights[1] * λx)
    test_update = u_rr - c_rr * (Fn - fn_inner_rr)
@@ -267,7 +267,7 @@ function compute_alp(
    if is_admissible(lower_order_update, equations) == false
       return 1.0
    end
- 
+
    λx = λy = 0.5 # blending flux factors (TODO - Do this correctly)
    # u_rr = get_node_vars(ur, equations, dg, 1)
    lower_order_update = u_rr - dt * Jr / (weights[1] * λx) * (fn_inner_rr - Fn)
@@ -591,7 +591,7 @@ end
    fn, Fn, fn_inner_ll, fn_inner_rr, node_index,
    equations, dg, dg.volume_integral)
    # Copy flux to buffer
-   Trixi.set_node_vars!(fstar[position_index], 
+   Trixi.set_node_vars!(fstar[position_index],
                         # alp * fn + (1-alp) * Fn,
                         Fn_corr,
                         equations, dg, node_index)

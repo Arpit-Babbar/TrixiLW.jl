@@ -64,7 +64,8 @@ function rhs_mdrk1!(du, u,
    tolerances::NamedTuple)
     # Reset du
     @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
-    @unpack u_transformed, gradients, flux_viscous = cache_parabolic
+    @unpack viscous_container = cache_parabolic
+    @unpack u_transformed, gradients, flux_viscous = viscous_container
 
     dt = cache.dt[1]
 

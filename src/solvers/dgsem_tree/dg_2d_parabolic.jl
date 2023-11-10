@@ -20,7 +20,8 @@ function rhs!(du, u, t, dt, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
 
    # Reset du
    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
-   @unpack u_transformed, gradients, flux_viscous = cache_parabolic
+   @unpack viscous_container = cache_parabolic
+   @unpack u_transformed, gradients, flux_viscous = viscous_container
 
    # Convert conservative variables to a form more suitable for viscous flux calculations
    @trixi_timeit timer() "transform variables" transform_variables!(

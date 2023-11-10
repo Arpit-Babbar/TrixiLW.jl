@@ -1,26 +1,20 @@
 using Trixi: SemidiscretizationHyperbolic, SemidiscretizationHyperbolicParabolic, initialize!, SummaryCallback, timer, have_constant_speed
 import DiffEqBase
 
-struct LWSolution{uType, tType, Problem}
+# Contains all that is needed to perform LW update
+struct LWUpdate{RHS,uType,SolutionArrays,SemiDiscretization}
+   f::RHS
+   u0::uType
+   soln_arrays::SolutionArrays
+   tspan::Tuple{Float64,Float64}
+   p::SemiDiscretization
+end
+
+struct LWSolution{uType, tType, Problem<:LWUpdate}
    u::uType
    prob::Problem
    t::tType
    stats::DiffEqBase.Stats
-end
-
-struct LWProblem{F,uType,tType,SemiDiscretization}
-   f::F
-   u0::uType
-   p::SemiDiscretization
-   tspan::Tuple{tType,tType}
-end
-
-# Contains all that is needed to perform LW update
-struct LWUpdate{RHS,SolutionArrays,SemiDiscretization}
-   rhs!::RHS
-   soln_arrays::SolutionArrays
-   tspan::Tuple{Float64,Float64}
-   semi::SemiDiscretization
 end
 
 mutable struct LWOptions{tType,CallBacks}
@@ -155,7 +149,7 @@ end
 
 function LWIntegrator(lw_update::LWUpdate, time_discretization, sol, callbacks, tolerances,
    ; time_step_computation, tType=Float64)
-   @unpack soln_arrays, semi, tspan = lw_update
+   @unpack soln_arrays, tspan = lw_update
    @unpack u0_ode, du_ode = soln_arrays # Previous time level solution and residual
    integrator_cache = (du_ode,) # Don't know what else to put here.
    u = sol.u[1]
@@ -172,8 +166,8 @@ function LWIntegrator(lw_update::LWUpdate, time_discretization, sol, callbacks, 
       callbacks # TODO - Is this really the right way to pass callbacks? Why are they needed here?
    )
    epsilon = OffsetArray(ones(tType, 3), OffsetArrays.Origin(-1))
-   f = lw_update.rhs! # TODO - Trixi.jl wants it to be more generally chosen by the user
-   LWIntegrator(semi, sol, u, u0_ode, integrator_cache, iter, t, tspan, dt, f,
+   f = lw_update.f # TODO - Trixi.jl wants it to be more generally chosen by the user
+   LWIntegrator(lw_update.p, sol, u, u0_ode, integrator_cache, iter, t, tspan, dt, f,
       dtpropose, dtcache, stats, epsilon,
       opts,
       time_discretization)
@@ -220,7 +214,8 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
    dt = compute_dt(semi, mesh, time_step_computation, integrator)
    dt = set_dt!(integrator, dt)
    @unpack u, uprev, epsilon = integrator
-   @unpack rhs!, soln_arrays = lw_update
+   @unpack soln_arrays = lw_update
+   rhs! = lw_update.f
    @unpack du_ode, u0_ode = soln_arrays         # Vectors form for compability with callbacks
    @.. uprev = u
 
@@ -234,11 +229,11 @@ end
 # This will allow both LW and FR. For debugging, we plant to rewrite the RKFR from Trixi.
 function solve_lwfr(lw_update, callbacks, dt_initial, tolerances;
    time_step_computation=CFLBased(), limiters=(;))
-   @unpack rhs!, soln_arrays, tspan, semi = lw_update
+   @unpack soln_arrays, tspan = lw_update
+   semi = lw_update.p
    @unpack du_ode, u0_ode = soln_arrays            # Vectors form for compability with callbacks
-   prob = LWProblem(rhs!, u0_ode, semi, tspan)     # Would be an ODE problem in Trixi
    u = compute_coefficients(first(tspan), semi)    # u satisfying initial condition
-   sol = LWSolution([u], prob, [0.0], DiffEqBase.Stats(0))
+   sol = LWSolution([u], lw_update, [0.0], DiffEqBase.Stats(0))
    @unpack solver = semi
    time_discretization = get_time_discretization(solver)
    integrator = LWIntegrator(lw_update, time_discretization, sol, callbacks, tolerances,

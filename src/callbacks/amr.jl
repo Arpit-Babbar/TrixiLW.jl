@@ -17,7 +17,6 @@ function DiffEqBase.resize!(integrator::LWIntegrator, i::Int)
    resize_interface_cache!(mesh, equations, solver, cache)
    resize_mortar_cache!(mesh, equations, solver, cache)
    resize_boundary_cache!(mesh, equations, solver, cache)
-
 end
 
 resize_element_cache!(

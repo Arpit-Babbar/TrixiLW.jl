@@ -11,5 +11,5 @@ function semidiscretize(semi::Union{SemidiscretizationHyperbolic, Semidiscretiza
 
    soln_arrays = (; u0_ode, du_ode)
 
-   return LWUpdate(rhs!, soln_arrays, tspan, semi)
+   return LWUpdate(rhs!, u0_ode, soln_arrays, tspan, semi)
  end

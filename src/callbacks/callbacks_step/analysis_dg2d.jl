@@ -71,6 +71,11 @@ pretty_form_utf(::AnalysisSurfaceIntegral{<:Any, typeof(lift_force)}) = "Lift"
 pretty_form_ascii(::AnalysisSurfaceIntegral{<:Any, typeof(drag_force)}) = "Drag"
 pretty_form_utf(::AnalysisSurfaceIntegral{<:Any, typeof(drag_force)}) = "Drag"
 
+pretty_form_ascii(::CFLComputation) = "CFLMin"
+pretty_form_utf(::CFLComputation) = "CFLMin"
+pretty_form_ascii(::CFLComputationMax) = "CFLMax"
+pretty_form_utf(::CFLComputationMax) = "CFLMax"
+
 function analyze(::CFLComputation, du, u, t,
     mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
     equations::CompressibleEulerEquations2D, dg::DGSEM, cache)

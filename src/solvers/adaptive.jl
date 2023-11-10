@@ -1,6 +1,6 @@
 using Trixi: get_node_vars
 
-@inline function test_rhs!(du_ode, u_ode, semi, t, integrator, tolerances, rhs! = rhs!)
+@inline function test_rhs!(du_ode, u_ode, semi, t, integrator, tolerances, rhs! = integrator.f)
    # TODO - Does this try catch block cause a performance issue?
    max_retries = 25 # TODO - This doesn't work, fix it please.
    try
@@ -111,7 +111,7 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
    semi = integrator.p
    @unpack tolerances, controller = integrator.opts
    @unpack u, uprev, epsilon = integrator
-   @unpack rhs!, soln_arrays = lw_update
+   @unpack soln_arrays = lw_update
    @unpack du_ode, u0_ode = soln_arrays         # Vectors form for compability with callbacks
    @.. uprev = u
 
@@ -178,7 +178,7 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
    @unpack mesh, cache = semi
    @unpack tolerances, controller = integrator.opts
    @unpack u, uprev, epsilon = integrator
-   @unpack rhs!, soln_arrays = lw_update
+   @unpack soln_arrays = lw_update
    @unpack du_ode, u0_ode = soln_arrays         # Vectors form for compability with callbacks
    @unpack _us = cache.element_cache.mdrk_cache
    @.. uprev = u
