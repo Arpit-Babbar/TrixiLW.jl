@@ -23,13 +23,13 @@ function drag_force(u, normal_direction, equations::CompressibleEulerEquations2D
     return p * normal_direction[1]  / norm(normal_direction)
 end
 
-function analyze(lift_computation::AnalysisSurfaceIntegral, du, u, t,
+function analyze(surface_variable::AnalysisSurfaceIntegral, du, u, t,
     mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
     equations::CompressibleEulerEquations2D, dg::DGSEM, cache)
     @unpack boundaries, boundary_cache = cache
     @unpack surface_flux_values, node_coordinates, contravariant_vectors = cache.elements
     @unpack weights = dg.basis
-    @unpack indices, variable = lift_computation
+    @unpack indices, variable = surface_variable
     # TODO - Use initialize callbacks to move boundary_conditions to cache
     indices_ = indices(cache)
 

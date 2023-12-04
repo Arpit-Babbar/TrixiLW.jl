@@ -224,9 +224,11 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
    # domain_valid = test_updated_solution(u, semi)
    domain_valid = min(domain_valid, test_updated_solution(u, semi))
 
-   # put appropriate temporal errors in epsilon
-   @unpack _u_low = cache.element_cache.mdrk_cache
-   epsilon = compute_and_load_temporal_errors!(u, _u_low, semi, epsilon, Trixi.ndofs(semi), tolerances, n_fail_it)
+      # put appropriate temporal errors in epsilon
+   @unpack temporal_errors = semi.cache
+   epsilon = load_temporal_errors!(epsilon, temporal_errors,
+      Trixi.ndofs(semi) - 1, n_fail_it)
+
 
    # Use epsilon to compute dt_factor
    factor = dt_factor(epsilon, Trixi.nnodes(semi.solver)-1, controller)

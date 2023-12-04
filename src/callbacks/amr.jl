@@ -45,18 +45,21 @@ function resize_element_cache!(mesh::Union{TreeMesh,P4estMesh}, equations, solve
 
 
    if isa(get_time_discretization(solver), MDRK) # TODO - Multiple dispatch instead?
-      @unpack _us, _u_low, _U2, _S2, _F2 = element_cache.mdrk_cache
+      @unpack _us, _unp1, _unp1_low, _U2, _S2, _F2 = element_cache.mdrk_cache
 
       resize!(_us, n_variables * n_nodes^NDIMS * n_elements)
-      resize!(_u_low, n_variables * n_nodes^NDIMS * n_elements)
+      resize!(_unp1, n_variables * n_nodes^NDIMS * n_elements)
+      resize!(_unp1_low, n_variables * n_nodes^NDIMS * n_elements)
       resize!(_U2, n_variables * n_nodes^NDIMS * n_elements)
       resize!(_S2, n_variables * n_nodes^NDIMS * n_elements)
       resize!(_F2, n_variables * NDIMS * n_nodes^NDIMS * n_elements)
 
       element_cache.mdrk_cache.us = unsafe_wrap(
          Array, pointer(_us), (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
-      element_cache.mdrk_cache.u_low = unsafe_wrap(
-         Array, pointer(_u_low), (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
+      element_cache.mdrk_cache.u_np1 = unsafe_wrap(
+         Array, pointer(_unp1), (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
+      element_cache.mdrk_cache.u_np1_low = unsafe_wrap(
+         Array, pointer(_unp1_low), (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
       element_cache.mdrk_cache.U2 = unsafe_wrap(
             Array, pointer(_U2), (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
       element_cache.mdrk_cache.S2 = unsafe_wrap(

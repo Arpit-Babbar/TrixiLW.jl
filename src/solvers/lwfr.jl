@@ -221,6 +221,7 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
 
    rhs!(du_ode, u, semi, integrator.t)        # Compute du = u^{n+1}-dt*u^n
    update_soln!(integrator, u, uprev, du_ode) # u += dt * du
+   apply_limiters!(limiters, integrator)
    set_t_and_iter!(integrator, dt)
 
    return nothing

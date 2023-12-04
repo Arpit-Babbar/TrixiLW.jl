@@ -6,7 +6,7 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
    dt = compute_dt(semi, mesh, time_step_computation, integrator)
    dt = set_dt!(integrator, dt)
    @unpack u, uprev, epsilon = integrator
-   @unpack rhs!, soln_arrays = lw_update
+   @unpack  soln_arrays = lw_update
    @unpack du_ode, u0_ode = soln_arrays         # Vectors form for compability with callbacks
    @.. uprev = u
 

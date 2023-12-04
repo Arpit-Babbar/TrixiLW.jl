@@ -53,7 +53,7 @@ function rhs_mdrk2!(du, u,
 
    # Calculate volume integral
    alpha = @trixi_timeit timer() "volume integral" calc_volume_integral_mdrk2!(
-      du, us, t, dt, tolerances, mesh,
+      du, u, us, t, dt, tolerances, mesh,
       have_nonconservative_terms(equations), source_terms, equations,
       dg.volume_integral, time_discretization, dg, cache)
 
@@ -99,7 +99,7 @@ end
    # TODO - Are the local F2, G2, U2 needed? This is a performance question
    # Benchmark and find out
    Ftilde, Gtilde, ut, U, U2, S, S2 = cell_arrays[id]
-   @unpack u_low = mdrk_cache
+   @unpack u_np1_low = mdrk_cache
    refresh!.((ut,))
    for j in eachnode(dg), i in eachnode(dg)
       u_node = get_node_vars(u, equations, dg, i, j, element)
@@ -132,7 +132,7 @@ end
 
       set_node_vars!(U, 0.5*u_node, equations, dg, i, j)
       set_node_vars!(U2, u_node, equations, dg, i, j)
-      set_node_vars!(u_low, u_node, equations, dg, i, j, element)
+      set_node_vars!(u_np1_low, u_node, equations, dg, i, j, element)
    end
 
    # Scale ut
@@ -179,12 +179,12 @@ end
       st = calc_source_t_N34(u_node, up, upp, um, umm, x, t, dt,
                              source_terms, equations, dg, cache)
 
-      ftilde_node = 2.0*get_node_vars(Ftilde, equations, dg, i, j)
-      gtilde_node = 2.0*get_node_vars(Gtilde, equations, dg, i, j)
+      ftilde_node = 2.0*get_node_vars(Ftilde, equations, dg, i, j) # just cv_f
+      gtilde_node = 2.0*get_node_vars(Gtilde, equations, dg, i, j) # just cv_g
       s_node = 2.0*get_node_vars(S, equations, dg, i, j)
-      Ftilde_node_low = ftilde_node + 0.5 * ftilde_t
-      Gtilde_node_low = gtilde_node + 0.5 * gtilde_t
-      S_node_low = s_node + 0.5 * st
+      Ftilde_node_low = ftilde_node + 0.25 * ftilde_t
+      Gtilde_node_low = gtilde_node + 0.25 * gtilde_t
+      S_node_low = s_node + 0.25 * st
 
       multiply_add_to_node_vars!(element_cache.F, 0.125, ft, equations, dg, 1, i, j, element)
       multiply_add_to_node_vars!(element_cache.F, 0.125, gt, equations, dg, 2, i, j, element)
@@ -207,7 +207,7 @@ end
          multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], F_node,
                                     equations, dg, ii, j, element)
          inv_jacobian = inverse_jacobian[ii,j,element]
-         multiply_add_to_node_vars!(u_low, -dt * inv_jacobian * derivative_matrix[ii, i],
+         multiply_add_to_node_vars!(u_np1_low, -dt * inv_jacobian * derivative_matrix[ii, i],
                                     Ftilde_node_low, equations, dg, ii, j, element)
       end
 
@@ -217,7 +217,7 @@ end
          multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], G_node,
                                     equations, dg, i, jj, element)
          inv_jacobian = inverse_jacobian[i,jj,element]
-         multiply_add_to_node_vars!(u_low, -dt * inv_jacobian * derivative_matrix[jj, j],
+         multiply_add_to_node_vars!(u_np1_low, -dt * inv_jacobian * derivative_matrix[jj, j],
                                     Gtilde_node_low, equations, dg, i, jj, element)
       end
 
@@ -234,7 +234,7 @@ end
       inv_jacobian = inverse_jacobian[i,j,element]
       multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations,
                                  dg, i, j, element)
-      multiply_add_to_node_vars!(u_low, dt, S_node_low, equations, dg, i, j, element)
+      multiply_add_to_node_vars!(u_np1_low, dt, S_node_low, equations, dg, i, j, element)
 
       set_node_vars!(mdrk_cache.S2, S2_node, equations, dg, i, j, element)
    end
@@ -242,7 +242,7 @@ end
    return nothing
 end
 
-@inline function mdrk_kernel_2!(du, us, t, dt, tolerances, element,
+@inline function mdrk_kernel_2!(du, u, us, t, dt, tolerances, element,
    mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
    nonconservative_terms::False, source_terms, equations, dg::DGSEM, cache, alpha=true)
 
@@ -251,18 +251,28 @@ end
    @unpack derivative_dhat, derivative_matrix = dg.basis
    @unpack contravariant_vectors, inverse_jacobian, node_coordinates = cache.elements
 
-   @unpack lw_res_cache, element_cache = cache
+   @unpack lw_res_cache, element_cache, temporal_errors = cache
    @unpack cell_arrays = lw_res_cache
+   @unpack abstol, reltol = tolerances
 
    @unpack mdrk_cache = element_cache
 
    @unpack U2, F2, S2 = mdrk_cache
+   @unpack u_np1_low = mdrk_cache
 
    id = Threads.threadid()
 
    refresh!(arr) = fill!(arr, zero(eltype(arr)))
 
-   Ftilde, Gtilde, F, G, ut, ust, U, S = cell_arrays[id]
+   u_element = @view u[:,:,:,element]
+
+   Ftilde, Gtilde, F, G, ut, ust, U, S, u_np1 = cell_arrays[id]
+
+   Ftilde, Gtilde, F, G, ut, ust, U, S, u_np1, u_np1_low = cell_arrays[id]
+   u_np1_low .= u_element
+
+   temporal_errors[element] = zero(dt)
+   u_np1 .= u_element
 
    # Load U2, F2 in local arrays
    for j in eachnode(dg), i in eachnode(dg)
@@ -329,11 +339,16 @@ end
    end
 
    for j in eachnode(dg), i in eachnode(dg)
+      u_node = get_node_vars(u,   equations, dg, i, j, element)
+
       us_node = get_node_vars(us,   equations, dg, i, j, element)
       ust_node = get_node_vars(ust, equations, dg, i, j)
 
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       Ja = get_contravariant_matrix(contravariant_vectors, i, j, element)
+
+      _, _, cv_f, cv_g   = contravariant_flux(u_node, Ja, equations)
+      _, _, cv_fs, cv_gs = contravariant_flux(us_node, Ja, equations)
 
       um  = us_node -   ust_node
       fm, gm, cv_fm, cv_gm = contravariant_flux(um, Ja, equations)
@@ -363,18 +378,36 @@ end
       Ftilde_node = get_node_vars(Ftilde, equations, dg, i, j)
       Gtilde_node = get_node_vars(Gtilde, equations, dg, i, j)
 
+      # F_low = 1.0/3.0 * cv_f + 2.0/3.0 * cv_fs + 1.0/6.0 * ftilde_t
+      # G_low = 1.0/3.0 * cv_g + 2.0/3.0 * cv_gs + 1.0/6.0 * gtilde_t
+
+      F_low = Ftilde_node - 1.0/3.0 * ftilde_t
+      G_low = Gtilde_node - 1.0/3.0 * gtilde_t
+
       for ii in eachnode(dg)
+         inv_jacobian = inverse_jacobian[ii, j, element]
          # res              += -lam * D * F for each variable
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
          multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], Ftilde_node, equations, dg,
             ii, j, element)
+
+         Trixi.multiply_add_to_node_vars!(u_np1, -dt * inv_jacobian * derivative_matrix[ii, i],
+            Ftilde_node, equations, dg, ii, j)
+         Trixi.multiply_add_to_node_vars!(u_np1_low, -dt * inv_jacobian * derivative_matrix[ii, i],
+            F_low, equations, dg, ii, j)
       end
 
       for jj in eachnode(dg)
+         inv_jacobian = inverse_jacobian[i, jj, element]
          # C += -lam*g*Dm' for each variable
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
          multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], Gtilde_node, equations, dg,
             i, jj, element)
+
+         Trixi.multiply_add_to_node_vars!(u_np1, -dt * inv_jacobian * derivative_matrix[jj, j],
+            Gtilde_node, equations, dg, i, jj)
+         Trixi.multiply_add_to_node_vars!(u_np1_low, -dt * inv_jacobian * derivative_matrix[jj, j],
+            G_low, equations, dg, i, jj)
       end
 
       # TODO - update to v1.8 and call with @inline
@@ -390,6 +423,22 @@ end
       S_node = get_node_vars(S, equations, dg, i, j)
       inv_jacobian = inverse_jacobian[i, j, element]
       multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg, i, j, element)
+      multiply_add_to_node_vars!(u_np1, 1.0, S_node, equations, dg, i, j)
+   end
+
+   for j in eachnode(dg), i in eachnode(dg)
+      u_np1_node = Trixi.get_node_vars(u_np1, equations, dg, i, j)
+      # u_np1_low_node = Trixi.get_node_vars(u_np1_low, equations, dg, i, j)
+      u_np1_low_node = Trixi.get_node_vars(mdrk_cache.u_np1_low, equations, dg, i, j, element)
+      # u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+      for v in eachvariable(equations)
+         
+         temporal_errors[element] += (
+            (u_np1_node[v] - u_np1_low_node[v])
+            /
+            (abstol + reltol * max(abs(u_np1_node[v]), abs(u_np1_low_node[v])))
+         )^2
+      end
    end
 
    return nothing

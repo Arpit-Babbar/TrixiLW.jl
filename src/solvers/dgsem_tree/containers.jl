@@ -84,13 +84,15 @@ end
 
 mutable struct MDRKElementCache{uEltype<:Real, NDIMSP2, NDIMSP3}
    us::Array{uEltype, NDIMSP2}
-   u_low::Array{uEltype, NDIMSP2}
+   u_np1::Array{uEltype, NDIMSP2}
+   u_np1_low::Array{uEltype, NDIMSP2}
    U2::Array{uEltype, NDIMSP2}
    S2::Array{uEltype, NDIMSP2}
    F1::Array{uEltype, NDIMSP3}
    F2::Array{uEltype, NDIMSP3}
    _us::Vector{uEltype}
-   _u_low::Vector{uEltype}
+   _unp1::Vector{uEltype}
+   _unp1_low::Vector{uEltype} # TODO Make it u_np1_low!!
    _U2::Vector{uEltype}
    _S2::Vector{uEltype}
    _F1::Vector{uEltype}
@@ -125,7 +127,8 @@ function create_element_cache(::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D
    time_discretization::AbstractLWTimeDiscretization)
 
    _us = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
-   _u_low = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
+   _u_np1_low = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
+   _u_np1 = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
    _U = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
    _F = fill(nan_uEltype, n_variables * NDIMS * n_nodes^NDIMS * n_elements)
    _F2 = fill(nan_uEltype, n_variables * NDIMS * n_nodes^NDIMS * n_elements)
@@ -137,7 +140,9 @@ function create_element_cache(::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D
 
    us = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_us),
                    (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
-   u_low = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_u_low),
+   u_np1_low = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_u_np1_low),
+                   (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
+   u_np1 = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_u_np1),
                    (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
    U = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_U),
                    (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
@@ -152,7 +157,7 @@ function create_element_cache(::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D
 
    if isa(time_discretization, MDRK)
       # TODO - This is too much storage. Can some be avoided?
-      mdrk_cache = MDRKElementCache(us, u_low, U2, S2, F, F2, _us, _u_low, _U2, _S2, _F, _F2)
+      mdrk_cache = MDRKElementCache(us, u_np1, u_np1_low, U2, S2, F, F2, _us, _u_np1, _u_np1_low, _U2, _S2, _F, _F2)
    else
       mdrk_cache = (;)
    end

@@ -72,7 +72,7 @@ function rhs_mdrk2!(du, u,
 
    # Calculate volume integral
    alpha = @trixi_timeit timer() "volume integral" calc_volume_integral_mdrk2!(
-      du, us, t, dt, tolerances, mesh,
+      du, u, us, t, dt, tolerances, mesh,
       have_nonconservative_terms(equations), source_terms, equations,
       dg.volume_integral, time_discretization, dg, cache)
 
@@ -138,8 +138,9 @@ function calc_volume_integral_mdrk2!(du, u,
    volume_integral::VolumeIntegralFR,
    time_discretization::AbstractLWTimeDiscretization,
    dg::DGSEM, cache)
+   @unpack us = cache.element_cache.mdrk_cache
    @threaded for element in eachelement(dg, cache)
-      mdrk_kernel_2!(du, u,
+      mdrk_kernel_2!(du, u, us,
          t, dt, tolerances, element, mesh,
          nonconservative_terms, source_terms, equations,
          dg, cache)
@@ -203,7 +204,7 @@ function calc_volume_integral_mdrk1!(du, u, t, dt, tolerances,
    return alpha
 end
 
-function calc_volume_integral_mdrk2!(du, u, t, dt, tolerances,
+function calc_volume_integral_mdrk2!(du, u, us, t, dt, tolerances,
    mesh::Union{
       TreeMesh{2},
       StructuredMesh{2},
@@ -230,7 +231,7 @@ function calc_volume_integral_mdrk2!(du, u, t, dt, tolerances,
       alpha_element = alpha[element]
 
       # Calculate DG volume integral contribution
-      mdrk_kernel_2!(du, u, t, dt, tolerances, element, mesh,
+      mdrk_kernel_2!(du, u, us, t, dt, tolerances, element, mesh,
          nonconservative_terms, source_terms, equations,
          dg, cache, 1 - alpha_element)
 
@@ -247,7 +248,7 @@ function calc_volume_integral_mdrk2!(du, u, t, dt, tolerances,
       alpha_element = alpha[element]
 
       # Calculate DG volume integral contribution
-      mdrk_kernel_2!(du, u, t, dt, tolerances, element, mesh,
+      mdrk_kernel_2!(du, u, us, t, dt, tolerances, element, mesh,
          nonconservative_terms, source_terms, equations,
          dg, cache, 1 - alpha_element)
 
@@ -419,7 +420,7 @@ end
    return nothing
 end
 
-@inline function mdrk_kernel_2!(du, us,
+@inline function mdrk_kernel_2!(du, u, us,
    t, dt, tolerances,
    element, mesh::TreeMesh{2},
    nonconservative_terms::False, source_terms, equations,
