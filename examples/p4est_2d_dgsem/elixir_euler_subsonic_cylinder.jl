@@ -99,7 +99,7 @@ semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver
 ###############################################################################
 # ODE solvers
 
-tspan = (0.0, 32.0)
+tspan = (0.0, 0.1)
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 # Callbacks
@@ -117,10 +117,13 @@ save_solution = SaveSolutionCallback(interval=1000,
   solution_variables=cons2prim)
 
 amr_indicator = IndicatorLöhner(semi, variable=Trixi.density)
+cylinder_center = [40.0, 40.0]
+cylinder_radius = 2.0
+amr_indicator = RadialIndicator(cylinder_center, 2.0*cylinder_radius)
 
 amr_controller = ControllerThreeLevel(semi, amr_indicator,
                                       base_level=0,
-                                      med_level=1, med_threshold=0.0001,
+                                      med_level=2, med_threshold=0.0001,
                                       max_level=2, max_threshold=0.001)
 
 amr_callback = AMRCallback(semi, amr_controller,

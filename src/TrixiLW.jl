@@ -61,9 +61,12 @@ include(solvers_dir() * "/dgsem_p4est/containers.jl")
 # AMR
 include(callback_dir() * "/amr.jl")
 
+include(solvers_dir() * "/dgsem_p4est/indicators.jl")
+
 include(src_dir() * "/callbacks/callbacks_stage/positivity_zhang_shu.jl")
 include(src_dir() * "/callbacks/callbacks_step/analysis_dg2d.jl")
 
-export get_time_discretization, SurfaceIntegralDiffusive, SemidiscretizationHyperbolic
+export get_time_discretization, SurfaceIntegralDiffusive, SemidiscretizationHyperbolic,
+       RadialIndicator
 
 end # module
