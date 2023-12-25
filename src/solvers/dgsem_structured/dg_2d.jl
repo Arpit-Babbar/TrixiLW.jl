@@ -2040,8 +2040,7 @@ function lw_volume_kernel_4!(du, u, t, dt, tolerances,
       u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
       stttt = calc_source_tttt_N4(u_node, up_node, um_node, upp_node, umm_node,
-         x, t, dt, source_terms,
-         equations, dg, cache)
+         x, t, dt, source_terms, equations, dg, cache)
       Trixi.multiply_add_to_node_vars!(S, 1.0 / 120.0, stttt, equations, dg, i, j)
 
       # TODO - update to v1.8 and call with @inline

@@ -23,6 +23,8 @@ function rhs!(du, u, t, dt, mesh::Union{TreeMesh{2},P4estMesh{2}}, equations,
    @unpack viscous_container = cache_parabolic
    @unpack u_transformed, gradients, flux_viscous = viscous_container
 
+   dt = cache.dt[1]
+
    # Convert conservative variables to a form more suitable for viscous flux calculations
    @trixi_timeit timer() "transform variables" transform_variables!(
       u_transformed, u, mesh, equations_parabolic, dg, parabolic_scheme, cache, cache_parabolic)

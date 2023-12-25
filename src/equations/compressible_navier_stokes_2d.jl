@@ -48,6 +48,28 @@ end
    return SVector(ρ_x, v1_x, v2_x, T_x)
 end
 
+function compute_tau(u, gradients, normal_direction, equations)
+   # Here `gradients` is assumed to contain the gradients of the primitive variables (rho, v1, v2, T)
+   # either computed directly or reverse engineered from the gradient of the entropy variables
+   # by way of the `convert_gradient_variables` function.
+   _, dv1dx, dv2dx, _ = convert_derivative_to_primitive(u, gradients[1], equations)
+   _, dv1dy, dv2dy, _ = convert_derivative_to_primitive(u, gradients[2], equations)
+
+   # Components of viscous stress tensor
+
+   # (4/3 * (v1)_x - 2/3 * (v2)_y)
+   tau_11 = 4.0 / 3.0 * dv1dx - 2.0 / 3.0 * dv2dy
+   # ((v1)_y + (v2)_x)
+   # stress tensor is symmetric
+   tau_12 = dv1dy + dv2dx # = tau_21
+   tau_21 = tau_12 # For readability
+   # (4/3 * (v2)_y - 2/3 * (v1)_x)
+   tau_22 = 4.0 / 3.0 * dv2dy - 2.0 / 3.0 * dv1dx
+
+   n = normal_direction / norm(normal_direction)
+   return tau_11*n[1]*Ψ[1] + tau_12*n[2]*Ψ[1] + tau_21*n[1]*Ψ[2] + tau_22*n[2]*Ψ[2]
+end
+
 @inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:NoSlip,<:Adiabatic})(
    flux_inner, u_inner, normal::AbstractVector, x, t, operator_type::Divergence,
    equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
@@ -65,22 +87,25 @@ end
    equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative}, scaling_factor = 1)
    v1, v2 = boundary_condition.boundary_condition_velocity.boundary_value_function(x, t, equations)
    T = boundary_condition.boundary_condition_heat_flux.boundary_value_function(x, t, equations)
-   # TODO - FIXME - URGENT - THIS IS WRONG, THESE ARE PRIMITIVE VARIABLES!
-   return SVector(u_inner[1], v1, v2, T)
+   rho = u_inner[1]
+   p = rho * T # TODO - this assumes R = 1!!
+   return prim2cons(SVector(rho, v1, v2, p), equations.equations_hyperbolic)
 end
 
 @inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:NoSlip,<:Isothermal})(
    flux_inner, u_inner, normal::AbstractVector,
    x, t, operator_type::Divergence,
-   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative}, scaling_factor=1)
+   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
+   ::AbstractLWTimeDiscretization, scaling_factor=1)
    return flux_inner
 end
 
 # specialized BC impositions for GradientVariablesConservative.
 
-@inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:NoSlip,<:Adiabatic})(flux_inner, u_inner, normal::AbstractVector,
-   x, t, operator_type::Gradient,
-   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative}, scaling_factor = 1)
+@inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:NoSlip,<:Adiabatic})(
+   flux_inner, u_inner, normal::AbstractVector, x, t, operator_type::Gradient,
+   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
+   scaling_factor = 1)
    v1, v2 = boundary_condition.boundary_condition_velocity.boundary_value_function(x, t, equations)
    rho = u_inner[1]
    p = pressure(u_inner, equations)
@@ -92,8 +117,8 @@ end
 end
 
 
-function max_dt(u, t, mesh::Union{TreeMesh{2}, P4estMesh{2}}, equations_parabolic::CompressibleNavierStokesDiffusion2D,
-   dg, cache)
+function max_dt(u, t, mesh::Union{TreeMesh{2}, P4estMesh{2}},
+   equations_parabolic::CompressibleNavierStokesDiffusion2D, dg, cache)
    N = polydeg(dg)
    max_diffusion = nextfloat(zero(t))
    max_lam_a = max_lam_v = nextfloat(zero(t))
