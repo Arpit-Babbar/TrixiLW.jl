@@ -10,25 +10,29 @@ using Plots
 
 equations = CompressibleEulerEquations2D(1.4)
 
+vk_Re() = 5000.0
 prandtl_number() = 0.72
-mu() = 0.0031959974968701088
-equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu=mu(), Prandtl=prandtl_number(),
-                                                          gradient_variables=TrixiLW.GradientVariablesConservative())
 
-sw_rho_inf() = 1.0
-sw_pre_inf() = 2.85
-sw_aoa() = 10.0 * pi / 180.0
-sw_linf() = 1.0
-sw_mach_inf() = 0.8
-sw_U_inf(equations) = sw_mach_inf() * sqrt(equations.gamma * sw_pre_inf() / sw_rho_inf())
+vk_rho_inf() = 1.0
+vk_pre_inf() = 2.85
+vk_aoa() = 0.0 * pi / 180.0
+vk_linf() = 1.0
+vk_mach_inf() = 0.5
+vk_a(equations) = sqrt(equations.gamma * vk_pre_inf() / vk_rho_inf())
+vk_uinf(equations) = vk_mach_inf()*vk_a(equations)
+@assert isapprox(0.9987, vk_uinf(equations), atol = 5e-5) abs(0.9987 - vk_uinf(equations))
+@assert 0.5 ≈ vk_uinf(equations)/vk_a(equations) abs(0.5 - vk_uinf(equations)/vk_a(equations))
+
+vk_mu(equations) = vk_rho_inf() * vk_uinf(equations) * vk_linf() / vk_Re()
+
+equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu=vk_mu(equations),
+                                                          Prandtl=prandtl_number(),
+                                                          gradient_variables=TrixiLW.GradientVariablesConservative())
 @inline function initial_condition_mach3_flow(x, t, equations)
-   # set the freestream flow parameters
-   gasGam = equations.gamma
-   mach_inf = sw_mach_inf()
-   aoa = sw_aoa()
-   rho_inf = sw_rho_inf()
-   pre_inf = sw_pre_inf()
-   U_inf = mach_inf * sqrt(gasGam * pre_inf / rho_inf)
+   aoa = vk_aoa()
+   rho_inf = vk_rho_inf()
+   pre_inf = vk_pre_inf()
+   U_inf = vk_uinf(equations)
 
    v1 = U_inf * cos(aoa)
    v2 = U_inf * sin(aoa)
@@ -36,6 +40,7 @@ sw_U_inf(equations) = sw_mach_inf() * sqrt(equations.gamma * sw_pre_inf() / sw_r
    prim = SVector(rho_inf, v1, v2, pre_inf)
    return prim2cons(prim, equations)
 end
+
 initial_condition = initial_condition_mach3_flow
 
 # Supersonic inflow boundary condition.
@@ -193,18 +198,19 @@ summary_callback = SummaryCallback()
 
 analysis_interval = 1000
 
-aoa = 10*pi/180.0
+aoa = 0.0*pi/180.0
 
-# TODO - Fix this. IT MUST be passed as a proper function for AMR
-indices = semi_ -> semi.boundary_conditions.boundary_indices[2]
+# TODO - Fix this. IT MUST be passed as a proper function for AMR. It requires
+# boundary_conditions to be a part of the cache object though
+indices = cache -> semi.boundary_conditions.boundary_indices[2]
 drag_force = AnalysisSurfaceIntegral(indices, TrixiLW.DragForcePressure(
-   sw_aoa(), sw_rho_inf(), sw_U_inf(equations), sw_linf()))
+   vk_aoa(), vk_rho_inf(), vk_uinf(equations), vk_linf()))
 lift_force = AnalysisSurfaceIntegral(indices, TrixiLW.LiftForcePressure(
-   sw_aoa(), sw_rho_inf(), sw_U_inf(equations), sw_linf()))
+   vk_aoa(), vk_rho_inf(), vk_uinf(equations), vk_linf()))
 drag_force_viscous = AnalysisSurfaceIntegralViscous(indices, TrixiLW.DragForceViscous(
-   sw_aoa(), sw_rho_inf(), sw_U_inf(equations), sw_linf()))
+   vk_aoa(), vk_rho_inf(), vk_uinf(equations), vk_linf()))
 lift_force_viscous = AnalysisSurfaceIntegralViscous(indices, TrixiLW.LiftForceViscous(
-   sw_aoa(), sw_rho_inf(), sw_U_inf(equations), sw_linf()))
+   vk_aoa(), vk_rho_inf(), vk_uinf(equations), vk_linf()))
 
 using TrixiLW: ERes
 eres = ERes()
@@ -227,7 +233,7 @@ visualization_callback = VisualizationCallback(interval=200,
    save_initial_solution=true,
    save_final_solution=true)
 
-callbacks = (;
+callbacks = (
    analysis_callback,
    alive_callback,
    # visualization_callback,
@@ -241,12 +247,12 @@ stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds=(5.0e-7, 1.0e-6)
 
 ###############################################################################
 # run the simulation
-time_int_tol = 1e-6
+time_int_tol = 1e-10
 tolerances = (; abstol=time_int_tol, reltol=time_int_tol);
 dt_initial = 1e-4;
 sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
    time_step_computation=TrixiLW.Adaptive(),
    # time_step_computation=TrixiLW.CFLBased(cfl_number),
-   limiters=(; stage_limiter!)
+   # limiters=(; stage_limiter!)
 );
 summary_callback() # print the timer summary

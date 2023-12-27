@@ -1,4 +1,5 @@
 using Trixi: integrate_via_indices, norm
+using DelimitedFiles
 import Trixi: analyze, pretty_form_ascii, pretty_form_utf
 
 struct RhoRes end
@@ -15,7 +16,6 @@ struct AnalysisSurfaceIntegral{Indices, Variable}
     indices::Indices
     variable::Variable
 end
-
 struct AnalysisSurfaceIntegralViscous{Indices, Variable}
     indices::Indices
     variable::Variable
