@@ -13,6 +13,10 @@ using StaticArrays
 
 struct GradientVariablesConservative end
 
+struct OutflowBC{F}
+   DummyFunction::F # This won't be used
+end
+
 gradient_variable_transformation(::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative}) = cons2cons
 
 pressure(u, equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative}
@@ -114,6 +118,25 @@ end
 
    u_outer = prim2cons((rho, v1, v2, p), equations)
    return u_outer
+end
+
+@inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:OutflowBC,<:Isothermal})(flux_inner, u_inner, normal::AbstractVector,
+   x, t, operator_type::Gradient,
+   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative}, scaling_factor = 1)
+   # T = boundary_condition.boundary_condition_heat_flux.boundary_value_function(x, t, equations)
+   # rho = u_inner[1]
+   # v1, v2 = u_inner[2] / rho, u_inner[3] / rho
+   # p = rho * T # TODO - this assumes R = 1!!
+   # return prim2cons(SVector(rho, v1, v2, p), equations.equations_hyperbolic)
+   return u_inner
+end
+
+@inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:OutflowBC,<:Isothermal})(
+   flux_inner, u_inner, normal::AbstractVector,
+   x, t, operator_type::Divergence,
+   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
+   ::AbstractLWTimeDiscretization, scaling_factor=1)
+   return flux_inner
 end
 
 
