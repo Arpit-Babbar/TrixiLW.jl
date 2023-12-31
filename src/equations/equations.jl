@@ -1,6 +1,9 @@
 import Trixi: BoundaryConditionDirichlet, CompressibleEulerEquations2D
 import Trixi
 using SimpleUnPack
+using MuladdMacro
+@muladd begin
+#!= no indent
 
 # Dirichlet-type boundary condition for use with TreeMesh or StructuredMesh
 @inline function (boundary_condition::BoundaryConditionDirichlet)(U_inner, F_inner, u_inner,
@@ -173,7 +176,7 @@ end
 
 is_admissible(u, equations::AbstractEquations) = @assert false "Please define specialized method to avoid bugs!"
 
-function get_reflection(u, normal_direction, equations::CompressibleEulerEquations2D)
+@inline function get_reflection(u, normal_direction, equations::CompressibleEulerEquations2D)
    rho, v1, v2, p = cons2prim(u, equations)
    norm_sqr = Trixi.norm(normal_direction)^2
    v_dot_n = (v1*normal_direction[1] + v2*normal_direction[2])/norm_sqr
@@ -285,3 +288,77 @@ function limit_variable_slope(eq, variable, slope, u_star_ll, u_star_rr, ue, xl,
    end
    return slope, u_star_ll, u_star_rr
 end
+
+struct SlipWallHO{Semi}
+   semi::Semi
+end
+
+@inline function pre_process_boundary_condition_ho(boundary_condition,
+   U_inner, f_inner, u_inner, i_index, j_index, boundary_element, outer_cache, normal_direction,
+   x, t, dt, surface_flux, equations, dg, time_discretization, scaling_factor = 1)
+   @unpack nodes, weights = dg.basis
+   U_outer, F_outer = outer_cache[Threads.threadid()]
+   fill!(U_outer, zero(eltype(U_outer)))
+   fill!(F_outer, zero(eltype(F_outer)))
+   dt_scaled = scaling_factor * dt
+
+   @unpack semi = boundary_condition
+   @unpack mesh, solver, cache, source_terms = semi
+   @unpack element_cache = cache
+   time_int_tol = NaN
+   tolerances = (; abstol=time_int_tol, reltol=time_int_tol); # Dummy, doesn't matter
+   @unpack u_inner_reflected, dummy_du = cache.lw_res_cache.boundary_arrays[Threads.threadid()]
+   dummy_element_number = 1
+   # TODO - Move u_inner_big to LWBoundariesContainer?
+   u_inner_big = @view cache.element_cache.u[:,:,:,boundary_element]
+   for j in eachnode(dg), i in eachnode(dg)
+      u_node = get_node_vars(u_inner_big, equations, dg, i, j, dummy_element_number)
+      u_node_reflected = get_reflection(u_node, normal_direction, equations)
+      set_node_vars!(u_inner_reflected, u_node_reflected, equations, dg, i, j)
+   end
+   correct_temporal_error = cache.temporal_errors[dummy_element_number] # This is the correct value but will be overwritten
+   lw_volume_kernel_4!(dummy_du, u_inner_reflected, t, dt, tolerances, dummy_element_number, mesh,
+                       have_nonconservative_terms(equations), source_terms, equations, dg, cache, 0.0)
+   cache.temporal_errors[dummy_element_number] = correct_temporal_error # Fix overwritten value
+
+   F = get_flux_vars(element_cache.F, equations, dg, i_index, j_index, dummy_element_number)
+   F_outer .= normal_product(F, equations, normal_direction)
+   U_outer .= get_reflection(U_inner, normal_direction, equations)
+
+   return nothing
+end
+
+@inline function pre_process_boundary_condition(boundary_condition::SlipWallHO,
+   U_inner, f_inner, u_inner, i_index, j_index, boundary_element, outer_cache, normal_direction,
+   x, t, dt, surface_flux, equations, dg, time_discretization, scaling_factor = 1)
+
+   return pre_process_boundary_condition_ho(boundary_condition,
+   U_inner, f_inner, u_inner, i_index, j_index, boundary_element, outer_cache, normal_direction,
+   x, t, dt, surface_flux, equations, dg, time_discretization, scaling_factor)
+
+   return nothing
+end
+
+@inline function (slip_wall_ho::SlipWallHO)(U_inner, F_inner, u_inner, outer_cache,
+   normal_direction::AbstractVector, x, t, dt,
+   surface_flux_function, equations::CompressibleEulerEquations2D,
+   dg, time_discretization , scaling_factor = 1)
+   U_outer, F_outer = outer_cache[Threads.threadid()]
+
+   # return @inline slip_wall_approximate(U_inner, F_inner, u_inner,
+   # outer_cache,
+   # normal_direction,
+   # x, t, dt,
+   # surface_flux_function,
+   # equations,
+   # dg, time_discretization, scaling_factor)
+   return surface_flux_function(F_inner, F_outer,
+         u_inner, get_reflection(u_inner, normal_direction, equations),
+         U_inner, U_outer,
+         normal_direction, equations)
+
+   # Don't know how to map the element time averaged flux to the correct face. Damn!
+   # They are available in calc_boundary_flux! function though. They are the i_index, j_index over there.
+end
+
+end # muladd

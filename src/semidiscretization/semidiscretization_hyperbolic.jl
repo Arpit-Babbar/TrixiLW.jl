@@ -7,6 +7,8 @@ function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t, tolerances =
    u  = wrap_array(u_ode,  mesh, equations, solver, cache)
    du = wrap_array(du_ode, mesh, equations, solver, cache)
 
+   cache.element_cache.u = u
+
    # TODO: Taal decide, do we need to pass the mesh?
    time_start = time_ns()
    @trixi_timeit timer() "rhs!" rhs!(du, u,

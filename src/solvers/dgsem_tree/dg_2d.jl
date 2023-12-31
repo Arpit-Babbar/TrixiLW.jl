@@ -54,16 +54,16 @@ using LoopVectorization: @turbo
       @trixi_timeit timer() "prolong2boundaries" prolong2boundaries!(
          cache, u, mesh, equations, dg.surface_integral, time_discretization, dg)
 
-      # Calculate boundary fluxes
-      @trixi_timeit timer() "boundary flux" calc_boundary_flux!(
-         cache, t, dt, boundary_conditions, mesh, equations, dg.surface_integral,
-         time_discretization, dg)
-
       # Prolong solution to mortars
       @trixi_timeit timer() "prolong2mortars" prolong2mortars!(
          cache, u, mesh, equations, dg.mortar, dg.surface_integral, time_discretization, dg)
       # @trixi_timeit timer() "prolong2mortars" prolong2mortars!(
       #       cache, u, mesh, equations, dg.mortar, dg.surface_integral, dg)
+
+      # Calculate boundary fluxes
+      @trixi_timeit timer() "boundary flux" calc_boundary_flux!(
+         cache, t, dt, boundary_conditions, mesh, equations, dg.surface_integral,
+         time_discretization, dg)
 
       # Calculate mortar fluxes
       @trixi_timeit timer() "mortar flux" calc_mortar_flux!(

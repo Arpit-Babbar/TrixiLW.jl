@@ -351,6 +351,11 @@ function calc_boundary_flux!(cache, t, dt, boundary_condition::BC, boundary_inde
    end
 end
 
+@inline function pre_process_boundary_condition(boundary_condition::Any, U_inner, f_inner, u_inner, i_index, j_index,
+                                                boundary_element, outer_cache, normal_direction, x, t, dt,
+                                                surface_flux, equations, dg, time_discretization, scaling_factor)
+   return nothing
+end
 
 # inlined version of the boundary flux calculation along a physical interface
 @inline function calc_boundary_flux!(surface_flux_values, t, dt, boundary_condition,
@@ -378,8 +383,14 @@ end
 
    # flux_ = boundary_condition(u_inner, normal_direction, x, t, surface_flux, equations)
 
-   flux_ = boundary_condition(U_inner, f_inner, u_inner, outer_cache, normal_direction, x, t, dt,
-      surface_flux, equations, dg, time_discretization, scaling_factor)
+   # This will update the U_outer, F_outer inside outer_cache (They are already there!)
+   pre_process_boundary_condition(boundary_condition, U_inner, f_inner, u_inner, i_index, j_index,
+                                  element_index, outer_cache, normal_direction, x, t, dt,
+                                  surface_flux, equations, dg, time_discretization, scaling_factor)
+
+   flux_ = boundary_condition(U_inner, f_inner, u_inner,
+      outer_cache, normal_direction, x, t, dt, surface_flux, equations, dg, time_discretization,
+      scaling_factor)
 
    # Copy flux to element storage in the correct orientation
    for v in eachvariable(equations)

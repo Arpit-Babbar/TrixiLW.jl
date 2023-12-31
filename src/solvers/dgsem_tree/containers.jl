@@ -58,6 +58,7 @@ n_elements = nelements(dg, cache)
    N4() = NamedTuple{(:f, :g, :ftilde, :gtilde, :Ftilde, :Gtilde, :ut, :utt, :uttt, :utttt,
                       :U, :up, :um, :upp, :umm, :S, :u_np1, :u_np1_low)}((MArr(undef) for _=1:18))
 
+   BoundaryArrays() = NamedTuple{(:u_inner_reflected, :dummy_du)}((MArr(undef) for _=1:2))
    if degree >= 4
       nt = Threads.nthreads()
       cell_arrays = SVector{Threads.nthreads()}([N4() for _ in 1:Threads.nthreads()])
@@ -65,7 +66,8 @@ n_elements = nelements(dg, cache)
       cell_arrays = alloc_for_threads(MArr, cell_array_size)
    end
 
-   lw_res_cache = (; cell_arrays)
+   boundary_arrays = SVector{Threads.nthreads()}([BoundaryArrays() for _ in 1:Threads.nthreads()])
+   lw_res_cache = (; cell_arrays, boundary_arrays)
 
    cache = (; element_cache, lw_res_cache, cfl_number, dt,
       temporal_errors, interface_cache, boundary_cache, lw_mortars)
@@ -73,6 +75,7 @@ n_elements = nelements(dg, cache)
 end
 
 mutable struct LWElementContainer{uEltype<:Real, NDIMSP2, NDIMSP3, MDRKCache}
+   u::Array{uEltype,NDIMSP2}      # [variables, i, j, k, element]
    U::Array{uEltype,NDIMSP2}      # [variables, i, j, k, element]
    F::Array{uEltype,NDIMSP3}      # [variables, coordinate, i, j, k, element]
    fn_low::Array{uEltype,NDIMSP2} # [variable, i, j, left/right/bottom/top, elements]
@@ -129,6 +132,7 @@ function create_element_cache(::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D
    _us = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
    _u_np1_low = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
    _u_np1 = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
+   _u = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements) # This will not be needed
    _U = fill(nan_uEltype, n_variables * n_nodes^NDIMS * n_elements)
    _F = fill(nan_uEltype, n_variables * NDIMS * n_nodes^NDIMS * n_elements)
    _F2 = fill(nan_uEltype, n_variables * NDIMS * n_nodes^NDIMS * n_elements)
@@ -146,6 +150,8 @@ function create_element_cache(::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D
                    (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
    U = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_U),
                    (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
+   u = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_u),
+                   (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements)) # This will be needed but replaced
    U2 = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_U2),
                    (n_variables, ntuple(_ -> n_nodes, NDIMS)..., n_elements))
    S2 = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_S2),
@@ -163,7 +169,7 @@ function create_element_cache(::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D
    end
    fn_low = unsafe_wrap(Array{uEltype,NDIMS + 2}, pointer(_fn_low),
                         (n_variables, ntuple(_ -> n_nodes, NDIMS - 1)..., 2^NDIMS, n_elements))
-   return LWElementContainer(U, F, fn_low, _U, _F, _fn_low, mdrk_cache)
+   return LWElementContainer(u, U, F, fn_low, _U, _F, _fn_low, mdrk_cache)
 end
 
 mutable struct L2MortarContainer_lw_Tree{uEltype<:Real,Temp} <: AbstractContainer
