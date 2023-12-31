@@ -308,11 +308,11 @@ end
    time_int_tol = NaN
    tolerances = (; abstol=time_int_tol, reltol=time_int_tol); # Dummy, doesn't matter
    @unpack u_inner_reflected, dummy_du = cache.lw_res_cache.boundary_arrays[Threads.threadid()]
-   dummy_element_number = 1
+   dummy_element_number = Threads.threadid() # Wow, what a hack!
    # TODO - Move u_inner_big to LWBoundariesContainer?
    u_inner_big = @view cache.element_cache.u[:,:,:,boundary_element]
    for j in eachnode(dg), i in eachnode(dg)
-      u_node = get_node_vars(u_inner_big, equations, dg, i, j, dummy_element_number)
+      u_node = get_node_vars(u_inner_big, equations, dg, i, j, 1)
       u_node_reflected = get_reflection(u_node, normal_direction, equations)
       set_node_vars!(u_inner_reflected, u_node_reflected, equations, dg, i, j)
    end
@@ -352,6 +352,8 @@ end
    # surface_flux_function,
    # equations,
    # dg, time_discretization, scaling_factor)
+   # TODO - Add flux correction here. Only Fn has to be corrected. You just need the
+   # Jl here. Get that into the outer_cache somehow.
    return surface_flux_function(F_inner, F_outer,
          u_inner, get_reflection(u_inner, normal_direction, equations),
          U_inner, U_outer,
