@@ -63,6 +63,9 @@ struct VolumeIntegralFRShockCapturing{TimeDiscretization,VolumeFluxFV,Indicator,
    reconstruction::Reconstruction                          # First Order / MUSCL-Hancock
 end
 
+@inline get_alpha(volume_integral::VolumeIntegralFRShockCapturing, element) = volume_integral.indicator.cache.alpha[element]
+@inline get_alpha(volume_integral::VolumeIntegralFR, element) = 0.0
+
 
 
 get_time_discretization(volume_integral::VolumeIntegralFRShockCapturing) =

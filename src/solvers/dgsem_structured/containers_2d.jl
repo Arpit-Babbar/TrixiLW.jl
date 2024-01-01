@@ -36,8 +36,10 @@ end
 function create_boundary_cache(mesh::Union{StructuredMesh{2}}, equations, dg,
    uEltype, RealT, cache, outer_cache, time_discretization)
    MOuter = MArray{Tuple{nvariables(equations)},Float64}
-   outer_cache = alloc_for_threads(MOuter, 2)
-   return (; outer_cache)
+   F_U_cache = alloc_for_threads(MOuter, 2)
+   c_ll_cache = SVector{Threads.nthreads()}([zeros(1) for _ in 1:Threads.nthreads()])
+   outer_cache = (;F_U_cache, c_ll_cache)
+   return outer_cache
 end
 
 function create_mortar_cache(mesh::Union{StructuredMesh,UnstructuredMesh2D}, equations, dg,

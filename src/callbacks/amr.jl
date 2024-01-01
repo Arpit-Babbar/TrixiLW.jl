@@ -109,7 +109,7 @@ end
 
 function resize_boundary_cache!(mesh::TreeMesh, equations, solver, cache)
    @unpack boundary_cache = cache
-   @unpack _U, _u, _f = boundary_cache
+   @unpack _U, _u, _f, _fn_low = boundary_cache
 
    n_variables = nvariables(equations)
    n_nodes = nnodes(solver)
@@ -117,18 +117,19 @@ function resize_boundary_cache!(mesh::TreeMesh, equations, solver, cache)
 
    resize_boundary_array!(u) = resize!(u, 2 * n_variables * n_nodes * n_boundaries)
 
-   resize_boundary_array!.((_U, _u, _f))
+   resize_boundary_array!.((_U, _u, _f, _fn_low))
 
    wrap_(u) = unsafe_wrap(Array, pointer(u), (2, n_variables, n_nodes, n_boundaries))
 
-   boundary_cache.U, boundary_cache.u, boundary_cache.f = wrap_.((_U, _u, _f))
+   boundary_cache.U, boundary_cache.u, boundary_cache.f, boundary_cache.fn_now = wrap_.(
+      (_U, _u, _f, _fn_low))
 
    return nothing
 end
 
 function resize_boundary_cache!(mesh::P4estMesh, equations, solver, cache)
    @unpack boundary_cache = cache
-   @unpack _U, _u, _f = boundary_cache
+   @unpack _U, _u, _f, _fn_low = boundary_cache
 
    n_variables = nvariables(equations)
    n_nodes = nnodes(solver)
@@ -136,11 +137,11 @@ function resize_boundary_cache!(mesh::P4estMesh, equations, solver, cache)
 
    resize_boundary_array!(u) = resize!(u, n_variables * n_nodes * n_boundaries)
 
-   resize_boundary_array!.((_U, _u, _f))
+   resize_boundary_array!.((_U, _u, _f, _fn_low))
 
    wrap_(u) = unsafe_wrap(Array, pointer(u), (n_variables, n_nodes, n_boundaries))
 
-   boundary_cache.U, boundary_cache.u, boundary_cache.f = wrap_.((_U, _u, _f))
+   boundary_cache.U, boundary_cache.u, boundary_cache.f, boundary_cache.fn_low = wrap_.((_U, _u, _f, _fn_low))
 
    return nothing
 end

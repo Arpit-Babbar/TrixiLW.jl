@@ -5,6 +5,46 @@ import Trixi
 import Trixi: prolong2interfaces!, calc_interface_flux!, calc_boundary_flux!,
    prolong2mortars!, calc_mortar_flux!
 
+@inline function index_to_step_inner_2d(index::Symbol, index_range)
+   index_begin = first(index_range)
+   index_end = last(index_range)
+
+   if index === :begin
+      step = 1
+      return index_begin, step
+   elseif index === :end
+      step = -1
+      return index_end, step
+   elseif index === :i_forward
+      return index_begin, 0
+   else # if index === :i_backward
+      return index_end, 0
+   end
+end
+
+@inline function common_dir_and_node_2d(nodes, directions)
+   if !iszero(directions[1])
+      return nodes[1], directions[1]
+   else
+      return nodes[2], directions[2]
+   end
+end
+
+@inline function node_indices_to_step_inner_2d(i, j, dg)
+   index_begin = 1
+   index_end = nnodes(nd)
+
+   if index === :begin
+         return index_begin, 1
+   elseif index === :end
+         return index_end, -1
+   elseif index === :i_forward
+         return index_begin, 0
+   else # if index === :i_backward
+         return index_end, 0
+   end
+end
+
 function prolong2interfaces!(cache, u,
    mesh::P4estMesh{2},
    equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
@@ -281,7 +321,7 @@ function prolong2boundaries!(cache, u,
    mesh::P4estMesh{2},
    equations, surface_integral, time_discretization::AbstractLWTimeDiscretization, dg::DG)
    @unpack boundaries, boundary_cache, elements, element_cache = cache
-   @unpack U, F = element_cache
+   @unpack U, F, fn_low = element_cache
    @unpack contravariant_vectors = elements
    index_range = eachnode(dg)
 
@@ -310,6 +350,11 @@ function prolong2boundaries!(cache, u,
          i_node += i_node_step
          j_node += j_node_step
       end
+
+      for v in eachvariable(equations), i in eachnode(dg)
+         # Maps indices = (:xbegin, :xend, :ybegin, :yend) to direction = (1,2,3,4)
+         boundary_cache.fn_low[v, i, boundary] = fn_low[v, i, direction, element]
+      end
    end
 
    return nothing
@@ -336,9 +381,24 @@ function calc_boundary_flux!(cache, t, dt, boundary_condition::BC, boundary_inde
       i_node_start, i_node_step = index_to_start_step_2d(node_indices[1], index_range)
       j_node_start, j_node_step = index_to_start_step_2d(node_indices[2], index_range)
 
+      i_node_inner, i_inner_step = index_to_step_inner_2d(node_indices[1], index_range)
+      j_node_inner, j_inner_step = index_to_step_inner_2d(node_indices[2], index_range)
+
+      # @assert 1 < i_node_inner < nnodes(dg) node_indices, index_range
+      # @assert 1 < j_node_inner < nnodes(dg) node_indices, index_range
+
       i_node = i_node_start
       j_node = j_node_start
       for node in eachnode(dg)
+         inner_node, inner_direction = common_dir_and_node_2d((i_node_inner, j_node_inner),
+                                                              (i_inner_step, j_inner_step))
+         pre_process_boundary_condition(boundary_condition,
+                                        i_node, j_node, element,
+                                        inner_node, inner_direction,
+                                       #  i_node_inner, j_node_inner,
+                                        boundary, node,
+                                        direction, t, dt,
+                                        equations, dg, time_discretization, scaling_factor)
          calc_boundary_flux!(surface_flux_values, t, dt, boundary_condition,
             mesh, have_nonconservative_terms(equations),
             equations, surface_integral, time_discretization, dg, cache,
@@ -347,13 +407,18 @@ function calc_boundary_flux!(cache, t, dt, boundary_condition::BC, boundary_inde
 
          i_node += i_node_step
          j_node += j_node_step
+         i_node_inner += i_inner_step
+         j_node_inner += j_inner_step
       end
    end
 end
 
-@inline function pre_process_boundary_condition(boundary_condition::Any, U_inner, f_inner, u_inner, i_index, j_index,
-                                                boundary_element, outer_cache, normal_direction, x, t, dt,
-                                                surface_flux, equations, dg, time_discretization, scaling_factor)
+@inline function pre_process_boundary_condition(boundary_condition,
+   i_node, j_node, element,
+   inner_node, inner_direction,
+   boundary, node,
+   direction, t, dt,
+   equations, dg, time_discretization, scaling_factor)
    return nothing
 end
 
@@ -382,11 +447,6 @@ end
    x = get_node_coords(node_coordinates, equations, dg, i_index, j_index, element_index)
 
    # flux_ = boundary_condition(u_inner, normal_direction, x, t, surface_flux, equations)
-
-   # This will update the U_outer, F_outer inside outer_cache (They are already there!)
-   pre_process_boundary_condition(boundary_condition, U_inner, f_inner, u_inner, i_index, j_index,
-                                  element_index, outer_cache, normal_direction, x, t, dt,
-                                  surface_flux, equations, dg, time_discretization, scaling_factor)
 
    flux_ = boundary_condition(U_inner, f_inner, u_inner,
       outer_cache, normal_direction, x, t, dt, surface_flux, equations, dg, time_discretization,

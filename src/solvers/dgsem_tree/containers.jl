@@ -41,7 +41,11 @@ n_elements = nelements(dg, cache)
    # `constructor` and store them in an SVector
 
    MOuter = MArray{Tuple{n_variables},Float64}
-   outer_cache = alloc_for_threads(MOuter, 2)
+   F_U_cache = alloc_for_threads(MOuter, 2)
+   c_ll = SVector{Threads.nthreads()}([zeros(1) for _ in 1:Threads.nthreads()])
+   fn_inner = SVector{Threads.nthreads()}([zeros(n_variables) for _ in 1:Threads.nthreads()])
+   alpha = SVector{Threads.nthreads()}([zeros(1) for _ in 1:Threads.nthreads()])
+   outer_cache = (;F_U_cache, c_ll, fn_inner, alpha)
    boundary_cache = create_boundary_cache(mesh, equations, dg, uEltype, RealT,
       cache, outer_cache, time_discretization)
 
@@ -115,13 +119,15 @@ mutable struct LWInterfaceContainer{RealT,uEltype,NDIMS,NDIMSP2}
    _inverse_jacobian::Vector{RealT}
 end
 
-mutable struct LWBoundariesContainer{uEltype<:Real,D,OuterCache}
+mutable struct LWBoundariesContainer{uEltype<:Real,D,E,OuterCache}
    U::Array{uEltype,D}  # [variables, i, boundaries]
    u::Array{uEltype,D}  # [variables, i, boundaries]
    f::Array{uEltype,D}  # [variables, i, boundaries]
+   fn_low::Array{uEltype,E}  # [2, variables, i, boundaries]
    _U::Vector{uEltype}
    _u::Vector{uEltype}
    _f::Vector{uEltype}
+   _fn_low::Vector{uEltype}
    outer_cache::OuterCache
 end
 
