@@ -75,7 +75,7 @@ function compute_tau(u, gradients, normal_direction, equations)
 end
 
 @inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:NoSlip,<:Adiabatic})(
-   flux_inner, u_inner, normal::AbstractVector, x, t, operator_type::Divergence,
+   flux_inner, u_inner, ux_node, uy_node, normal::AbstractVector, x, t, operator_type::Divergence,
    equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
    ::AbstractLWTimeDiscretization, scaling_factor = 1)
    # rho, v1, v2, _ = u_inner
@@ -97,7 +97,7 @@ end
 end
 
 @inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:NoSlip,<:Isothermal})(
-   flux_inner, u_inner, normal::AbstractVector,
+   flux_inner, u_inner, ux_node, uy_node, normal::AbstractVector,
    x, t, operator_type::Divergence,
    equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
    ::AbstractLWTimeDiscretization, scaling_factor=1)
@@ -132,7 +132,7 @@ end
 end
 
 @inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:OutflowBC,<:Isothermal})(
-   flux_inner, u_inner, normal::AbstractVector,
+   flux_inner, u_inner, ux_node, uy_node, normal::AbstractVector,
    x, t, operator_type::Divergence,
    equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
    ::AbstractLWTimeDiscretization, scaling_factor=1)

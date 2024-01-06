@@ -2018,11 +2018,11 @@ function calc_boundary_flux_divergence_lw!(
    return nothing
 end
 
-function calc_boundary_flux_divergence_lw!(cache, cache_hyperbolic, t, boundary_conditions_parabolic::NamedTuple,
+function calc_boundary_flux_divergence_lw!(cache_parabolic, cache_hyperbolic, t, boundary_conditions_parabolic::NamedTuple,
    mesh::TreeMesh{2}, equations_parabolic::AbstractEquationsParabolic,
    surface_integral, dg::DG, scaling_factor = 1)
    @unpack surface_flux_values = cache_hyperbolic.elements
-   @unpack n_boundaries_per_direction = cache.boundaries
+   @unpack n_boundaries_per_direction = cache_parabolic.boundaries
 
    # Calculate indices
    lasts = accumulate(+, n_boundaries_per_direction)
@@ -2030,18 +2030,18 @@ function calc_boundary_flux_divergence_lw!(cache, cache_hyperbolic, t, boundary_
 
    # Calc boundary fluxes in each direction
    calc_boundary_flux_by_direction_divergence_lw!(surface_flux_values, t, boundary_conditions_parabolic[1],
-      equations_parabolic, surface_integral, dg, cache,
+      equations_parabolic, surface_integral, dg, cache_parabolic,
       1, firsts[1], lasts[1], scaling_factor)
    calc_boundary_flux_by_direction_divergence_lw!(surface_flux_values, t,
       boundary_conditions_parabolic[2],
-      equations_parabolic, surface_integral, dg, cache,
+      equations_parabolic, surface_integral, dg, cache_parabolic,
       2, firsts[2], lasts[2], scaling_factor)
    calc_boundary_flux_by_direction_divergence_lw!(surface_flux_values, t,
       boundary_conditions_parabolic[3],
-      equations_parabolic, surface_integral, dg, cache,
+      equations_parabolic, surface_integral, dg, cache_parabolic,
       3, firsts[3], lasts[3], scaling_factor)
    calc_boundary_flux_by_direction_divergence_lw!(surface_flux_values, t, boundary_conditions_parabolic[4],
-      equations_parabolic, surface_integral, dg, cache,
+      equations_parabolic, surface_integral, dg, cache_parabolic,
       4, firsts[4], lasts[4], scaling_factor)
 end
 
