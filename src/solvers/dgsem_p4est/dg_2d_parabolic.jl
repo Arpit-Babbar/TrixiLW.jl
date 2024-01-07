@@ -2053,10 +2053,15 @@ function calc_boundary_flux_lw!(cache_parabolic, cache_hyperbolic, t,
    (; surface_flux_values) = cache_hyperbolic.elements
    (; contravariant_vectors) = cache_parabolic.elements
 
+   dt = cache_hyperbolic.dt[1]
+
    @unpack viscous_container = cache_parabolic
    @unpack gradients = viscous_container
    gradients_x, gradients_y = gradients
    equations = equations_parabolic.equations_hyperbolic
+
+   @unpack outer_cache = cache_hyperbolic.boundary_cache
+
    index_range = eachnode(dg)
 
    @threaded for local_index in eachindex(boundary_condition_indices)
@@ -2094,9 +2099,9 @@ function calc_boundary_flux_lw!(cache_parabolic, cache_hyperbolic, t,
          x = get_node_coords(node_coordinates, equations_parabolic, dg, i_node, j_node,
             element)
 
-         flux_ = boundary_condition_parabolic(flux_inner, u_inner, ux_inner, uy_inner,
-            normal_direction, x, t, operator_type, equations_parabolic,
-            get_time_discretization(dg), scaling_factor)
+         flux_ = boundary_condition_parabolic(flux_inner, u_inner,
+            (ux_inner, uy_inner), outer_cache, normal_direction, x, t, dt, dg, operator_type,
+            equations_parabolic, get_time_discretization(dg), scaling_factor)
 
          # Copy flux to element storage in the correct orientation
          for v in eachvariable(equations_parabolic)

@@ -17,6 +17,10 @@ struct OutflowBC{F}
    DummyFunction::F # This won't be used
 end
 
+struct BoundaryConditionsNavierStokesInflow{F}
+   boundary_value_function::F
+end
+
 gradient_variable_transformation(::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative}) = cons2cons
 
 pressure(u, equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative}
@@ -75,7 +79,7 @@ function compute_tau(u, gradients, normal_direction, equations)
 end
 
 @inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:NoSlip,<:Adiabatic})(
-   flux_inner, u_inner, ux_node, uy_node, normal::AbstractVector, x, t, operator_type::Divergence,
+   flux_inner, u_inner, gradients, outer_cache, normal::AbstractVector, x, t, dt, dg, operator_type::Divergence,
    equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
    ::AbstractLWTimeDiscretization, scaling_factor = 1)
    # rho, v1, v2, _ = u_inner
@@ -97,8 +101,8 @@ end
 end
 
 @inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:NoSlip,<:Isothermal})(
-   flux_inner, u_inner, ux_node, uy_node, normal::AbstractVector,
-   x, t, operator_type::Divergence,
+   flux_inner, u_inner, gradients, outer_cache, normal::AbstractVector,
+   x, t, dt, dg, operator_type::Divergence,
    equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
    ::AbstractLWTimeDiscretization, scaling_factor=1)
    return flux_inner
@@ -132,11 +136,49 @@ end
 end
 
 @inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:OutflowBC,<:Isothermal})(
-   flux_inner, u_inner, ux_node, uy_node, normal::AbstractVector,
-   x, t, operator_type::Divergence,
+   flux_inner, u_inner, gradients, outer_cache, normal::AbstractVector,
+   x, t, dt, dg, operator_type::Divergence,
    equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
    ::AbstractLWTimeDiscretization, scaling_factor=1)
    return flux_inner
+end
+
+
+@inline function (boundary_condition::BoundaryConditionsNavierStokesInflow)(
+   flux_inner, u_inner, gradients, outer_cache, normal::AbstractVector, x, t, dt, dg, operator_type::Divergence,
+   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
+   ::AbstractLWTimeDiscretization, scaling_factor = 1)
+   @unpack nodes, weights = dg.basis
+   u_outer = boundary_condition.boundary_value_function(x, t, equations)
+   U_outer, F_outer = outer_cache[Threads.threadid()]
+   fill!(U_outer, zero(eltype(U_outer)))
+   fill!(F_outer, zero(eltype(F_outer)))
+   dt_scaled = scaling_factor * dt
+
+   for i in eachnode(dg) # Loop over intermediary time levels
+      ts = t + 0.5 * dt_scaled * (nodes[i] + 1.0)
+      # get the external value of the solution
+      u_boundary = boundary_condition.boundary_value_function(x, ts, equations)
+      flux_x = Trixi.flux(u_boundary, gradients, 1, equations)
+      flux_y = Trixi.flux(u_boundary, gradients, 2, equations)
+      fluxes = (flux_x, flux_y)
+      flux_viscous = normal_product(fluxes, equations, normal)
+      for n in eachvariable(equations)
+         U_outer[n] += 0.5 * scaling_factor * u_boundary[n] * weights[i]
+         F_outer[n] += 0.5 * scaling_factor * flux_viscous[n] * weights[i]
+      end
+   end
+
+   return SVector(F_outer[1], F_outer[2], F_outer[3], F_outer[4])
+end
+
+@inline function (boundary_condition::BoundaryConditionsNavierStokesInflow)(flux_inner, u_inner, normal::AbstractVector,
+   x, t, operator_type::Gradient,
+   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative}, scaling_factor = 1)
+
+   u_outer = boundary_condition.boundary_value_function(x, t, equations)
+   # TODO - Should u_outer[1] be set to u_inner[1]? We are assuming density is constant at inflow...
+   return u_outer
 end
 
 
