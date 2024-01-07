@@ -1994,14 +1994,14 @@ function calc_boundary_flux_divergence_lw!(
    @assert isempty(eachboundary(dg, cache_hyperbolic))
 end
 
-function calc_boundary_flux_divergence_lw!(cache, cache_hyperbolic, t,
+function calc_boundary_flux_divergence_lw!(cache_parabolic, cache_hyperbolic, t,
    boundary_conditions,
    mesh::P4estMesh{2}, equations::AbstractEquationsParabolic,
    surface_integral, dg::DG, scaling_factor=1)
 
    (; boundary_condition_types, boundary_indices) = boundary_conditions
 
-   calc_boundary_flux_by_type_lw!(cache, cache_hyperbolic, t, boundary_condition_types, boundary_indices,
+   calc_boundary_flux_by_type_lw!(cache_parabolic, cache_hyperbolic, t, boundary_condition_types, boundary_indices,
       Divergence(), mesh, equations, surface_integral, dg,
       scaling_factor)
    return nothing
@@ -2009,7 +2009,7 @@ end
 
 # Iterate over tuples of boundary condition types and associated indices
 # in a type-stable way using "lispy tuple programming".
-function calc_boundary_flux_by_type_lw!(cache, cache_hyperbolic, t, BCs::NTuple{N,Any},
+function calc_boundary_flux_by_type_lw!(cache_parabolic, cache_hyperbolic, t, BCs::NTuple{N,Any},
    BC_indices::NTuple{N,Vector{Int}},
    operator_type,
    mesh::P4estMesh,
@@ -2023,11 +2023,11 @@ function calc_boundary_flux_by_type_lw!(cache, cache_hyperbolic, t, BCs::NTuple{
    remaining_boundary_condition_indices = Base.tail(BC_indices)
 
    # process the first boundary condition type
-   calc_boundary_flux_lw!(cache, cache_hyperbolic, t, boundary_condition, boundary_condition_indices,
+   calc_boundary_flux_lw!(cache_parabolic, cache_hyperbolic, t, boundary_condition, boundary_condition_indices,
       operator_type, mesh, equations, surface_integral, dg, scaling_factor)
 
    # recursively call this method with the unprocessed boundary types
-   calc_boundary_flux_by_type_lw!(cache, cache_hyperbolic, t, remaining_boundary_conditions,
+   calc_boundary_flux_by_type_lw!(cache_parabolic, cache_hyperbolic, t, remaining_boundary_conditions,
       remaining_boundary_condition_indices,
       operator_type,
       mesh, equations, surface_integral, dg, scaling_factor)
@@ -2036,22 +2036,32 @@ function calc_boundary_flux_by_type_lw!(cache, cache_hyperbolic, t, BCs::NTuple{
 end
 
 # terminate the type-stable iteration over tuples
-function calc_boundary_flux_by_type_lw!(cache, cache_hyperbolic, t, BCs::Tuple{}, BC_indices::Tuple{},
+function calc_boundary_flux_by_type_lw!(cache_parabolic, cache_hyperbolic, t, BCs::Tuple{}, BC_indices::Tuple{},
    operator_type, mesh::P4estMesh, equations,
    surface_integral, dg::DG, scaling_factor)
    nothing
 end
 
-function calc_boundary_flux_lw!(cache, cache_hyperbolic, t,
+function calc_boundary_flux_lw!(cache_parabolic, cache_hyperbolic, t,
    boundary_condition_parabolic, # works with Dict types
    boundary_condition_indices,
    operator_type, mesh::P4estMesh{2},
    equations_parabolic::AbstractEquationsParabolic,
    surface_integral, dg::DG, scaling_factor)
-   (; boundaries) = cache
-   (; node_coordinates) = cache.elements
+   (; boundaries) = cache_parabolic
+   (; node_coordinates) = cache_parabolic.elements
    (; surface_flux_values) = cache_hyperbolic.elements
-   (; contravariant_vectors) = cache.elements
+   (; contravariant_vectors) = cache_parabolic.elements
+
+   dt = cache_hyperbolic.dt[1]
+
+   @unpack viscous_container = cache_parabolic
+   @unpack gradients = viscous_container
+   gradients_x, gradients_y = gradients
+   equations = equations_parabolic.equations_hyperbolic
+
+   @unpack outer_cache = cache_hyperbolic.boundary_cache
+
    index_range = eachnode(dg)
 
    @threaded for local_index in eachindex(boundary_condition_indices)
@@ -2071,6 +2081,8 @@ function calc_boundary_flux_lw!(cache, cache_hyperbolic, t,
       j_node = j_node_start
       for node_index in eachnode(dg)
          # Extract solution data from boundary container
+         ux_inner = get_node_vars(gradients_x, equations, dg, i_node, j_node, element)
+         uy_inner = get_node_vars(gradients_y, equations, dg, i_node, j_node, element)
          u_inner = get_node_vars(boundaries.u, equations_parabolic, dg, node_index,
             boundary_index)
 
@@ -2087,8 +2099,9 @@ function calc_boundary_flux_lw!(cache, cache_hyperbolic, t,
          x = get_node_coords(node_coordinates, equations_parabolic, dg, i_node, j_node,
             element)
 
-         flux_ = boundary_condition_parabolic(flux_inner, u_inner, normal_direction,
-            x, t, operator_type, equations_parabolic, get_time_discretization(dg), scaling_factor)
+         flux_ = boundary_condition_parabolic(flux_inner, u_inner,
+            (ux_inner, uy_inner), outer_cache, normal_direction, x, t, dt, dg, operator_type,
+            equations_parabolic, get_time_discretization(dg), scaling_factor)
 
          # Copy flux to element storage in the correct orientation
          for v in eachvariable(equations_parabolic)
