@@ -1,4 +1,4 @@
-using Trixi: integrate_via_indices, norm
+using Trixi: integrate_via_indices, norm, apply_jacobian_parabolic!
 using DelimitedFiles
 import Trixi: analyze, pretty_form_ascii, pretty_form_utf
 
@@ -20,8 +20,9 @@ struct AnalysisSurfaceIntegral{Indices, Variable}
     variable::Variable
 end
 
-struct AnalysisSurfaceFrictionCoefficient{Indices} <: SurfaceQuantitiyViscous
+struct AnalysisSurfaceFrictionCoefficient{Indices, FreeStreamVariables} <: SurfaceQuantitiyViscous
     indices::Indices
+    free_stream_variables::FreeStreamVariables
 end
 
 struct AnalysisSurfaceIntegralViscous{Indices, Variable} <: SurfaceQuantitiyViscous
@@ -44,6 +45,13 @@ end
 
 struct ForceState{RealT <: Real}
     Ψl::Tuple{RealT, RealT}
+    rhoinf::RealT
+    uinf::RealT
+    linf::RealT
+end
+
+# TODO - This should be a struct in ForceState
+struct FreeStreamVariables{RealT <: Real}
     rhoinf::RealT
     uinf::RealT
     linf::RealT
@@ -121,8 +129,8 @@ function (lift_force_viscous::LiftForceViscous)(u, gradients, normal_direction, 
     return force / factor
 end
 
-function surface_skin_friction(u, gradients, normal_direction, equations)
-    @unpack rhoinf, uinf, linf = surface_skin_coefficient.force_state
+function surface_skin_friction(u, gradients, normal_direction, equations, free_stream_variables)
+    @unpack rhoinf, uinf, linf = free_stream_variables
     @unpack mu = equations
 
     _, dv1dx, dv2dx, _ = convert_derivative_to_primitive(u, gradients[1], equations)
@@ -246,7 +254,7 @@ function analyze(surface_variable::AnalysisSurfaceFrictionCoefficient,
     @unpack boundaries, boundary_cache = cache
     @unpack surface_flux_values, node_coordinates, contravariant_vectors = cache.elements
     @unpack weights = dg.basis
-    @unpack indices = surface_variable
+    @unpack indices, free_stream_variables = surface_variable
     # TODO - Use initialize callbacks to move boundary_conditions to cache
     indices_ = indices(cache)
     @unpack viscous_container = cache_parabolic
@@ -257,8 +265,8 @@ function analyze(surface_variable::AnalysisSurfaceFrictionCoefficient,
     nvar = nvariables(equations)
     n_nodes = nnodes(dg)
     n_elements = length(indices_)
-    avg_array = zeros(n_elements, dim + nvar)
-    soln_array = zeros(n_elements*n_nodes, dim + nvar)
+    avg_array = zeros(n_elements, dim + 1)
+    soln_array = zeros(n_elements*n_nodes, dim + 1)
 
     local it = 1
     local element_it = 1
@@ -287,7 +295,8 @@ function analyze(surface_variable::AnalysisSurfaceFrictionCoefficient,
           ux = Trixi.get_node_vars(gradients_x, equations, dg, i_node, j_node, element)
           uy = Trixi.get_node_vars(gradients_y, equations, dg, i_node, j_node, element)
 
-          Cf = surface_skin_friction(u_node, (ux, uy), normal_direction, equations_parabolic)
+          Cf = surface_skin_friction(u_node, (ux, uy), normal_direction,
+                                     equations_parabolic, free_stream_variables)
 
           soln_array[it, 1:2  ] .= x
           soln_array[it, 3] = Cf
@@ -365,8 +374,9 @@ function analyze(surface_variable::AnalysisSurfaceIntegralViscous, du, u, t,
     @unpack indices, variable = surface_variable
     # TODO - Use initialize callbacks to move boundary_conditions to cache
     indices_ = indices(cache)
+    @unpack contravariant_vectors = cache.elements
     @unpack viscous_container = cache_parabolic
-    @unpack gradients = viscous_container
+    @unpack gradients, u_transformed = viscous_container
     gradients_x, gradients_y = gradients
 
     reset_du!(gradients_x, dg, cache)
@@ -378,8 +388,8 @@ function analyze(surface_variable::AnalysisSurfaceIntegralViscous, du, u, t,
         # Calculate volume terms in one element
         for j in eachnode(dg), i in eachnode(dg)
             # In Trixi, this is u_transformed instead of u. Does that have side-effects?
-            # Of course, we compute gradients in conservative variables
-            u_node = get_node_vars(u, equations_parabolic, dg, i, j, element)
+            # It shouldn't because we compute gradients in conservative variables
+            u_node = get_node_vars(u_transformed, equations_parabolic, dg, i, j, element)
 
             for ii in eachnode(dg)
                 multiply_add_to_node_vars!(gradients_x, derivative_matrix[ii, i],
@@ -393,7 +403,37 @@ function analyze(surface_variable::AnalysisSurfaceIntegralViscous, du, u, t,
                                            element)
             end
         end
+
+        for j in eachnode(dg), i in eachnode(dg)
+            Ja11, Ja12 = get_contravariant_vector(1, contravariant_vectors, i, j,
+                                                  element)
+            Ja21, Ja22 = get_contravariant_vector(2, contravariant_vectors, i, j,
+                                                  element)
+
+            gradients_reference_1 = get_node_vars(gradients_x, equations_parabolic, dg,
+                                                  i, j, element)
+            gradients_reference_2 = get_node_vars(gradients_y, equations_parabolic, dg,
+                                                  i, j, element)
+
+            # note that the contravariant vectors are transposed compared with computations of flux
+            # divergences in `calc_volume_integral!`. See
+            # https://github.com/trixi-framework/Trixi.jl/pull/1490#discussion_r1213345190
+            # for a more detailed discussion.
+            gradient_x_node = Ja11 * gradients_reference_1 +
+                              Ja21 * gradients_reference_2
+            gradient_y_node = Ja12 * gradients_reference_1 +
+                              Ja22 * gradients_reference_2
+
+            set_node_vars!(gradients_x, gradient_x_node, equations_parabolic, dg, i, j,
+                           element)
+            set_node_vars!(gradients_y, gradient_y_node, equations_parabolic, dg, i, j,
+                           element)
+        end
     end
+
+    # apply_jacobian_parabolic! is needed because we don't want to flip the signs
+    apply_jacobian_parabolic!(gradients_x, mesh, equations_parabolic, dg, cache_parabolic)
+    apply_jacobian_parabolic!(gradients_y, mesh, equations_parabolic, dg, cache_parabolic)
 
     surface_integral = zero(eltype(u))
     index_range = eachnode(dg)
@@ -506,6 +546,11 @@ pretty_form_ascii(::AnalysisSurfaceIntegralViscous{<:Any, <:LiftForceViscous{<:A
 pretty_form_utf(::AnalysisSurfaceIntegralViscous{<:Any, <:LiftForceViscous{<:Any}}) = "Viscous_lift"
 pretty_form_ascii(::AnalysisSurfaceIntegralViscous{<:Any, <:DragForceViscous{<:Any}}) = "Viscous_drag"
 pretty_form_utf(::AnalysisSurfaceIntegralViscous{<:Any, <:DragForceViscous{<:Any}}) = "Viscous_drag"
+
+pretty_form_ascii(::AnalysisSurfaceIntegralViscousCorrectedGrad{<:Any, <:LiftForceViscous{<:Any}}) = "Viscous_lift_corr"
+pretty_form_utf(::AnalysisSurfaceIntegralViscousCorrectedGrad{<:Any, <:LiftForceViscous{<:Any}}) = "Viscous_lift_corr"
+pretty_form_ascii(::AnalysisSurfaceIntegralViscousCorrectedGrad{<:Any, <:DragForceViscous{<:Any}}) = "Viscous_drag_corr"
+pretty_form_utf(::AnalysisSurfaceIntegralViscousCorrectedGrad{<:Any, <:DragForceViscous{<:Any}}) = "Viscous_drag_corr"
 
 pretty_form_ascii(::CFLComputation) = "CFLMin"
 pretty_form_utf(::CFLComputation) = "CFLMin"
