@@ -1,4 +1,5 @@
-import Trixi: FluxHLL
+import Trixi: FluxHLL, FluxRotated
+using Trixi: rotate_to_x, rotate_from_x, flux_hllc
 
 @inline function is_admissible(u, equations::CompressibleEulerEquations2D)
    prim = cons2prim(u, equations)
@@ -37,3 +38,24 @@ end
         return factor_ll * f_ll - factor_rr * f_rr + factor_diss * (U_rr - U_ll)
     end
 end
+
+# Rotated surface flux computation (2D version)
+@inline function (flux_rotated::FluxRotated)(f_ll, f_rr, U_ll, U_rr, u_ll, u_rr,
+   normal_direction::AbstractVector,
+   equations::AbstractEquations{2})
+
+   @unpack numerical_flux = flux_rotated
+
+   norm_ = norm(normal_direction)
+   # Normalize the vector without using `normalize` since we need to multiply by the `norm_` later
+   normal_vector = normal_direction / norm_
+
+   u_ll_rotated = rotate_to_x(u_ll, normal_vector, equations)
+   u_rr_rotated = rotate_to_x(u_rr, normal_vector, equations)
+
+   f = numerical_flux(u_ll_rotated, u_rr_rotated, 1, equations)
+
+   return rotate_from_x(f, normal_vector, equations) * norm_
+end
+
+const flux_hllc_rotated = FluxRotated(flux_hllc)

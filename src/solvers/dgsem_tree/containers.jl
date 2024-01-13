@@ -50,7 +50,7 @@ n_elements = nelements(dg, cache)
    cfl_number = fill(nan_RealT, 1)
    dt = fill(nan_RealT, 1)
 
-   cell_array_sizes = Dict(1 => 9, 2 => 14, 3 => 17, 4 => 18)
+   cell_array_sizes = Dict(1 => 12, 2 => 14, 3 => 17, 4 => 18)
    degree = n_nodes - 1
    cell_array_size = cell_array_sizes[min(4, degree)]
 

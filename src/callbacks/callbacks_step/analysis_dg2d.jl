@@ -1,4 +1,6 @@
-using Trixi: integrate_via_indices, norm, apply_jacobian_parabolic!
+using Trixi
+using Trixi: integrate_via_indices, norm, apply_jacobian_parabolic!, @threaded, indices2direction,
+             index_to_start_step_2d, get_normal_direction, dot, get_node_coords
 using DelimitedFiles
 import Trixi: analyze, pretty_form_ascii, pretty_form_utf
 
@@ -207,7 +209,7 @@ end
 function analyze(surface_variable::AnalysisSurfaceIntegral, du, u, t,
     mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
     equations, dg::DGSEM, cache)
-    @unpack boundaries, boundary_cache = cache
+    @unpack boundaries = cache
     @unpack surface_flux_values, node_coordinates, contravariant_vectors = cache.elements
     @unpack weights = dg.basis
     @unpack indices, variable = surface_variable
@@ -232,7 +234,7 @@ function analyze(surface_variable::AnalysisSurfaceIntegral, du, u, t,
        i_node = i_node_start
        j_node = j_node_start
        for node_index in eachnode(dg)
-          u_node = Trixi.get_node_vars(boundary_cache.u, equations, dg, node_index, boundary)
+          u_node = Trixi.get_node_vars(cache.boundaries.u, equations, dg, node_index, boundary)
           normal_direction = get_normal_direction(direction, contravariant_vectors, i_node, j_node,
                                                   element)
 
@@ -251,7 +253,7 @@ end
 function analyze(surface_variable::AnalysisSurfaceFrictionCoefficient,
     du, u, t, mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}}, equations,
     equations_parabolic, dg::DGSEM, cache, cache_parabolic)
-    @unpack boundaries, boundary_cache = cache
+    @unpack boundaries = cache
     @unpack surface_flux_values, node_coordinates, contravariant_vectors = cache.elements
     @unpack weights = dg.basis
     @unpack indices, free_stream_variables = surface_variable
@@ -289,7 +291,7 @@ function analyze(surface_variable::AnalysisSurfaceFrictionCoefficient,
        j_node = j_node_start
        for node_index in eachnode(dg)
           x = get_node_coords(node_coordinates, equations, dg, i_node, j_node, element)
-          u_node = Trixi.get_node_vars(boundary_cache.u, equations, dg, node_index, boundary)
+          u_node = Trixi.get_node_vars(cache.boundaries.u, equations, dg, node_index, boundary)
           normal_direction = get_normal_direction(direction, contravariant_vectors, i_node, j_node,
                                                   element)
           ux = Trixi.get_node_vars(gradients_x, equations, dg, i_node, j_node, element)
@@ -319,7 +321,7 @@ end
 function analyze(surface_variable::AnalysisSurfaceIntegralViscousCorrectedGrad,
     du, u, t, mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}}, equations,
     equations_parabolic, dg::DGSEM, cache, cache_parabolic)
-    @unpack boundaries, boundary_cache = cache
+    @unpack boundaries = cache
     @unpack surface_flux_values, node_coordinates, contravariant_vectors = cache.elements
     @unpack weights = dg.basis
     @unpack indices, variable = surface_variable
@@ -347,7 +349,7 @@ function analyze(surface_variable::AnalysisSurfaceIntegralViscousCorrectedGrad,
        i_node = i_node_start
        j_node = j_node_start
        for node_index in eachnode(dg)
-          u_node = Trixi.get_node_vars(boundary_cache.u, equations, dg, node_index, boundary)
+          u_node = Trixi.get_node_vars(cache.boundaries.u, equations, dg, node_index, boundary)
           normal_direction = get_normal_direction(direction, contravariant_vectors, i_node, j_node,
                                                   element)
           ux = Trixi.get_node_vars(gradients_x, equations, dg, i_node, j_node, element)
@@ -368,7 +370,7 @@ end
 function analyze(surface_variable::AnalysisSurfaceIntegralViscous, du, u, t,
     mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}}, equations,
     equations_parabolic, dg::DGSEM, cache, cache_parabolic)
-    @unpack boundaries, boundary_cache = cache
+    @unpack boundaries = cache
     @unpack surface_flux_values, node_coordinates, contravariant_vectors = cache.elements
     @unpack weights = dg.basis
     @unpack indices, variable = surface_variable
@@ -453,7 +455,7 @@ function analyze(surface_variable::AnalysisSurfaceIntegralViscous, du, u, t,
        i_node = i_node_start
        j_node = j_node_start
        for node_index in eachnode(dg)
-          u_node = Trixi.get_node_vars(boundary_cache.u, equations, dg, node_index, boundary)
+          u_node = Trixi.get_node_vars(boundaries.u, equations, dg, node_index, boundary)
           normal_direction = get_normal_direction(direction, contravariant_vectors, i_node, j_node,
                                                   element)
           ux = Trixi.get_node_vars(gradients_x, equations, dg, i_node, j_node, element)
@@ -474,7 +476,7 @@ end
 function analyze(surface_variable::SaveSurfacePrimitives, du, u, t,
     mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
     equations, dg::DGSEM, cache)
-    @unpack boundaries, boundary_cache = cache
+    @unpack boundaries = cache
     @unpack surface_flux_values, node_coordinates, contravariant_vectors = cache.elements
     @unpack weights = dg.basis
     @unpack indices = surface_variable
@@ -505,7 +507,7 @@ function analyze(surface_variable::SaveSurfacePrimitives, du, u, t,
        i_node = i_node_start
        j_node = j_node_start
        for node_index in eachnode(dg)
-          u_node = Trixi.get_node_vars(boundary_cache.u, equations, dg, node_index, boundary)
+          u_node = Trixi.get_node_vars(boundaries.u, equations, dg, node_index, boundary)
           x = get_node_coords(node_coordinates, equations, dg, i_node, j_node, element)
           prim = cons2prim(u_node, equations)
 

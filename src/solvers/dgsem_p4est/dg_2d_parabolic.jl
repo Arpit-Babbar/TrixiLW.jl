@@ -601,7 +601,7 @@ function lw_volume_kernel_3!(
 
    refresh!(arr) = fill!(arr, zero(eltype(arr)))
 
-   refresh!.((ut, utx, uty, utt, uttx, utty, uttt, utttx, uttty))
+   refresh!.((ut, utx, uty, utt, uttx, utty, uttt, utttx, uttty, u_np1, u_np1_low))
 
    # Calculate volume terms in one element
    for j in eachnode(dg), i in eachnode(dg)
@@ -1014,6 +1014,32 @@ function lw_volume_kernel_3!(
       fppa, gppa, fppv, gppv, cv_fpp, cv_gpp = contravariant_fluxes(
          upp_node, (uppx_node, uppy_node), Ja, equations, equations_parabolic)
 
+      # Updating u_np1_low here
+      F_ = Trixi.get_node_vars(cv_F, equations, dg, i, j)
+      G_ = Trixi.get_node_vars(cv_G, equations, dg, i, j)
+
+      for ii in eachnode(dg)
+         inv_jacobian = inverse_jacobian[ii, j, element]
+         # res              += -lam * D * F for each variable
+         # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
+         Trixi.multiply_add_to_node_vars!(u_np1_low, -dt * inv_jacobian * derivative_matrix[ii, i],
+            F_, equations, dg, ii, j)
+      end
+
+      for jj in eachnode(dg)
+         inv_jacobian = inverse_jacobian[i, jj, element]
+         # C += -lam*g*Dm' for each variable
+         # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+         Trixi.multiply_add_to_node_vars!(u_np1_low, -dt * inv_jacobian * derivative_matrix[jj, j],
+            G_, equations, dg, i, jj)
+      end
+
+      # TODO - Check the source term contribution
+      S_node = Trixi.get_node_vars(S, equations, dg, i, j)
+      Trixi.multiply_add_to_node_vars!(u_np1_low, 1.0, S_node, equations, dg, i, j)
+
+      # UPDATING u_np1_low ENDS!!!
+
       fttta = 0.5 * (fppa - 2.0 * fpa + 2.0 * fma - fmma)
       multiply_add_to_node_vars!(element_cache.F, 1.0 / 24.0, fttta, equations, dg, 1, i, j, element)
       gttta = 0.5 * (gppa - 2.0 * gpa + 2.0 * gma - gmma)
@@ -1034,10 +1060,14 @@ function lw_volume_kernel_3!(
       G_node = get_node_vars(cv_G, equations, dg, i, j)
 
       for ii in eachnode(dg)
+         inv_jacobian = inverse_jacobian[ii, j, element]
          # res              += -lam * D * F for each variable
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
          multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F_node, equations,
             dg, ii, j, element)
+
+         multiply_add_to_node_vars!(u_np1, -dt*inv_jacobian*derivative_matrix[ii, i],
+                                    F_node, equations, dg, ii, j)
       end
 
       for jj in eachnode(dg)
@@ -1045,6 +1075,9 @@ function lw_volume_kernel_3!(
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
          multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G_node, equations,
             dg, i, jj, element)
+
+         multiply_add_to_node_vars!(u_np1, -dt * inv_jacobian * derivative_matrix[jj, j],
+                                    G_node, equations, dg, i, jj)
       end
 
       u_node = get_node_vars(u, equations, dg, i, j, element)
@@ -1052,6 +1085,8 @@ function lw_volume_kernel_3!(
       sttt = calc_source_ttt_N34(u_node, up_node, um_node, upp_node, umm_node,
          x, t, dt, source_terms,
          equations, dg, cache)
+
+      multiply_add_to_node_vars!(u_np1_low, 1.0, S_node, equations, dg, i, j)
       multiply_add_to_node_vars!(S, 1.0 / 24.0, sttt, equations, dg, i, j)
 
 
@@ -1066,6 +1101,23 @@ function lw_volume_kernel_3!(
       S_node = get_node_vars(S, equations, dg, i, j)
       inv_jacobian = inverse_jacobian[i, j, element]
       multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg, i, j, element)
+      Trixi.multiply_add_to_node_vars!(u_np1, 1.0, S_node, equations, dg, i, j)
+
+      @unpack temporal_errors = cache
+      @unpack abstol, reltol = tolerances
+      temporal_errors[element] = zero(dt)
+      for j in eachnode(dg), i in eachnode(dg)
+         u_np1_node = Trixi.get_node_vars(u_np1, equations, dg, i, j)
+         u_np1_low_node = Trixi.get_node_vars(u_np1_low, equations, dg, i, j)
+         # u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+         for v in eachvariable(equations)
+            temporal_errors[element] += (
+               (u_np1_node[v] - u_np1_low_node[v])
+               /
+               (abstol + reltol * max(abs(u_np1_node[v]), abs(u_np1_low_node[v])))
+            )^2
+         end
+      end
    end
    return nothing
 end

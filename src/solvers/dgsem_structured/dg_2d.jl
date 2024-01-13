@@ -978,7 +978,7 @@ function lw_volume_kernel_1!(du, u, t, dt, tolerances,
    @unpack elements = cache # To access cache.U and cache.F
    refresh!(arr) = fill!(arr, zero(eltype(u)))
    id = Threads.threadid()
-   ftilde, gtilde, Ftilde, Gtilde, ut, U, up, um,
+   Ftilde, Gtilde, ut, U, up, um,
    ftildet, gtildet, S, u_np1, u_np1_low = cell_arrays[id]
    refresh!.((ut, ftildet, gtildet))
    for j in eachnode(dg), i in eachnode(dg)
@@ -1072,11 +1072,13 @@ function lw_volume_kernel_1!(du, u, t, dt, tolerances,
 
       # UPDATING u_np1_low ENDS!!!
 
-      multiply_add_to_node_vars!(ftildet, 0.5, cv_fp, -0.5, cv_fm, equations, i, j)
-      multiply_add_to_node_vars!(gtildet, 0.5, cv_gp, -0.5, cv_gm, equations, i, j)
+      multiply_add_to_node_vars!(ftildet,  0.5, cv_fp, equations, dg, i, j)
+      multiply_add_to_node_vars!(ftildet, -0.5, cv_fm, equations, dg, i, j)
+      multiply_add_to_node_vars!(gtildet,  0.5, cv_gp, equations, dg, i, j)
+      multiply_add_to_node_vars!(gtildet, -0.5, cv_gm, equations, dg, i, j)
 
-      multiply_add_to_node_vars!(element_cache.F, 0.5, ft, equations, 1, i, j, element)
-      multiply_add_to_node_vars!(element_cache.F, 0.5, gt, equations, 2, i, j, element)
+      multiply_add_to_node_vars!(element_cache.F, 0.5, ft, equations, dg, 1, i, j, element)
+      multiply_add_to_node_vars!(element_cache.F, 0.5, gt, equations, dg, 2, i, j, element)
       ftildet_node = Trixi.get_node_vars(ftildet, equations, dg, i, j)
       Trixi.multiply_add_to_node_vars!(Ftilde,
          0.5, ftildet_node,
@@ -1138,7 +1140,6 @@ function lw_volume_kernel_1!(du, u, t, dt, tolerances,
             /
             (abstol + reltol * max(abs(u_np1_node[v]), abs(u_np1_low_node[v])))
          )^2
-         @show temporal_errors[element]
       end
    end
 
