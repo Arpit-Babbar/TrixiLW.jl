@@ -2048,13 +2048,17 @@ end
 function calc_boundary_flux_by_direction_divergence_lw!(surface_flux_values::AbstractArray{<:Any,4}, t,
    boundary_condition,
    equations_parabolic::AbstractEquationsParabolic,
-   surface_integral, dg::DG, cache,
+   surface_integral, dg::DG, cache_parabolic,
    direction, first_boundary, last_boundary, scaling_factor)
    @unpack surface_flux = surface_integral
 
    # Note: cache.boundaries.u contains the unsigned normal component (using "orientation", not "direction")
    # of the viscous flux, as computed in `prolong2boundaries!`
-   @unpack u, neighbor_ids, neighbor_sides, node_coordinates, orientations = cache.boundaries
+   @unpack u, neighbor_ids, neighbor_sides, node_coordinates, orientations = cache_parabolic.boundaries
+
+   @unpack viscous_container = cache_parabolic
+   @unpack gradients = viscous_container
+   gradients_x, gradients_y = gradients
 
    @threaded for boundary in first_boundary:last_boundary
       # Get neighboring element
@@ -2062,11 +2066,11 @@ function calc_boundary_flux_by_direction_divergence_lw!(surface_flux_values::Abs
 
       for i in eachnode(dg)
          # Get viscous boundary fluxes
-         flux_ll, flux_rr = get_surface_node_vars(u, equations_parabolic, dg, i, boundary)
+         u_ll, u_rr = get_surface_node_vars(u, equations_parabolic, dg, i, boundary)
          if neighbor_sides[boundary] == 1 # Element is on the left, boundary on the right
-            flux_inner = flux_ll
+            u_inner = u_ll
          else # Element is on the right, boundary on the left
-            flux_inner = flux_rr
+            u_inner = u_rr
          end
 
          x = get_node_coords(node_coordinates, equations_parabolic, dg, i, boundary)
@@ -2076,8 +2080,14 @@ function calc_boundary_flux_by_direction_divergence_lw!(surface_flux_values::Abs
          # This currently works with Dirichlet/Neuman boundary conditions for LaplaceDiffusion2D and
          # NoSlipWall/Adiabatic boundary conditions for CompressibleNavierStokesDiffusion2D as of 2022-6-27.
          # It will not work with implementations which utilize `u_inner` to impose boundary conditions.
-         flux = boundary_condition(flux_inner, nothing, get_unsigned_normal_vector_2d(direction),
-            x, t, Divergence(), equations_parabolic, get_time_discretization(dg), scaling_factor)
+         gradient = nothing # Dummy place holder
+         outer_cache = nothing # dummy place holder
+         dt = nothing # dummy place holder
+         flux_inner = u_inner
+         flux = boundary_condition(flux_inner, u_inner, gradient, outer_cache,
+            get_unsigned_normal_vector_2d(direction),
+            x, t, dt, dg, Divergence(), equations_parabolic, get_time_discretization(dg),
+            scaling_factor)
 
          # Copy flux to left and right element storage
          for v in eachvariable(equations_parabolic)

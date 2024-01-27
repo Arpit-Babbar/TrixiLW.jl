@@ -8,6 +8,7 @@ solvers_dir()  = joinpath(src_dir(),"solvers")
 aux_dir()      = joinpath(src_dir(),"auxiliary")
 callback_dir() = joinpath(src_dir(),"callbacks")
 utils_dir() = joinpath(base_dir(), "utils")
+data_dir() = joinpath(base_dir(), "data")
 
 examples_dir_trixilw() = joinpath(base_dir(), "examples")
 

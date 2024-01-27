@@ -42,8 +42,8 @@ function max_dt(u, t, mesh::Union{TreeMesh{2}, P4estMesh{2}}, equations_paraboli
    # return 1/(N^4 * max_diffusion)
 end
 
-@inline function (boundary_condition::BoundaryConditionDirichlet)(flux_inner, u_inner, normal::AbstractVector,
-   x, t, operator_type::Divergence,
+@inline function (boundary_condition::BoundaryConditionDirichlet)(flux_inner, u_inner, grad_u,
+   outer_cache, normal::AbstractVector, x, t, dt, dg, operator_type::Divergence,
    equations_parabolic::LaplaceDiffusion2D, time_discretization::AbstractLWTimeDiscretization,
    scaling_factor = 1)
    return flux_inner

@@ -889,7 +889,9 @@ using LoopVectorization: @turbo
 
          u_node = get_node_vars(u, equations, dg, i, j, element)
          x = get_node_coords(node_coordinates, equations, dg, i, j, element)
-         sttt = calc_source_ttt_N34(u_node, up_node, um_node, upp_node, umm_node,
+         # TODO - BIG BIG BUG. Incorrect ordering of arguments.
+         # Check all source terms if they have this bug
+         sttt = calc_source_ttt_N34(u_node, up_node, upp_node, upp_node, umm_node,
             x, t, dt, source_terms,
             equations, dg, cache)
          multiply_add_to_node_vars!(S, 1.0 / 24.0, sttt, equations, dg, i, j)

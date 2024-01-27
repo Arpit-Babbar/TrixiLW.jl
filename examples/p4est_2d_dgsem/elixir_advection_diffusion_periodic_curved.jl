@@ -29,10 +29,12 @@ function initial_condition_diffusive_convergence_test(x, t, equation::LinearScal
     scalar = c + A * sin(omega * sum(x_trans)) * exp(-nu * omega^2 * t)
     return SVector(scalar)
 end
+
+
 initial_condition = initial_condition_diffusive_convergence_test
 
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
-solver = DGSEM(polydeg=1, surface_flux=flux_lax_friedrichs,
+solver = DGSEM(polydeg=4, surface_flux=flux_lax_friedrichs,
    volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
 
 # This maps the domain [-1, 1]^2 to [-pi, pi]^2 while also
@@ -45,7 +47,7 @@ end
 
 trees_per_dimension = (4, 4)
 mesh = P4estMesh(trees_per_dimension,
-                 polydeg=1, initial_refinement_level=3,
+                 polydeg=4, initial_refinement_level=2,
                  mapping=mapping,
                  periodicity=true)
 
@@ -84,7 +86,7 @@ callbacks = (
    summary_callback,
    analysis_callback,
    alive_callback,
-   visualization_callback
+   # visualization_callback
 );
 
 
