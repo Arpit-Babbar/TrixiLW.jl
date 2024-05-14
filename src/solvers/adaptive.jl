@@ -7,10 +7,10 @@ using Trixi: get_node_vars
       rhs!(du_ode, u_ode, semi, t, tolerances) # Compute du = u^{n+1}-dt*u^n
    catch e
       if isa(e, DomainError) || isa(e, TaskFailedException) # Second exception is for multithreading. TODO - Get a more specific second exception
-         if integrator.n_fail_it > max_retries
-            println("Domain error not fixed in $max_retries retries, rethrowing...")
-            rethrow(e)
-         end
+         # if integrator.n_fail_it > max_retries
+         #    println("Domain error not fixed in $max_retries retries, rethrowing...")
+         #    rethrow(e)
+         # end
          println("Adjusting time step to maintain admissibility")
          domain_valid = false
          return domain_valid

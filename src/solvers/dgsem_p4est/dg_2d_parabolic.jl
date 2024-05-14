@@ -36,6 +36,73 @@ function contravariant_fluxes(u, grad_u, Ja,
    return fa, ga, fv, gv, cv_f, cv_g
 end
 
+# Works for any temporal derivative of u
+function scale_ut!(ut, element, equations, dg, cache)
+   @unpack contravariant_vectors, inverse_jacobian = cache.elements
+   for j in eachnode(dg), i in eachnode(dg)
+      inv_jacobian = inverse_jacobian[i, j, element]
+      for v in eachvariable(equations)
+         ut[v, i, j] *= inv_jacobian
+      end
+   end
+end
+
+# Assumes utx, uty are zeros
+function compute_local_grad_u!(ux, uy, u, element, equations, dg, cache)
+   @unpack contravariant_vectors, inverse_jacobian = cache.elements
+   @unpack derivative_matrix = dg.basis
+
+   # Compute ∇u_t
+   for j in eachnode(dg), i in eachnode(dg)
+      ut_node = get_node_vars(u, equations, dg, i, j)
+
+      for ii in eachnode(dg)
+         # ut              += -lam * D * f for each variable
+         # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
+         multiply_add_to_node_vars!(ux, derivative_matrix[ii, i], ut_node, equations, dg,
+            ii, j)
+      end
+
+      for jj in eachnode(dg)
+         # C += -lam*g*Dm' for each variable
+         # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+         multiply_add_to_node_vars!(uy, derivative_matrix[jj, j], ut_node, equations, dg,
+            i, jj)
+      end
+   end
+
+   for j in eachnode(dg), i in eachnode(dg)
+      Ja11, Ja12 = get_contravariant_vector(1, contravariant_vectors, i, j,
+                                            element)
+      Ja21, Ja22 = get_contravariant_vector(2, contravariant_vectors, i, j,
+                                            element)
+
+      gradients_reference_1 = get_node_vars(ux, equations, dg, i, j)
+      gradients_reference_2 = get_node_vars(uy, equations, dg, i, j)
+
+      # note that the contravariant vectors are transposed compared with computations of flux
+      # divergences in `calc_volume_integral!`. See
+      # https://github.com/trixi-framework/Trixi.jl/pull/1490#discussion_r1213345190
+      # for a more detailed discussion.
+      gradient_x_node = Ja11 * gradients_reference_1 +
+                        Ja21 * gradients_reference_2
+      gradient_y_node = Ja12 * gradients_reference_1 +
+                        Ja22 * gradients_reference_2
+
+      set_node_vars!(ux, gradient_x_node, equations, dg, i, j)
+      set_node_vars!(uy, gradient_y_node, equations, dg, i, j)
+  end
+
+   # Scale ∇u_t
+   for j in eachnode(dg), i in eachnode(dg)
+      inv_jacobian = inverse_jacobian[i, j, element]
+      for v in eachvariable(equations)
+         ux[v, i, j] *= inv_jacobian
+         uy[v, i, j] *= inv_jacobian
+      end
+   end
+end
+
 function lw_volume_kernel_1!(
    du, flux_viscous, gradients, u_transformed, u, t, dt,
    tolerances, mesh::P4estMesh{2},
@@ -48,12 +115,10 @@ function lw_volume_kernel_1!(
    flux_viscous_x, flux_viscous_y = flux_viscous # viscous fluxes computed by correction
 
    @unpack derivative_dhat, derivative_matrix = dg.basis
-   @unpack node_coordinates, contravariant_vectors = cache.elements
+   @unpack node_coordinates, contravariant_vectors, inverse_jacobian = cache.elements
 
    @unpack lw_res_cache, element_cache = cache
    @unpack cell_arrays = lw_res_cache
-
-   @unpack inverse_jacobian = cache.elements
 
    id = Threads.threadid()
 
@@ -601,7 +666,7 @@ function lw_volume_kernel_3!(
 
    refresh!(arr) = fill!(arr, zero(eltype(arr)))
 
-   refresh!.((ut, utx, uty, utt, uttx, utty, uttt, utttx, uttty))
+   refresh!.((ut, utx, uty, utt, uttx, utty, uttt, utttx, uttty, u_np1, u_np1_low))
 
    # Calculate volume terms in one element
    for j in eachnode(dg), i in eachnode(dg)
@@ -1014,6 +1079,32 @@ function lw_volume_kernel_3!(
       fppa, gppa, fppv, gppv, cv_fpp, cv_gpp = contravariant_fluxes(
          upp_node, (uppx_node, uppy_node), Ja, equations, equations_parabolic)
 
+      # Updating u_np1_low here
+      F_ = Trixi.get_node_vars(cv_F, equations, dg, i, j)
+      G_ = Trixi.get_node_vars(cv_G, equations, dg, i, j)
+
+      for ii in eachnode(dg)
+         inv_jacobian = inverse_jacobian[ii, j, element]
+         # res              += -lam * D * F for each variable
+         # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
+         Trixi.multiply_add_to_node_vars!(u_np1_low, -dt * inv_jacobian * derivative_matrix[ii, i],
+            F_, equations, dg, ii, j)
+      end
+
+      for jj in eachnode(dg)
+         inv_jacobian = inverse_jacobian[i, jj, element]
+         # C += -lam*g*Dm' for each variable
+         # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+         Trixi.multiply_add_to_node_vars!(u_np1_low, -dt * inv_jacobian * derivative_matrix[jj, j],
+            G_, equations, dg, i, jj)
+      end
+
+      # TODO - Check the source term contribution
+      S_node = Trixi.get_node_vars(S, equations, dg, i, j)
+      Trixi.multiply_add_to_node_vars!(u_np1_low, 1.0, S_node, equations, dg, i, j)
+
+      # UPDATING u_np1_low ENDS!!!
+
       fttta = 0.5 * (fppa - 2.0 * fpa + 2.0 * fma - fmma)
       multiply_add_to_node_vars!(element_cache.F, 1.0 / 24.0, fttta, equations, dg, 1, i, j, element)
       gttta = 0.5 * (gppa - 2.0 * gpa + 2.0 * gma - gmma)
@@ -1034,10 +1125,14 @@ function lw_volume_kernel_3!(
       G_node = get_node_vars(cv_G, equations, dg, i, j)
 
       for ii in eachnode(dg)
+         inv_jacobian = inverse_jacobian[ii, j, element]
          # res              += -lam * D * F for each variable
          # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
          multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F_node, equations,
             dg, ii, j, element)
+
+         multiply_add_to_node_vars!(u_np1, -dt*inv_jacobian*derivative_matrix[ii, i],
+                                    F_node, equations, dg, ii, j)
       end
 
       for jj in eachnode(dg)
@@ -1045,13 +1140,18 @@ function lw_volume_kernel_3!(
          # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
          multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G_node, equations,
             dg, i, jj, element)
+
+         multiply_add_to_node_vars!(u_np1, -dt * inv_jacobian * derivative_matrix[jj, j],
+                                    G_node, equations, dg, i, jj)
       end
 
       u_node = get_node_vars(u, equations, dg, i, j, element)
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
-      sttt = calc_source_ttt_N34(u_node, up_node, um_node, upp_node, umm_node,
+      sttt = calc_source_ttt_N34(u_node, up_node, upp_node, um_node, umm_node,
          x, t, dt, source_terms,
          equations, dg, cache)
+
+      multiply_add_to_node_vars!(u_np1_low, 1.0, S_node, equations, dg, i, j)
       multiply_add_to_node_vars!(S, 1.0 / 24.0, sttt, equations, dg, i, j)
 
 
@@ -1066,6 +1166,23 @@ function lw_volume_kernel_3!(
       S_node = get_node_vars(S, equations, dg, i, j)
       inv_jacobian = inverse_jacobian[i, j, element]
       multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg, i, j, element)
+      Trixi.multiply_add_to_node_vars!(u_np1, 1.0, S_node, equations, dg, i, j)
+
+      @unpack temporal_errors = cache
+      @unpack abstol, reltol = tolerances
+      temporal_errors[element] = zero(dt)
+      for j in eachnode(dg), i in eachnode(dg)
+         u_np1_node = Trixi.get_node_vars(u_np1, equations, dg, i, j)
+         u_np1_low_node = Trixi.get_node_vars(u_np1_low, equations, dg, i, j)
+         # u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+         for v in eachvariable(equations)
+            temporal_errors[element] += (
+               (u_np1_node[v] - u_np1_low_node[v])
+               /
+               (abstol + reltol * max(abs(u_np1_node[v]), abs(u_np1_low_node[v])))
+            )^2
+         end
+      end
    end
    return nothing
 end
@@ -1169,12 +1286,7 @@ function lw_volume_kernel_4!(
    end
 
    # Scale ut
-   for j in eachnode(dg), i in eachnode(dg)
-      inv_jacobian = inverse_jacobian[i, j, element]
-      for v in eachvariable(equations)
-         ut[v, i, j] *= inv_jacobian
-      end
-   end
+   scale_ut!(ut, element, equations, dg, cache)
 
    # Add source term contribution to ut and some to S
    for j in eachnode(dg), i in eachnode(dg)
@@ -1186,33 +1298,8 @@ function lw_volume_kernel_4!(
       multiply_add_to_node_vars!(ut, dt, s_node, equations, dg, i, j) # has no jacobian factor
    end
 
-   # Compute ∇u_t
-   for j in eachnode(dg), i in eachnode(dg)
-      ut_node = get_node_vars(ut, equations, dg, i, j)
 
-      for ii in eachnode(dg)
-         # ut              += -lam * D * f for each variable
-         # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-         multiply_add_to_node_vars!(utx, derivative_matrix[ii, i], ut_node, equations, dg,
-            ii, j)
-      end
-
-      for jj in eachnode(dg)
-         # C += -lam*g*Dm' for each variable
-         # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         multiply_add_to_node_vars!(uty, derivative_matrix[jj, j], ut_node, equations, dg,
-            i, jj)
-      end
-   end
-
-   # Scale ∇u_t
-   for j in eachnode(dg), i in eachnode(dg)
-      inv_jacobian = inverse_jacobian[i, j, element]
-      for v in eachvariable(equations)
-         utx[v, i, j] *= inv_jacobian
-         uty[v, i, j] *= inv_jacobian
-      end
-   end
+   compute_local_grad_u!(utx, uty, ut, element, equations, dg, cache)
 
    for j in eachnode(dg), i in eachnode(dg)
       ut_node = get_node_vars(ut, equations, dg, i, j)
@@ -1317,32 +1404,7 @@ function lw_volume_kernel_4!(
    end
 
    # Compute ∇utt
-   for j in eachnode(dg), i in eachnode(dg)
-      utt_node = get_node_vars(utt, equations, dg, i, j)
-
-      for ii in eachnode(dg)
-         # ut              += -lam * D * f for each variable
-         # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-         multiply_add_to_node_vars!(uttx, derivative_matrix[ii, i], utt_node, equations, dg,
-            ii, j)
-      end
-
-      for jj in eachnode(dg)
-         # C += -lam*g*Dm' for each variable
-         # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         multiply_add_to_node_vars!(utty, derivative_matrix[jj, j], utt_node, equations, dg,
-            i, jj)
-      end
-   end
-
-   # Scale ∇u_tt
-   for j in eachnode(dg), i in eachnode(dg)
-      inv_jacobian = inverse_jacobian[i, j, element]
-      for v in eachvariable(equations)
-         uttx[v, i, j] *= inv_jacobian
-         utty[v, i, j] *= inv_jacobian
-      end
-   end
+   compute_local_grad_u!(uttx, utty, utt, element, equations, dg, cache)
 
    for j in eachnode(dg), i in eachnode(dg)
       utt_node = get_node_vars(utt, equations, dg, i, j)
@@ -1455,32 +1517,7 @@ function lw_volume_kernel_4!(
    end
 
    # Compute ∇uttt
-   for j in eachnode(dg), i in eachnode(dg)
-      uttt_node = get_node_vars(uttt, equations, dg, i, j)
-
-      for ii in eachnode(dg)
-         # ut              += -lam * D * f for each variable
-         # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-         multiply_add_to_node_vars!(utttx, derivative_matrix[ii, i], uttt_node, equations, dg,
-            ii, j)
-      end
-
-      for jj in eachnode(dg)
-         # C += -lam*g*Dm' for each variable
-         # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         multiply_add_to_node_vars!(uttty, derivative_matrix[jj, j], uttt_node, equations, dg,
-            i, jj)
-      end
-   end
-
-   # Scale ∇uttt
-   for j in eachnode(dg), i in eachnode(dg)
-      inv_jacobian = inverse_jacobian[i, j, element]
-      for v in eachvariable(equations)
-         utttx[v, i, j] *= inv_jacobian
-         uttty[v, i, j] *= inv_jacobian
-      end
-   end
+   compute_local_grad_u!(utttx, uttty, uttt, element, equations, dg, cache)
 
    for j in eachnode(dg), i in eachnode(dg)
       uttt_node = get_node_vars(uttt, equations, dg, i, j)
@@ -1585,32 +1622,7 @@ function lw_volume_kernel_4!(
    end
 
    # Compute ∇utttt
-   for j in eachnode(dg), i in eachnode(dg)
-      utttt_node = get_node_vars(utttt, equations, dg, i, j)
-
-      for ii in eachnode(dg)
-         # ut              += -lam * D * f for each variable
-         # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-         multiply_add_to_node_vars!(uttttx, derivative_matrix[ii, i], utttt_node, equations, dg,
-            ii, j)
-      end
-
-      for jj in eachnode(dg)
-         # C += -lam*g*Dm' for each variable
-         # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-         multiply_add_to_node_vars!(utttty, derivative_matrix[jj, j], utttt_node, equations, dg,
-            i, jj)
-      end
-   end
-
-   # Scale ∇utttt
-   for j in eachnode(dg), i in eachnode(dg)
-      inv_jacobian = inverse_jacobian[i, j, element]
-      for v in eachvariable(equations)
-         uttttx[v, i, j] *= inv_jacobian
-         utttty[v, i, j] *= inv_jacobian
-      end
-   end
+   compute_local_grad_u!(uttttx, utttty, utttt, element, equations, dg, cache)
 
    for j in eachnode(dg), i in eachnode(dg)
       utttt_node = get_node_vars(utttt, equations, dg, i, j)
@@ -1735,7 +1747,7 @@ function lw_volume_kernel_4!(
 
       u_node = get_node_vars(u, equations, dg, i, j, element)
       x = get_node_coords(node_coordinates, equations, dg, i, j, element)
-      stttt = calc_source_tttt_N4(u_node, up_node, um_node, upp_node, umm_node,
+      stttt = calc_source_tttt_N4(u_node, up_node, upp_node, um_node, umm_node,
          x, t, dt, source_terms,
          equations, dg, cache)
       multiply_add_to_node_vars!(S, 1.0 / 120.0, stttt, equations, dg, i, j)

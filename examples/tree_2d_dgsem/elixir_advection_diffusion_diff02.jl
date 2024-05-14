@@ -95,3 +95,4 @@ sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
                       );
 summary_callback()
 return sol;
+

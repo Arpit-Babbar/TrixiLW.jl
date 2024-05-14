@@ -16,24 +16,19 @@ prandtl_number() = 0.72
 rho_inf() = 1.0
 pre_inf() = 160.714285714286
 T_inf() = pre_inf()
-linf() = 1.0
+linf() = 0.1
 H() = 0.41
-centre() = 0.5 * H() # NOT the centre of cylinder (which is 0.2), but of the domain.
 um() = 1.5 # Maximum velocity
-uinf(y) = 4.0 * um() * y/H() * ( 1.0- y/H() )
+u(y) = 4.0 * um() * y/H() * ( 1.0- y/H() )
 mach_inf() = 0.1
-a(equations) = sqrt(equations.gamma * pre_inf() / rho_inf())
-@assert isapprox(mach_inf(), uinf(centre())/a(equations), atol = 5e-9) abs(0.1 - uinf(centre())/a(equations))
-# mu() = rho_inf() * uinf(centre()) * linf() / Re()
 mu() = 1e-3
-# mu() = 1.0/Re()
 equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu=mu(),
                                                           Prandtl=prandtl_number(),
                                                           gradient_variables=TrixiLW.GradientVariablesConservative())
 @inline function initial_condition_mach01_flow(x, t, equations)
    rho = rho_inf()
    pre = pre_inf()
-   U_inf = uinf(x[2])
+   U_inf = u(x[2])
 
    v1 = U_inf
    v2 = 0.0
@@ -196,13 +191,13 @@ aoa = 0.0*pi/180.0
 # boundary_conditions to be a part of the cache object though
 indices = cache -> semi.boundary_conditions.boundary_indices[1]
 drag_force = AnalysisSurfaceIntegral(indices, TrixiLW.DragForcePressure(
-   aoa, rho_inf(), uinf(centre()), linf()))
+   aoa, rho_inf(), u(centre()), linf()))
 lift_force = AnalysisSurfaceIntegral(indices, TrixiLW.LiftForcePressure(
-   aoa, rho_inf(), uinf(centre()), linf()))
+   aoa, rho_inf(), u(centre()), linf()))
 drag_force_viscous = AnalysisSurfaceIntegralViscous(indices, TrixiLW.DragForceViscous(
-   aoa, rho_inf(), uinf(centre()), linf()))
+   aoa, rho_inf(), u(centre()), linf()))
 lift_force_viscous = AnalysisSurfaceIntegralViscous(indices, TrixiLW.LiftForceViscous(
-   aoa, rho_inf(), uinf(centre()), linf()))
+   aoa, rho_inf(), u(centre()), linf()))
 
 analysis_callback = AnalysisCallback(semi, interval=5000,
                                      analysis_errors = Symbol[],

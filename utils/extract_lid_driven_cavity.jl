@@ -20,11 +20,12 @@ sol_mdrk = trixi_include(elixir,
    polydeg = 4)
 
 
-pd_y_error = PlotData1D(sol_error_lw.u, semi, slice = :y, point = (0.5,0.5), nvisnodes = 3)
+sol_error_lw = sol
+pd_y_error = PlotData1D(sol_error_lw.u[1], semi, slice = :y, point = (0.5,0.5), nvisnodes = 3)
 pd_y_cfl = PlotData1D(sol_cfl.u, semi, slice = :y, point = (0.5,0.5), nvisnodes = 3)
 pd_y_mdrk = PlotData1D(sol_mdrk.u, semi, slice = :y, point = (0.5,0.5), nvisnodes = 3)
 
-pd_x_error = PlotData1D(sol_error_lw.u, semi, slice = :x, point = (0.5,0.5), nvisnodes = 3)
+pd_x_error = PlotData1D(sol_error_lw.u[1], semi, slice = :x, point = (0.5,0.5), nvisnodes = 3)
 pd_x_cfl = PlotData1D(sol_cfl.u, semi, slice = :x, point = (0.5,0.5), nvisnodes = 3)
 pd_x_mdrk = PlotData1D(sol_mdrk.u, semi, slice = :x, point = (0.5,0.5), nvisnodes = 3)
 

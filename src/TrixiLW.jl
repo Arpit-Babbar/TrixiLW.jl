@@ -8,6 +8,7 @@ solvers_dir()  = joinpath(src_dir(),"solvers")
 aux_dir()      = joinpath(src_dir(),"auxiliary")
 callback_dir() = joinpath(src_dir(),"callbacks")
 utils_dir() = joinpath(base_dir(), "utils")
+data_dir() = joinpath(base_dir(), "data")
 
 examples_dir_trixilw() = joinpath(base_dir(), "examples")
 
@@ -67,6 +68,6 @@ include(src_dir() * "/callbacks/callbacks_stage/positivity_zhang_shu.jl")
 include(src_dir() * "/callbacks/callbacks_step/analysis_dg2d.jl")
 
 export get_time_discretization, SurfaceIntegralDiffusive, SemidiscretizationHyperbolic,
-       RadialIndicator, BoundaryConditionsNavierStokesInflow
+       RadialIndicator, BoundaryConditionsNavierStokesInflow, AnalysisSurfaceFrictionCoefficient
 
 end # module

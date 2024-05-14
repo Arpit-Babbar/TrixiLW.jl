@@ -40,7 +40,7 @@ boundary_conditions_parabolic = Dict(:x_neg => BoundaryConditionDirichlet(initia
                                      :y_pos => BoundaryConditionDirichlet(initial_condition))
 
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
-solver = DGSEM(polydeg=1, surface_flux=flux_lax_friedrichs,
+solver = DGSEM(polydeg=4, surface_flux=flux_lax_friedrichs,
                volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
 
 coordinates_min = (-1.0, -0.5)
@@ -56,7 +56,7 @@ end
 
 trees_per_dimension = (4, 4)
 mesh = P4estMesh(trees_per_dimension,
-                 polydeg=1, initial_refinement_level=4,
+                 polydeg=4, initial_refinement_level=3,
                  mapping=mapping, periodicity=(false, false))
 
 # A semidiscretization collects data structures and functions for the spatial discretization
@@ -94,14 +94,13 @@ visualization_callback = VisualizationCallback(interval=300,
 callbacks = (
    summary_callback,
    analysis_callback,
-   alive_callback,
-   visualization_callback
+   alive_callback
 );
 
 
 ###############################################################################
 # run the simulation
-cfl_number = 22000
+cfl_number = 22
 time_int_tol = 1e-8
 tolerances = (; abstol=time_int_tol, reltol=time_int_tol)
 dt_initial = 1.0
