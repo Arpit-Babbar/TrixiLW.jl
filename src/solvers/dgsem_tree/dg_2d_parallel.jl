@@ -1,4 +1,5 @@
 # dg::DG contains info about the solver such as basis(GL nodes), weights etc.
+#!
 using MuladdMacro
 @muladd begin
 
@@ -156,8 +157,65 @@ function create_cache(mesh::ParallelTreeMesh{2}, equations,
     return cache    
 end
 
-function init_mpi_cache()
+function init_mpi_cache(mesh, elements, mpi_interfaces, mpi_mortars, nvars, nnodes,
+                        uEltype)
+    mpi_cache = MPICache(uEltype)
+
+    init_mpi_cache!(mpi_cache, mesh, elements, mpi_interfaces, mpi_mortars, nvars,
+                    nnodes, uEltype)
+
+    return mpi_cache
 end
+
+function init_mpi_cache!(mpi_cache, mesh, elements, mpi_interfaces, mpi_mortars, nvars,
+                         nnodes, uEltype)
+    mpi_neighbor_ranks, mpi_neighbor_interfaces, mpi_neighbor_mortars = init_mpi_neighbor_connectivity(elements,
+                                                                                                        mpi_interfaces,
+                                                                                                        mpi_mortars,
+                                                                                                        mesh)
+    mpi_send_buffers, mpi_recv_buffers, mpi_send_requests, mpi_recv_requests = init_mpi_data_structures(mpi_neighbor_interfaces,
+                                                                                                        mpi_neighbor_mortars,
+                                                                                                        ndims(mesh),
+                                                                                                        nvars,
+                                                                                                        nnodes,
+                                                                                                        uEltype)
+    # Define local and total number of elements
+    n_elements_by_rank = Vector{Int}(undef, mpi_nranks())   # vector of length `size`
+    n_elements_by_rank[mpi_rank() + 1] = nelements(elements)    # number of elements each rank has.
+    MPI.Allgather!(MPI.UBuffer(n_elements_by_rank, 1), mpi_comm())  # MPI.UBuffer()-> create buffer without datatype
+    n_elements_by_rank = OffsetArray(n_elements_by_rank, 0:(mpi_nranks() - 1))  # Overwriting same array and index changing
+    n_elements_global = MPI.Allreduce(nelements(elements), +, mpi_comm())   # total number of elements
+    @assert n_elements_global == sum(n_elements_by_rank) "error in total number of elements"
+
+    # Determine the global element id of the first element
+    # MPI.Exscan()-> partial reduction(here sum) but exclude process's own cotribution
+    # Complement-> MPI.Scan()-> include process's own contribution 
+    first_element_global_id = MPI.Exscan(nelements(elements), +, mpi_comm())
+    if mpi_isroot()
+        # With Exscan, the result on the first rank is undefined
+        first_element_global_id = 1
+    else
+        # on all other ranks, +1 since julia is 1-based indexing
+        first_element_global_id += 1
+    end
+
+    @pack! mpi_cache = mpi_neighbor_ranks, mpi_neighbor_interfaces,
+                       mpi_neighbor_mortars, 
+                       mpi_send_buffers, mpi_recv_buffers,
+                       mpi_send_requests, mpi_recv_requests,
+                       n_element_by_rank, n_element_global,
+                       first_element_global_id
+end
+
+# Initialize connectivity between MPI neighbor ranks
+function init_mpi_neighbor_connectivity(element, mpi_interfaces, mpi_mortars,
+                                        mesh::TreeMesh2D)
+    tree = mesh.tree
+
+    # Determine neighbor ranks and sides for MPI interfaces
+    neighbor_ranks_interfaces = fill(-1, nmpiinterfaces(mpi_interfaces))
+    # 
+
 
 
 # TODO: Add functionality for time averaged solution and fluxes
