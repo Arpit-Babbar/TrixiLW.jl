@@ -182,7 +182,12 @@ function init_mpi_cache!(mpi_cache, mesh, elements, mpi_interfaces, mpi_mortars,
     # Define local and total number of elements
     n_elements_by_rank = Vector{Int}(undef, mpi_nranks())   # vector of length `size`
     n_elements_by_rank[mpi_rank() + 1] = nelements(elements)    # number of elements each rank has.
-    MPI.Allgather!(MPI.UBuffer(n_elements_by_rank, 1), mpi_comm())  # MPI.UBuffer()-> create buffer without datatype
+
+    # This will create a buffer on each rank of the needed size as described in the array n_elements_by_rank then gather
+    # all those buffers and make a single buf which is then bcast to all ranks.
+    # MPI.UBuffer(::Array, ::DataType)- create separate buffer on each rank.
+    MPI.Allgather!(MPI.UBuffer(n_elements_by_rank, 1), mpi_comm())
+    
     n_elements_by_rank = OffsetArray(n_elements_by_rank, 0:(mpi_nranks() - 1))  # Overwriting same array and index changing
     n_elements_global = MPI.Allreduce(nelements(elements), +, mpi_comm())   # total number of elements
     @assert n_elements_global == sum(n_elements_by_rank) "error in total number of elements"
@@ -214,9 +219,94 @@ function init_mpi_neighbor_connectivity(element, mpi_interfaces, mpi_mortars,
 
     # Determine neighbor ranks and sides for MPI interfaces
     neighbor_ranks_interfaces = fill(-1, nmpiinterfaces(mpi_interfaces))
-    # 
+    # The global interface id is the smaller of the (globally unique) neighbor cell ids, 
+    # multiplied by number of directions (2 * ndims; for 2D 4 directions) plus direction minus one
+    global_interface_ids = fill(-1, nmpiinterfaces(mpi_interfaces))
+    for interface_id in 1:nmpiinterfaces(mpi_interfaces)
+        orientation = mpi_interfaces.orientations[interface_id]
+        remote_side = mpi_interfaces.remote_sides[interface_id]
+        # Direction is from local cell to remote cell
+        if orientation == 1 # MPI interface is in X-direction
+            if remote_side == 1 # remote cell is on the "left" of MPI Interface  
+                direction = 1
+            else # remote cell is on the "right" of MPI Interface
+                direction = 2
+            end
+        else # MPI interface is in y-direction
+            if remote_side == 1 # remote cell is on the "left" of MPI Interface
+                direction = 3
+            else # remote cell is on the "right" of MPI Interface
+                direction = 4
+            end
+        end
+
+        local_neighbor_id = mpi_interfaces.local_neighbor_ids[interface_id]
+        local_cell_id = elements.cell_ids[local_neighbor_id]
+        remote_cell_id = tree.neighbor_ids[direction, local_cell_id]
+        neighbor_ranks_interface[interface_id] = tree.mpi_ranks[remote_cell_id]
+
+        if local_cell_id < remote_cell_id
+            global_interface_ids[interface_id] = 2 * ndims(tree) * local_cell_id + direction - 1
+        else
+            global_interface_ids[interface_id] = (2 * ndims(tree) * remote_cell_id + opposite_direction(direction) - 1)
+        end
+    end
+
+    # Determine neighbor ranks for MPI mortars
+    # TODO: mortar code here
+
+    # Get sorted, unique neighbor ranks
+    # |> - pipe operator (transfers output of left fxn to input of right fxn)
+    # vcat() - vertical concatenation
+    # sort - sort the array
+    # unique - remove duplicates
+    mpi_neighbor_ranks = vcat(neighbor_ranks_interface, neighbor_raks_mortar...) |> sort |> unique
+
+    # Sort interfaces by global interface id
+    p = sortperm(global_interface_ids)      # sortperm() - returns indices for which, sorted array can be obtained
+    # p contains sorted indices
+    neighbor_ranks_interface .= neighbor_ranks_interface[p] # array will get sorted here
+    interface_ids = collect(1:nmpiinterfaces(mpi_interfaces))[p]
+
+    # Sort mortars by global mortar id
+    # TODO: mortar code here
+
+    # For each neighbor rank, init connectivity data structures
+    mpi_neighbor_interfaces = Vector{Vector{Int}}(undef, length(mpi_neighbor_ranks))
+    mpi_neighbor_mortars = Vector{Vector{Int}}(undef, length(mpi_neighbor_ranks))
+    for (index, d) in enumerate(mpi_neighbor_ranks)
+        # findall(predicate, collection) - returns indices of those elements for which predicate is true
+        mpi-neighbor_ranks_interfaces[index] = interface_ids[findall(x -> (x == d)), neighbor_ranks_interface]
+        mpi_neighbor_mortars[index] = mortar_ids[findall(x -> (x == d)), neighbor_raks_mortar]
+    end
+
+    # Check that we counted all interfaces exactly once
+    @assert sum(length(v) for v in mpi_neighbor_interfaces) == nmpiinterfaces(mpi_interfaces)
+
+    return mpi_neighbor_ranks, mpi_neighbor_interfaces, mpi_neighbor_mortars
+
+end
+
+# TODO: complete rhs!()
+function rhs!(du, u, t, mesh::Union{ParallelTreeMesh{2}, ParallelP4estMesh{2}, ParallelT8codeMesh{2}}, equations,
+              initial_condition, boundary_conditions, source_terms::Source, dg::DG, time_discretization::AbstractLWTimeDiscretization,
+              cache, tolerances::NamedTuple) where {Source}
+    # Start to receive MPI data
+    @trixi_timeit timer() "start MPI receive" start_mpi_receive!(cache.mpi_cache)
+
+    # Prolong solution to MPI interfaces
+    @trixi_timeit timer() "prolong2mpiinterfaces" begin
+        prolong2mpiinterfaces!(cache, u, mesh, equations, dg.surface_integral, time_discretization, dg)
+    end
+
+    # Prolong solution to MPI mortars
+    # TODO: code `prolong2mpimortars!()`
+    @trixi_timeit timer() "start MPI send" begin
+        start_mpi_send!(cache.mpi_cache, mesh, equations, dg, cache)
+    end
 
 
+end
 
 # TODO: Add functionality for time averaged solution and fluxes
 # These functions are extra in LW because it is using LW instead of RK?(ASK)
@@ -229,7 +319,7 @@ function prolong2mpiinterfaces!(cache, u, mesh::ParallelTreeMesh{2},
         local_element = mpi_interface.local_neighbor_ids[interface]
         
         # TODO: create fluxes anad time averaged solution part too. 
-        #TODO: create struct in containers_2d.jl that contains `u`, `remote_sides` etc
+        # TODO: create struct in containers_2d.jl that contains `u`, `remote_sides` etc
         # check similar struct in container_2d.jl in Trixi.jl
         if mpi_interfaces.orientations[interface] == 1 # interface in x direction
             if mpi_interface.remote_sides[interface] == 1 # local element in positive direction 
