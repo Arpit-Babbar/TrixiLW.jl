@@ -1,7 +1,7 @@
 # dg::DG contains info about the solver such as basis(GL nodes), weights etc.
 using Trixi: prolong2mpimortars!, start_mpi_receive!, MPICache, init_elements, local_leaf_cells, init_interfaces, init_mpi_interfaces, init_boundaries,
 init_mortars, init_mpi_mortars, init_mpi_cache, init_mpi_neighbor_connectivity, nmpiinterfaces, reset_du!, get_surface_node_vars, surface_flux, finish_mpi_send!,
-calc_mpi_mortar_flux!, mpi_mortar_fluxes_to_elements!
+calc_mpi_mortar_flux!, mpi_mortar_fluxes_to_elements!, Base.eltype
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
 # we need to opt-in explicitly.
@@ -13,48 +13,6 @@ calc_mpi_mortar_flux!, mpi_mortar_fluxes_to_elements!
 using MuladdMacro
 @muladd begin
 #! format: noindent
-
-mutable struct MPICache{uEltype <: Real}
-    mpi_neighbor_ranks::Vector{Int}
-    mpi_neighbor_interfaces::Vector{Vector{Int}}
-    mpi_neighbor_mortars::Vector{Vector{Int}}
-    mpi_send_buffers::Vector{Vector{uEltype}}
-    mpi_recv_buffers::Vector{Vector{uEltype}}
-    mpi_send_requests::Vector{MPI.Request}
-    mpi_recv_requests::Vector{MPI.Request}
-    n_elements_by_rank::OffsetArray{Int, 1, Array{Int, 1}}
-    n_elements_global::Int
-    first_element_global_id::Int
-end
-
-function MPICache(uEltype)      # Outer constructor
-    # MPI communication "just works" for bitstypes only(Int, Float, bool)
-    # complex types such as struct etc. can not be transferred.
-    if !isbitstype(uEltype)
-        throw(ArgumentError("MPICache only supports bitstypes, $uEltype is not a bittype."))
-    end
-    mpi_neighbor_ranks = Vector{Int}(undef, 0)  # vector of 0 length; later will be filled
-    mpi_neighbor_interfaces = Vector{Vector{Int}}(undef, 0)
-    mpi_neighbor_mortars = Vector{Vector{Int}}(undef, 0)
-    mpi_send_buffers = Vector{Vector{uEltype}}(undef, 0)
-    mpi_recv_buffers = Vector{Vector{uEltype}}(undef, 0)
-    mpi_send_requests = Vector{MPI.Request}(undef, 0)
-    mpi_recv_requests = Vector{MPI.Request}(undef, 0)
-    n_elements_by_rank = offsetArray(Vector{Int}(undef, 0), 0:-1)
-    n_elements_by_global = 0
-    first_element_global_id = 0
-
-    # Initializing the MPICache struct (outer constructor approach)
-    # Creating a instance of MPICache and return the resulting instance
-    MPICache{uEltype}(mpi_neighbor_ranks, mpi_neighbor_interfaces, mpi_neighbor_mortars,
-                      mpi_send_buffers, mpi_recv_buffers,
-                      mpi_send_requests, mpi_recv_requests,
-                      n_elements_by_rank, n_elements_by_global,
-                      first_element_global_id)
-end
-# Overloading Base.eltype function to tell type of elements of instances of MPICache 
-@inline Base.eltype(::MPICache{uEltype}) where {uEltype} = uEltype
-
 
 function start_mpi_send!(mpi_cache::MPICache, mesh, equations,
                          time_discretization::AbstractLWTimeDiscretization,
@@ -175,7 +133,7 @@ function create_cache(mesh::ParallelTreeMesh{2}, equations,
 end
 
 
-function (mpi_cache, mesh, elements, mpi_interfaces, mpi_mortars, nvars,
+function init_mpi_cache!(mpi_cache, mesh, elements, mpi_interfaces, mpi_mortars, nvars,
                          nnodes, uEltype)
     mpi_neighbor_ranks, mpi_neighbor_interfaces, mpi_neighbor_mortars = init_mpi_neighbor_connectivity(elements,
                                                                                                        mpi_interfaces,
