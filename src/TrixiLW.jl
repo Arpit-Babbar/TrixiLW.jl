@@ -42,6 +42,7 @@ include(semi_dir() * "/semidiscretization_hyperbolic_parabolic.jl")
 include(solvers_dir() * "/dgsem_tree/dg_2d.jl")
 include(solvers_dir() * "/dgsem_tree/dg_2d_parabolic.jl")
 include(solvers_dir() * "/dgsem_tree/containers.jl")
+include(solvers_dir() * "/dgsem_tree/containers_2d.jl")
 include(solvers_dir() * "/dgsem_tree/multi_derivative_2d.jl")
 include(solvers_dir() * "/dgsem_tree/multi_derivative_2d_parabolic.jl")
 
@@ -66,6 +67,11 @@ include(solvers_dir() * "/dgsem_p4est/indicators.jl")
 
 include(src_dir() * "/callbacks/callbacks_stage/positivity_zhang_shu.jl")
 include(src_dir() * "/callbacks/callbacks_step/analysis_dg2d.jl")
+
+
+# Parallel code
+include(solvers_dir() * "/dgsem_tree/dg_parallel.jl")
+include(solvers_dir() * "/dgsem_tree/dg_2d_parallel.jl")
 
 export get_time_discretization, SurfaceIntegralDiffusive, SemidiscretizationHyperbolic,
        RadialIndicator, BoundaryConditionsNavierStokesInflow, AnalysisSurfaceFrictionCoefficient
