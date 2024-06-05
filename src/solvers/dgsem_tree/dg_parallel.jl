@@ -27,8 +27,8 @@ function init_mpi_data_structures(mpi_neighbor_interfaces, mpi_neighbor_mortars,
                                                     n_small_elements * 2 * data_size)
     end
 
-    mpi_send_requests = Vector{MPI.Request}(undef, lw_extras * length(mpi_neighbor_interfaces))
-    mpi_recv_requests = Vector{MPI.Request}(undef, lw_extras * length(mpi_neighbor_interfaces))
+    mpi_send_requests = Vector{MPI.Request}(undef, length(mpi_neighbor_interfaces))
+    mpi_recv_requests = Vector{MPI.Request}(undef, length(mpi_neighbor_interfaces))
 
     return mpi_send_buffers, mpi_recv_buffers, mpi_send_requests, mpi_recv_requests
 end
