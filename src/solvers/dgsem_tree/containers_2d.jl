@@ -58,6 +58,7 @@ nnodes(mpi_interfaces::MPIInterfaceContainer2D) = size(mpi_interfaces.u, 3)
 Base.eltype(mpi_interfaces::MPIInterfaceContainer2D) = eltype(mpi_interfaces.u)
 
 # See explanation of Base.resize! for the element container
+# For AMR, to be tested
 function Base.resize!(mpi_interfaces::MPIInterfaceContainer2D, capacity)
    n_nodes = nnodes(mpi_interfaces)
    n_variables = nvariables(mpi_interfaces)
