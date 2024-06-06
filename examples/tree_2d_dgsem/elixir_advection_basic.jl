@@ -59,8 +59,8 @@ dt_initial = 0.1;
 # 0.9 works for 2-staged
 cfl_number = TrixiLW.trixi2lw(0.71, solver)
 sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
-                         time_step_computation = TrixiLW.Adaptive(),
-                        #  time_step_computation = TrixiLW.CFLBased(cfl_number),
+                        #  time_step_computation = TrixiLW.Adaptive(),
+                         time_step_computation = TrixiLW.CFLBased(cfl_number),
                         );
 
 # Print the timer summary
