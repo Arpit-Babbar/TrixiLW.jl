@@ -1,4 +1,4 @@
-import Trixi: eachinterface
+import Trixi: eachinterface, nvariables, nnodes
 
 function create_interface_cache(mesh::Union{TreeMesh{2},UnstructuredMesh2D,P4estMesh{2}}, equations, dg,
    uEltype, RealT, cache, time_discretization)

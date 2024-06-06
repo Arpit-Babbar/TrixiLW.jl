@@ -1,7 +1,7 @@
 # dg::DG contains info about the solver such as basis(GL nodes), weights etc.
 using Trixi: prolong2mpimortars!, start_mpi_receive!, MPICache, init_elements, local_leaf_cells, init_interfaces, init_mpi_interfaces, init_boundaries,
-init_mortars, init_mpi_mortars, init_mpi_cache, init_mpi_neighbor_connectivity, nmpiinterfaces, reset_du!, get_surface_node_vars, surface_flux, finish_mpi_send!,
-calc_mpi_mortar_flux!, mpi_mortar_fluxes_to_elements!
+init_mortars, init_mpi_mortars, init_mpi_cache, init_mpi_neighbor_connectivity, nmpiinterfaces, reset_du!, get_surface_node_vars, finish_mpi_send!,
+calc_mpi_mortar_flux!, mpi_mortar_fluxes_to_elements!, ParallelTreeMesh, ParallelP4estMesh
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
 # we need to opt-in explicitly.
@@ -179,7 +179,7 @@ function init_mpi_cache!(mpi_cache, mesh, elements, mpi_interfaces, mpi_mortars,
                        first_element_global_id
 end
 
-function rhs!(du, u, t, mesh::Union{ParallelTreeMesh{2}, ParallelP4estMesh{2}, ParallelT8codeMesh{2}},
+function rhs!(du, u, t, mesh::Union{ParallelTreeMesh{2}, ParallelP4estMesh{2}},
             equations, initial_condition, boundary_conditions, source_terms::Source, dg::DG,
             time_discretization::AbstractLWTimeDiscretization,
             cache, tolerances::NamedTuple) where {Source}
