@@ -1,4 +1,4 @@
-import Trixi: eachinterface, nvariables, nnodes
+import Trixi: eachinterface, nvariables, nnodes, init_mpi_interfaces!, count_required_mpi_interfaces, ElementContainer2D, TreeMesh2D
 
 function create_interface_cache(mesh::Union{TreeMesh{2},UnstructuredMesh2D,P4estMesh{2}}, equations, dg,
    uEltype, RealT, cache, time_discretization)
@@ -40,7 +40,7 @@ function create_boundary_cache(mesh::Union{TreeMesh{2}}, equations, dg, uEltype,
 end
 
 # Container data structure (structure-of-arrays style) for DG MPI interfaces
-mutable struct MPIInterfaceContainer2D{uEltype <: Real} <: AbstractContainer
+mutable struct MPIInterfaceContainerLW2D{uEltype <: Real} <: AbstractContainer
    u::Array{uEltype, 4}            # [leftright, variables, i, interfaces]
    U::Array{uEltype, 4}
    F::Array{uEltype, 4}
@@ -53,13 +53,13 @@ mutable struct MPIInterfaceContainer2D{uEltype <: Real} <: AbstractContainer
    _F::Vector{uEltype}
 end
 
-nvariables(mpi_interfaces::MPIInterfaceContainer2D) = size(mpi_interfaces.u, 2)
-nnodes(mpi_interfaces::MPIInterfaceContainer2D) = size(mpi_interfaces.u, 3)
-Base.eltype(mpi_interfaces::MPIInterfaceContainer2D) = eltype(mpi_interfaces.u)
+nvariables(mpi_interfaces::MPIInterfaceContainerLW2D) = size(mpi_interfaces.u, 2)
+nnodes(mpi_interfaces::MPIInterfaceContainerLW2D) = size(mpi_interfaces.u, 3)
+Base.eltype(mpi_interfaces::MPIInterfaceContainerLW2D) = eltype(mpi_interfaces.u)
 
 # See explanation of Base.resize! for the element container
 # For AMR, to be tested
-function Base.resize!(mpi_interfaces::MPIInterfaceContainer2D, capacity)
+function Base.resize!(mpi_interfaces::MPIInterfaceContainerLW2D, capacity)
    n_nodes = nnodes(mpi_interfaces)
    n_variables = nvariables(mpi_interfaces)
    @unpack _u, _U, _F, local_neighbor_ids, orientations, remote_sides = mpi_interfaces
@@ -84,7 +84,7 @@ function Base.resize!(mpi_interfaces::MPIInterfaceContainer2D, capacity)
    return nothing
 end
 
-function MPIInterfaceContainer2D{uEltype}(capacity::Integer, n_variables,
+function MPIInterfaceContainerLW2D{uEltype}(capacity::Integer, n_variables,
    n_nodes) where {uEltype <: Real}
 nan = convert(uEltype, NaN)
 
@@ -102,7 +102,21 @@ orientations = fill(typemin(Int), capacity)
 
 remote_sides = fill(typemin(Int), capacity)
 
-return MPIInterfaceContainer2D{uEltype}(u, U, F, local_neighbor_ids, orientations,
+return MPIInterfaceContainerLW2D{uEltype}(u, U, F, local_neighbor_ids, orientations,
                                        remote_sides,
                                        _u, _U, _F)
+end
+
+# Create MPI interface container and initialize MPI interface data in `elements`.
+function init_mpi_interfaces(cell_ids, mesh::TreeMesh2D,
+   elements::ElementContainer2D)
+# Initialize container
+n_mpi_interfaces = count_required_mpi_interfaces(mesh, cell_ids)
+mpi_interfaces = MPIInterfaceContainerLW2D{eltype(elements)}(n_mpi_interfaces,
+                                     nvariables(elements),
+                                     nnodes(elements))
+
+# Connect elements with interfaces
+init_mpi_interfaces!(mpi_interfaces, elements, mesh)
+return mpi_interfaces
 end
