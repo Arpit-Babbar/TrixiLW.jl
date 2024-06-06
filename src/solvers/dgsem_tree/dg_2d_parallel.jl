@@ -1,7 +1,10 @@
 # dg::DG contains info about the solver such as basis(GL nodes), weights etc.
-using Trixi: prolong2mpimortars!, start_mpi_receive!, MPICache, init_elements, local_leaf_cells, init_interfaces, init_mpi_interfaces, init_boundaries,
-init_mortars, init_mpi_mortars, init_mpi_cache, init_mpi_neighbor_connectivity, nmpiinterfaces, reset_du!, get_surface_node_vars, finish_mpi_send!,
-calc_mpi_mortar_flux!, mpi_mortar_fluxes_to_elements!, ParallelTreeMesh, ParallelP4estMesh
+using Trixi: prolong2mpimortars!, start_mpi_receive!, MPICache, init_elements, local_leaf_cells,
+             init_interfaces, init_mpi_interfaces, init_boundaries, init_mortars, init_mpi_mortars,
+             init_mpi_cache, init_mpi_neighbor_connectivity,
+             nmpiinterfaces, reset_du!, get_surface_node_vars, finish_mpi_send!,
+             calc_mpi_mortar_flux!, mpi_mortar_fluxes_to_elements!, ParallelTreeMesh,
+             ParallelP4estMesh, eachmpiinterface
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
 # we need to opt-in explicitly.
@@ -39,7 +42,7 @@ function start_mpi_send!(mpi_cache::MPICache, mesh, equations,
                 @views send_buffer[first2:last2] .= vec(cache.mpi_interfaces.U[2, :, :,
                                                                              interface])
                 @views send_buffer[first3:last3] .= vec(cache.mpi_interfaces.F[2, :, :,
-                                                                             interface])                
+                                                                             interface])
             else # local element in negative direction
                 @views send_buffer[first1:last1] .= vec(cache.mpi_interfaces.u[1, :, :,
                                                                              interface])
@@ -79,13 +82,13 @@ function finish_mpi_receive!(mpi_cache::MPICache, mesh, equations,
             last3 = first3 + data_size
 
             if cache.mpi_interfaces.remote_sides[interface] == 1 # local element in positive direction
-                @views vec(cache.mpi_interface.u[1, :, :, interface]) .= recv_buffer[first1:last1]
-                @views vec(cache.mpi_interface.U[1, :, :, interface]) .= recv_buffer[first2:last2]
-                @views vec(cache.mpi_interface.F[1, :, :, interface]) .= recv_buffer[first3:last3]
+                @views vec(cache.mpi_interfaces.u[1, :, :, interface]) .= recv_buffer[first1:last1]
+                @views vec(cache.mpi_interfaces.U[1, :, :, interface]) .= recv_buffer[first2:last2]
+                @views vec(cache.mpi_interfaces.F[1, :, :, interface]) .= recv_buffer[first3:last3]
             else # local element in negative direction
-                @views vec(cache.mpi_interface.u[2, :, :, interface]) .= recv_buffer[first1:last1]
-                @views vec(cache.mpi_interface.U[2, :, :, interface]) .= recv_buffer[first2:last2]
-                @views vec(cache.mpi_interface.F[2, :, :, interface]) .= recv_buffer[first3:last3]
+                @views vec(cache.mpi_interfaces.u[2, :, :, interface]) .= recv_buffer[first1:last1]
+                @views vec(cache.mpi_interfaces.U[2, :, :, interface]) .= recv_buffer[first2:last2]
+                @views vec(cache.mpi_interfaces.F[2, :, :, interface]) .= recv_buffer[first3:last3]
             end
         end
         # mortar code here
@@ -129,7 +132,7 @@ function create_cache(mesh::ParallelTreeMesh{2}, equations,
     cache = (; cache..., create_cache(mesh, equations, dg.volume_integral, time_discretization, dg, uEltype)...)
     cache = (; cache..., create_cache(mesh, equations, dg.mortar, uEltype)...)
 
-    return cache    
+    return cache
 end
 
 
@@ -154,14 +157,14 @@ function init_mpi_cache!(mpi_cache, mesh, elements, mpi_interfaces, mpi_mortars,
     # all those buffers and make a single buf which is then bcast to all ranks.
     # MPI.UBuffer(::Array, ::DataType)- create fixed size separate buffer on each rank.
     MPI.Allgather!(MPI.UBuffer(n_elements_by_rank, 1), mpi_comm())
-    
+
     n_elements_by_rank = OffsetArray(n_elements_by_rank, 0:(mpi_nranks() - 1))  # Overwriting same array and index changing
     n_elements_global = MPI.Allreduce(nelements(elements), +, mpi_comm())   # total number of elements
     @assert n_elements_global == sum(n_elements_by_rank) "error in total number of elements"
 
     # Determine the global element id of the first element
     # MPI.Exscan()-> partial reduction(here sum) but exclude process's own cotribution
-    # MPI.Scan()-> include process's own contribution 
+    # MPI.Scan()-> include process's own contribution
     first_element_global_id = MPI.Exscan(nelements(elements), +, mpi_comm())
     if mpi_isroot()
         # With Exscan, the result on the first rank is undefined
@@ -172,14 +175,14 @@ function init_mpi_cache!(mpi_cache, mesh, elements, mpi_interfaces, mpi_mortars,
     end
 
     @pack! mpi_cache = mpi_neighbor_ranks, mpi_neighbor_interfaces,
-                       mpi_neighbor_mortars, 
+                       mpi_neighbor_mortars,
                        mpi_send_buffers, mpi_recv_buffers,
                        mpi_send_requests, mpi_recv_requests,
                        n_element_by_rank, n_element_global,
                        first_element_global_id
 end
 
-function rhs!(du, u, t, mesh::Union{ParallelTreeMesh{2}, ParallelP4estMesh{2}},
+function rhs!(du, u, t, dt, mesh::Union{ParallelTreeMesh{2}, ParallelP4estMesh{2}},
             equations, initial_condition, boundary_conditions, source_terms::Source, dg::DG,
             time_discretization::AbstractLWTimeDiscretization,
             cache, tolerances::NamedTuple) where {Source}
@@ -191,13 +194,14 @@ function rhs!(du, u, t, mesh::Union{ParallelTreeMesh{2}, ParallelP4estMesh{2}},
         prolong2mpiinterfaces!(cache, u, mesh, equations, dg.surface_integral, time_discretization, dg)
     end
 
+    @assert false u
     # Prolong solution to MPI mortars
     # TODO: code `prolong2mpimortars!()`
     @trixi_timeit timer() "prolong2mpimortars" begin
         prolong2mpimortars!(cache, u, mesh, equations,
                             dg.mortar, dg.surface_integral, dg)
     end
-    
+
     # Start to send MPI data
     @trixi_timeit timer() "start MPI send" begin
         start_mpi_send!(cache.mpi_cache, mesh, equations, time_discretization::AbstractLWTimeDiscretization, dg, cache)
@@ -294,17 +298,17 @@ end
 
 # U, F are extra in here because it is using LW instead of RK
 function prolong2mpiinterfaces!(cache, u, mesh::ParallelTreeMesh{2},
-                                equations, surface_integral, 
+                                equations, surface_integral,
                                 time_discretization::AbstractLWTimeDiscretization,
                                 dg::DG)
     @unpack mpi_interfaces = cache
     @unpack U, F = cache.element_cache
 
     @threaded for interface in eachmpiinterface(dg, cache)
-        local_element = mpi_interface.local_neighbor_ids[interface]
-        
+        local_element = mpi_interfaces.local_neighbor_ids[interface]
+
         if mpi_interfaces.orientations[interface] == 1 # interface in x direction
-            if mpi_interface.remote_sides[interface] == 1 # local element in positive direction 
+            if mpi_interfaces.remote_sides[interface] == 1 # local element in positive direction
                 for j in eachnode(dg), v in eachvariable(equations)
                     mpi_interfaces.u[2, v, j, interface] = u[v, 1, j, local_element]
                     mpi_interfaces.U[2, v, j, interface] = U[v, 1, j, local_element]
