@@ -25,17 +25,6 @@ function create_cache(mesh::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D,P4e
    interface_cache = create_interface_cache(mesh, equations, dg, uEltype, RealT,
       cache, time_discretization)
 
-   function alloc_for_threads(constructor, cache_size)
-      nt = Threads.nthreads()
-      SVector{nt}([alloc(constructor, cache_size) for _ in Base.OneTo(nt)])
-   end
-
-   # Construct `cache_size` number of objects with `constructor`
-   # and store them in an SVector
-   function alloc(constructor, cache_size)
-      SVector{cache_size}(constructor(undef) for _ in Base.OneTo(cache_size))
-   end
-
    # Create the result of `alloc` for each thread. Basically,
    # for each thread, construct `cache_size` number of objects with
    # `constructor` and store them in an SVector
