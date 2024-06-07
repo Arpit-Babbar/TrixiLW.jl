@@ -1,10 +1,12 @@
 # dg::DG contains info about the solver such as basis(GL nodes), weights etc.
 using Trixi: prolong2mpimortars!, start_mpi_receive!, MPICache, init_elements, local_leaf_cells,
              init_interfaces, init_boundaries, init_mortars, init_mpi_mortars,
-             init_mpi_cache, init_mpi_neighbor_connectivity,
+             init_mpi_neighbor_connectivity,
              nmpiinterfaces, reset_du!, get_surface_node_vars, finish_mpi_send!,
              calc_mpi_mortar_flux!, mpi_mortar_fluxes_to_elements!, ParallelTreeMesh,
              ParallelP4estMesh, eachmpiinterface
+            
+import Trixi: init_mpi_cache, init_mpi_cache!
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
 # we need to opt-in explicitly.
@@ -113,7 +115,7 @@ function create_cache(mesh::ParallelTreeMesh{2}, equations,
     # Generate interfaces to store info about of adjacent elements
     interfaces = init_interfaces(leaf_cell_ids, mesh, elements)
 
-    mpi_interfaces = init_mpi_interfaces(leaf_cell_ids, mesh, elements)
+    mpi_interfaces = init_mpi_interfaces(leaf_cell_ids, mesh, time_discretization, elements)
 
     # records elements which contains boundaries
     boundaries = init_boundaries(leaf_cell_ids, mesh, elements)
@@ -123,7 +125,7 @@ function create_cache(mesh::ParallelTreeMesh{2}, equations,
     mpi_mortars = init_mpi_mortars(leaf_cell_ids, mesh, elements, dg.mortar)
 
     mpi_cache = init_mpi_cache(mesh, elements, mpi_interfaces, mpi_mortars,
-                                nvariables(equations), nnodes(dg), uEltype)
+                                nvariables(equations), nnodes(dg), uEltype, time_discretization)
 
     cache = (; elements, interfaces, mpi_interfaces, boundaries, mortars, mpi_mortars,
             mpi_cache)
@@ -135,8 +137,17 @@ function create_cache(mesh::ParallelTreeMesh{2}, equations,
     return cache
 end
 
+function init_mpi_cache(mesh, elements, mpi_interfaces, mpi_mortars, nvars, nnodes,
+                        uEltype, time_discretization::AbstractLWTimeDiscretization)
+    mpi_cache = MPICache(uEltype)
+
+    init_mpi_cache!(mpi_cache, mesh, elements, mpi_interfaces, mpi_mortars, nvars,
+                    nnodes, uEltype, time_discretization)
+    return mpi_cache
+end
+
 function init_mpi_cache!(mpi_cache, mesh, elements, mpi_interfaces, mpi_mortars, nvars,
-                         nnodes, uEltype)
+                         nnodes, uEltype, time_discretization::AbstractLWTimeDiscretization)
     mpi_neighbor_ranks, mpi_neighbor_interfaces, mpi_neighbor_mortars = init_mpi_neighbor_connectivity(elements,
                                                                                                        mpi_interfaces,
                                                                                                        mpi_mortars,
@@ -147,7 +158,8 @@ function init_mpi_cache!(mpi_cache, mesh, elements, mpi_interfaces, mpi_mortars,
                                                                                                         ndims(mesh),
                                                                                                         nvars,
                                                                                                         nnodes,
-                                                                                                        uEltype)
+                                                                                                        uEltype,
+                                                                                                        time_discretization)
     # Define local and total number of elements
     n_elements_by_rank = Vector{Int}(undef, mpi_nranks())   # vector of length `size`
     n_elements_by_rank[mpi_rank() + 1] = nelements(elements)    # number of elements each rank has.

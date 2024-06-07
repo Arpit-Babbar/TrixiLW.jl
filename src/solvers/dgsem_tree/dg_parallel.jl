@@ -8,7 +8,7 @@
 # Initialize MPI data structures. This works for both the
 # `TreeMesh` and the `P4estMesh` and is dimension-agnostic.
 function init_mpi_data_structures(mpi_neighbor_interfaces, mpi_neighbor_mortars, n_dims,
-                                    nvars, n_nodes, uEltype)
+                                  nvars, n_nodes, uEltype, time_discretization::AbstractLWTimeDiscretization)
     lw_extras = 3 
     data_size = nvars * lw_extras * n_nodes^(n_dims - 1)
     n_small_elements = 2^(n_dims - 1)
