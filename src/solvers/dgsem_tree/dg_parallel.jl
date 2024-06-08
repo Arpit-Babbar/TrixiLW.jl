@@ -4,7 +4,7 @@
 # See https://ranocha.de/blog/Optimizing_EC_Trixi for further details.
 @muladd begin
 #! format: noindent
-
+using MPI
 # Initialize MPI data structures. This works for both the
 # `TreeMesh` and the `P4estMesh` and is dimension-agnostic.
 function init_mpi_data_structures(mpi_neighbor_interfaces, mpi_neighbor_mortars, n_dims,

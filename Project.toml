@@ -1,12 +1,14 @@
-authors = ["Arpit-Babbar <arpitbabbar@gmail.com>"]
 name = "TrixiLW"
 uuid = "448c043f-8f12-4619-bfac-a47248cda7f8"
+authors = ["Arpit-Babbar <arpitbabbar@gmail.com>"]
 version = "0.1.0"
 
 [deps]
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
+HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
 LoopVectorization = "bdcacae8-1622-11e9-2a5c-532679323890"
+MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
 MPIPreferences = "3da0fdf6-3ccc-4f1b-acd9-58baa6c99267"
 MuladdMacro = "46d2c3a1-f734-5fdb-9937-b9b9aeba4221"
 OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
@@ -14,6 +16,4 @@ P4est = "7d669430-f675-4ae7-b43e-fab78ec5a902"
 SimpleUnPack = "ce78b400-467f-4804-87d8-8f486da07d0a"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Trixi = "a7f1ee26-1774-49b1-8366-f1abc58fbfcb"
-
-[extras]
-HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
+Trixi2Vtk = "bc1476a1-1ca6-4cc3-950b-c312b255ff95"

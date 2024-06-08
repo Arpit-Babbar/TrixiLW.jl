@@ -1,8 +1,9 @@
+using Trixi: SerialTree
 import Trixi: ninterfaces, nboundaries
 using StaticArrays
 
 # Called within the create_cache function of dg_2d.jl
-function create_cache(mesh::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D,P4estMesh},
+function create_cache(mesh::Union{TreeMesh{NDIMS, <:Trixi.SerialTree{NDIMS}},StructuredMesh,UnstructuredMesh2D,P4estMesh} where NDIMS,
    equations::AbstractEquations, time_discretization::AbstractLWTimeDiscretization,
    dg, RealT, uEltype, cache)
 

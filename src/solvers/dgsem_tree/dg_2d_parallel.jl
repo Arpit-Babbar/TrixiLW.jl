@@ -1,10 +1,10 @@
 # dg::DG contains info about the solver such as basis(GL nodes), weights etc.
 using Trixi: prolong2mpimortars!, start_mpi_receive!, MPICache, init_elements, local_leaf_cells,
              init_interfaces, init_boundaries, init_mortars, init_mpi_mortars,
-             init_mpi_neighbor_connectivity,
-             nmpiinterfaces, reset_du!, get_surface_node_vars, finish_mpi_send!,
-             calc_mpi_mortar_flux!, mpi_mortar_fluxes_to_elements!, ParallelTreeMesh,
-             ParallelP4estMesh, eachmpiinterface
+             init_mpi_neighbor_connectivity,nmpiinterfaces, reset_du!, get_surface_node_vars,
+             finish_mpi_send!, calc_mpi_mortar_flux!, mpi_mortar_fluxes_to_elements!, 
+             ParallelTreeMesh, ParallelP4estMesh, eachmpiinterface, mpi_nranks, mpi_rank, mpi_comm,
+             mpi_isroot, calc_sources!
             
 import Trixi: init_mpi_cache, init_mpi_cache!
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
@@ -30,13 +30,13 @@ function start_mpi_send!(mpi_cache::MPICache, mesh, equations,
 
         for (index, interface) in enumerate(mpi_cache.mpi_neighbor_interfaces[d])
             first1 = lw_extras * (index - 1) * data_size + 1        # for u
-            last1 = first1 + data_size
+            last1 = first1 + data_size - 1 
 
             first2 = last1 + 1      # for U
-            last2 =  first2 + data_size
+            last2 =  first2 + data_size - 1
 
             first3 = last2 + 1      # for F
-            last3 = first3 + data_size
+            last3 = first3 + data_size - 1
 
             if cache.mpi_interfaces.remote_sides[interface] == 1 # local element in positive direction
                 @views send_buffer[first1:last1] .= vec(cache.mpi_interfaces.u[2, :, :,
@@ -59,6 +59,14 @@ function start_mpi_send!(mpi_cache::MPICache, mesh, equations,
         # mortar code needs to be change according to the first1:last1; first2:last2 etc. indices
         # since U, F will be extra so indices needs to managed as done in normal element case
     end
+        # Start sending
+    for (index, d) in enumerate(mpi_cache.mpi_neighbor_ranks)
+        mpi_cache.mpi_send_requests[index] = MPI.Isend(mpi_cache.mpi_send_buffers[index],
+                                                       d, mpi_rank(), mpi_comm())
+    end
+
+    return nothing
+
 end
 
 function finish_mpi_receive!(mpi_cache::MPICache, mesh, equations,
@@ -75,13 +83,13 @@ function finish_mpi_receive!(mpi_cache::MPICache, mesh, equations,
 
         for (index, interface) in enumerate(mpi_cache.mpi_neighbor_interfaces[d])
             first1 = lw_extras * (index - 1) * data_size + 1        # for u
-            last1 = first1 + data_size
+            last1 = first1 + data_size - 1
 
             first2 = last1 + 1      # for U
-            last2 =  first2 + data_size
+            last2 =  first2 + data_size - 1
 
             first3 = last2 + 1      # for F
-            last3 = first3 + data_size
+            last3 = first3 + data_size - 1
 
             if cache.mpi_interfaces.remote_sides[interface] == 1 # local element in positive direction
                 @views vec(cache.mpi_interfaces.u[1, :, :, interface]) .= recv_buffer[first1:last1]
@@ -249,7 +257,7 @@ function init_mpi_cache!(mpi_cache, mesh, elements, mpi_interfaces, mpi_mortars,
                        mpi_neighbor_mortars,
                        mpi_send_buffers, mpi_recv_buffers,
                        mpi_send_requests, mpi_recv_requests,
-                       n_element_by_rank, n_element_global,
+                       n_elements_by_rank, n_elements_global,
                        first_element_global_id
 end
 
@@ -265,7 +273,6 @@ function rhs!(du, u, t, dt, mesh::Union{ParallelTreeMesh{2}, ParallelP4estMesh{2
         prolong2mpiinterfaces!(cache, u, mesh, equations, dg.surface_integral, time_discretization, dg)
     end
 
-    @assert false u
     # Prolong solution to MPI mortars
     # TODO: code `prolong2mpimortars!()`
     @trixi_timeit timer() "prolong2mpimortars" begin
@@ -283,9 +290,10 @@ function rhs!(du, u, t, dt, mesh::Union{ParallelTreeMesh{2}, ParallelP4estMesh{2
 
     # Calculate volume integral
     @trixi_timeit timer() "volume integral" begin
-        calc_volume_integral!(du, u, mesh,
-                                have_nonconservative_terms(equations), equations,
-                                dg.volume_integral, dg, cache)
+        calc_volume_integral!(du, u, t, dt, tolerances, mesh,
+                              have_nonconservative_terms(equations), source_terms, 
+                              equations, dg.volume_integral, time_discretization,
+                              dg, cache)
     end
 
     # Prolong solution to interfaces
@@ -375,7 +383,6 @@ function prolong2mpiinterfaces!(cache, u, mesh::ParallelTreeMesh{2},
     @unpack mpi_interfaces = cache
     @unpack U, F = cache.element_cache
 
-    @show mpi_interfaces.U
     @threaded for interface in eachmpiinterface(dg, cache)
         local_element = mpi_interfaces.local_neighbor_ids[interface]
 
@@ -384,7 +391,7 @@ function prolong2mpiinterfaces!(cache, u, mesh::ParallelTreeMesh{2},
                 for j in eachnode(dg), v in eachvariable(equations)
                     mpi_interfaces.u[2, v, j, interface] = u[v, 1, j, local_element]
                     mpi_interfaces.U[2, v, j, interface] = U[v, 1, j, local_element]
-                    mpi_interfaces.F[2, v, j, interface] = F[v, 1, j, local_element]
+                    mpi_interfaces.F[2, v, j, interface] = F[v, 1, 1, j, local_element]
                 end
 
             else # local element in negative x-direction
@@ -393,7 +400,7 @@ function prolong2mpiinterfaces!(cache, u, mesh::ParallelTreeMesh{2},
                                                             local_element]
                     mpi_interfaces.U[1, v, j, interface] = U[v, nnodes(dg), j,
                                                             local_element]
-                    mpi_interfaces.F[1, v, j, interface] = F[v, nnodes(dg), j,
+                    mpi_interfaces.F[1, v, j, interface] = F[v, 1, nnodes(dg), j,
                                                             local_element]
                 end
             end
@@ -402,7 +409,7 @@ function prolong2mpiinterfaces!(cache, u, mesh::ParallelTreeMesh{2},
                 for i in eachnode(dg), v in eachvariable(equations)
                     mpi_interfaces.u[2, v, i, interface] = u[v, i, 1, local_element]
                     mpi_interfaces.U[2, v, i, interface] = U[v, i, 1, local_element]
-                    mpi_interfaces.F[2, v, i, interface] = F[v, i, 1, local_element]
+                    mpi_interfaces.F[2, v, i, interface] = F[v, 2, i, 1, local_element]
                 end
             else # local element in negative y-direction
                 for i in eachnode(dg), v in eachvariable(equations)
@@ -410,7 +417,7 @@ function prolong2mpiinterfaces!(cache, u, mesh::ParallelTreeMesh{2},
                                                             local_element]
                     mpi_interfaces.U[1, v, i, interface] = U[v, i, nnodes(dg),
                                                              local_element]
-                    mpi_interfaces.F[1, v, i, interface] = F[v, i, nnodes(dg),
+                    mpi_interfaces.F[1, v, i, interface] = F[v, 2, i, nnodes(dg),
                                                              local_element]
                 end
             end

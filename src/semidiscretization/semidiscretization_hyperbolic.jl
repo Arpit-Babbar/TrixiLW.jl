@@ -69,9 +69,7 @@ end
   cache = (; create_cache(mesh, equations, solver, RealT, uEltype)..., initial_cache...)
 
   # From TrixiLW.jl
-  cache = (; create_cache(mesh, equations, time_discretization, solver, RealT, uEltype, cache)...,
-             cache...)
-
+  cache = create_cache(mesh, equations, time_discretization, solver, RealT, uEltype, cache)
 
   _boundary_conditions = digest_boundary_conditions(boundary_conditions, mesh, solver, cache)
 
