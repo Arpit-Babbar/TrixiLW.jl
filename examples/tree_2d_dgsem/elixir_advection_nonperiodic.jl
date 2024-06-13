@@ -14,7 +14,7 @@ initial_condition = initial_condition_gauss
 boundary_conditions = BoundaryConditionDirichlet(initial_condition)
 
 solver = DGSEM(polydeg=3, surface_flux=flux_lax_friedrichs,
-               volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.MDRK()))
+               volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
 
 coordinates_min = (-5.0, -5.0)
 coordinates_max = ( 5.0,  5.0)

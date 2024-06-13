@@ -57,7 +57,7 @@ function create_cache(mesh::Union{TreeMesh{NDIMS, <:Trixi.SerialTree{NDIMS}},Str
 
    lw_res_cache = (; cell_arrays)
 
-   cache = (; element_cache, lw_res_cache, cfl_number, dt,
+   cache = (; cache..., element_cache, lw_res_cache, cfl_number, dt,
       temporal_errors, interface_cache, boundary_cache, lw_mortars)
    return cache
 end

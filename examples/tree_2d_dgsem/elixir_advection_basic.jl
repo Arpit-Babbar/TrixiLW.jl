@@ -35,10 +35,10 @@ tspan = (0.0, 10.0)
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 # The AnalysisCallback allows to analyse the solution in regular intervals and prints the results
-analysis_callback = AnalysisCallback(semi, interval=1000)
+analysis_callback = AnalysisCallback(semi, interval=1000, analysis_integrals = Symbol[])
 
 # The SaveSolutionCallback allows to save the solution to a file in regular intervals
-save_solution = SaveSolutionCallback(interval=1000,
+save_solution = SaveSolutionCallback(interval=1,
                                      solution_variables=cons2prim)
 
 summary_callback = SummaryCallback()

@@ -1243,6 +1243,10 @@ using LoopVectorization: @turbo
          set_node_vars!(element_cache.F, G_node, equations, dg, 2, i, j, element)
          set_node_vars!(element_cache.U, U_node, equations, dg, i, j, element)
 
+         # if isnan(U_node[1])
+         #    @assert t ≈ 0.0 t
+         # end
+
          S_node = get_node_vars(S, equations, dg, i, j)
          # inv_jacobian = inverse_jacobian[i, j, element]
          multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg,

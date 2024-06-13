@@ -1,12 +1,13 @@
 # dg::DG contains info about the solver such as basis(GL nodes), weights etc.
 using Trixi: prolong2mpimortars!, start_mpi_receive!, MPICache, init_elements, local_leaf_cells,
              init_interfaces, init_boundaries, init_mortars, init_mpi_mortars,
-             init_mpi_neighbor_connectivity,nmpiinterfaces, reset_du!, get_surface_node_vars,
-             finish_mpi_send!, calc_mpi_mortar_flux!, mpi_mortar_fluxes_to_elements!, 
+             init_mpi_neighbor_connectivity, nmpiinterfaces, reset_du!, get_surface_node_vars,
+             finish_mpi_send!, calc_mpi_mortar_flux!, mpi_mortar_fluxes_to_elements!,
              ParallelTreeMesh, ParallelP4estMesh, eachmpiinterface, mpi_nranks, mpi_rank, mpi_comm,
-             mpi_isroot, calc_sources!
-            
-import Trixi: init_mpi_cache, init_mpi_cache!
+             mpi_isroot, calc_sources!, calc_surface_integral!
+
+import Trixi: init_mpi_cache, init_mpi_cache!, start_mpi_send!, finish_mpi_receive!, prolong2mpiinterfaces!,
+calc_mpi_interface_flux!
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
 # we need to opt-in explicitly.
@@ -30,7 +31,7 @@ function start_mpi_send!(mpi_cache::MPICache, mesh, equations,
 
         for (index, interface) in enumerate(mpi_cache.mpi_neighbor_interfaces[d])
             first1 = lw_extras * (index - 1) * data_size + 1        # for u
-            last1 = first1 + data_size - 1 
+            last1 = first1 + data_size - 1
 
             first2 = last1 + 1      # for U
             last2 =  first2 + data_size - 1
@@ -268,9 +269,21 @@ function rhs!(du, u, t, dt, mesh::Union{ParallelTreeMesh{2}, ParallelP4estMesh{2
     # Start to receive MPI data
     @trixi_timeit timer() "start MPI receive" start_mpi_receive!(cache.mpi_cache)
 
+    # Reset du
+    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+
+    # Calculate volume integral
+    @trixi_timeit timer() "volume integral" begin
+        calc_volume_integral!(du, u, t, dt, tolerances, mesh,
+                              have_nonconservative_terms(equations), source_terms,
+                              equations, dg.volume_integral, time_discretization,
+                              dg, cache)
+    end
+
     # Prolong solution to MPI interfaces
     @trixi_timeit timer() "prolong2mpiinterfaces" begin
-        prolong2mpiinterfaces!(cache, u, mesh, equations, dg.surface_integral, time_discretization, dg)
+        prolong2mpiinterfaces!(cache, u, mesh, equations, dg.surface_integral,
+                               time_discretization, dg)
     end
 
     # Prolong solution to MPI mortars
@@ -282,69 +295,63 @@ function rhs!(du, u, t, dt, mesh::Union{ParallelTreeMesh{2}, ParallelP4estMesh{2
 
     # Start to send MPI data
     @trixi_timeit timer() "start MPI send" begin
-        start_mpi_send!(cache.mpi_cache, mesh, equations, time_discretization::AbstractLWTimeDiscretization, dg, cache)
-    end
-
-    # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
-
-    # Calculate volume integral
-    @trixi_timeit timer() "volume integral" begin
-        calc_volume_integral!(du, u, t, dt, tolerances, mesh,
-                              have_nonconservative_terms(equations), source_terms, 
-                              equations, dg.volume_integral, time_discretization,
-                              dg, cache)
+        start_mpi_send!(cache.mpi_cache, mesh, equations, time_discretization,
+                        dg, cache)
     end
 
     # Prolong solution to interfaces
     # TODO: Taal decide order of arguments, consistent vs. modified cache first?
     @trixi_timeit timer() "prolong2interfaces" begin
-        prolong2interfaces!(cache, u, mesh, equations,
-                            dg.surface_integral, dg)
+        prolong2interfaces!(cache, u, mesh, equations, dg.surface_integral,
+                            time_discretization, dg)
     end
 
     # Calculate interface fluxes
     @trixi_timeit timer() "interface flux" begin
         calc_interface_flux!(cache.elements.surface_flux_values, mesh,
                              have_nonconservative_terms(equations), equations,
-                             dg.surface_integral, dg, cache)
+                             dg.surface_integral, dt, time_discretization,
+                             dg, cache)
     end
 
     # Prolong solution to boundaries
     @trixi_timeit timer() "prolong2boundaries" begin
-        prolong2boundaries!(cache, u, mesh, equations,
-                            dg.surface_integral, dg)
+        prolong2boundaries!(cache, u, mesh, equations, dg.surface_integral,
+                            time_discretization, dg)
     end
 
     # Calculate boundary fluxes
     @trixi_timeit timer() "boundary flux" begin
-        calc_boundary_flux!(cache, t, boundary_conditions, mesh, equations,
-                            dg.surface_integral, dg)
+        calc_boundary_flux!(cache, t, dt, boundary_conditions, mesh, equations,
+                            dg.surface_integral, time_discretization, dg)
     end
 
     # Prolong solution to mortars
     @trixi_timeit timer() "prolong2mortars" begin
-        prolong2mortars!(cache, u, mesh, equations,
-                         dg.mortar, dg.surface_integral, dg)
+        prolong2mortars!(cache, u, mesh, equations, dg.mortar, dg.surface_integral,
+                         time_discretization, dg)
     end
 
     # Calculate mortar fluxes
     @trixi_timeit timer() "mortar flux" begin
         calc_mortar_flux!(cache.elements.surface_flux_values, mesh,
                           have_nonconservative_terms(equations), equations,
-                          dg.mortar, dg.surface_integral, dg, cache)
+                          dg.mortar, dg.surface_integral, time_discretization,
+                          dg, cache)
     end
 
     # Finish to receive MPI data
     @trixi_timeit timer() "finish MPI receive" begin
-        finish_mpi_receive!(cache.mpi_cache, mesh, equations, time_discretization, dg, cache)
+        finish_mpi_receive!(cache.mpi_cache, mesh, equations, time_discretization,
+                            dg, cache)
     end
 
     # Calculate MPI interface fluxes
     @trixi_timeit timer() "MPI interface flux" begin
         calc_mpi_interface_flux!(cache.elements.surface_flux_values, mesh,
                                  have_nonconservative_terms(equations), equations,
-                                 dg.surface_integral, time_discretization, dg, cache)
+                                 dg.surface_integral, time_discretization,
+                                 dg, cache)
     end
 
     # Calculate MPI mortar fluxes
@@ -363,10 +370,6 @@ function rhs!(du, u, t, dt, mesh::Union{ParallelTreeMesh{2}, ParallelP4estMesh{2
     # Apply Jacobian from mapping to reference element
     @trixi_timeit timer() "Jacobian" apply_jacobian!(du, mesh, equations, dg, cache)
 
-    # Calculate source terms
-    @trixi_timeit timer() "source terms" begin
-        calc_sources!(du, u, t, source_terms, equations, dg, cache)
-    end
 
     # Finish to send MPI data
     @trixi_timeit timer() "finish MPI send" finish_mpi_send!(cache.mpi_cache)
@@ -460,7 +463,7 @@ function calc_mpi_interface_flux!(surface_flux_values,
             U_ll, U_rr = get_surface_node_vars(U, equations, dg, i, interface)
             F_ll, F_rr = get_surface_node_vars(F, equations, dg, i, interface)
 
-            flux = surface_flux(u_ll, u_rr, U_ll, U_rr, F_ll, F_rr, orientations[interface], equations)
+            flux = surface_flux(F_ll, F_rr, U_ll, U_rr, u_ll, u_rr, orientations[interface], equations)
 
             # Copy flux to local element storage
             for v in eachvariable(equations)
