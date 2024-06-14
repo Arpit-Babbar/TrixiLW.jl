@@ -1,4 +1,4 @@
-using Trixi: SemidiscretizationHyperbolic, SemidiscretizationHyperbolicParabolic, initialize!, SummaryCallback, timer, have_constant_speed
+using Trixi: SemidiscretizationHyperbolic, SemidiscretizationHyperbolicParabolic, initialize!, SummaryCallback, timer, have_constant_speed, ParallelTreeMesh
 import DiffEqBase
 
 # Contains all that is needed to perform LW update
@@ -174,21 +174,23 @@ function LWIntegrator(lw_update::LWUpdate, time_discretization, sol, callbacks, 
 end
 
 function compute_dt(semi::SemidiscretizationHyperbolic,
-   mesh::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D,P4estMesh},
+   mesh::Union{ParallelTreeMesh, TreeMesh,StructuredMesh,UnstructuredMesh2D,P4estMesh},
    time_step_computation::CFLBased, integrator)
    t = integrator.t
    u_ode = integrator.u
    @unpack equations, solver, cache = semi
    @unpack cfl_number = time_step_computation
+
    u = Trixi.wrap_array(u_ode, mesh, equations, solver, cache)
 
    dt = Trixi.@trixi_timeit timer() "calculate dt" cfl_number * max_dt(
       u, t, mesh, have_constant_speed(equations), equations, solver, cache)
+
    return dt
 end
 
 function compute_dt(semi::SemidiscretizationHyperbolicParabolic,
-   mesh::Union{TreeMesh, P4estMesh}, time_step_computation::CFLBased,
+   mesh::Union{ParallelTreeMesh, TreeMesh, P4estMesh}, time_step_computation::CFLBased,
    integrator)
    t = integrator.t
    u_ode = integrator.u

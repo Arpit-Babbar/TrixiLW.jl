@@ -35,7 +35,7 @@ tspan = (0.0, 10.0)
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
 # The AnalysisCallback allows to analyse the solution in regular intervals and prints the results
-analysis_callback = AnalysisCallback(semi, interval=1000)
+analysis_callback = AnalysisCallback(semi, interval=1000, analysis_integrals = Symbol[])
 
 # The SaveSolutionCallback allows to save the solution to a file in regular intervals
 save_solution = SaveSolutionCallback(interval=1000,
@@ -59,8 +59,8 @@ dt_initial = 0.1;
 # 0.9 works for 2-staged
 cfl_number = TrixiLW.trixi2lw(0.71, solver)
 sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
-                         time_step_computation = TrixiLW.Adaptive(),
-                        #  time_step_computation = TrixiLW.CFLBased(cfl_number),
+                        #  time_step_computation = TrixiLW.Adaptive(),
+                         time_step_computation = TrixiLW.CFLBased(cfl_number),
                         );
 
 # Print the timer summary

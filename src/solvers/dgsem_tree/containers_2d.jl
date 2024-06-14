@@ -1,4 +1,5 @@
-import Trixi: eachinterface
+import Trixi: init_mpi_interfaces, nmpiinterfaces, nvariables, nnodes
+using Trixi: eachinterface, count_required_mpi_interfaces, ElementContainer2D, ParallelTreeMesh, init_mpi_interfaces!
 
 function create_interface_cache(mesh::Union{TreeMesh{2},UnstructuredMesh2D,P4estMesh{2}}, equations, dg,
    uEltype, RealT, cache, time_discretization)
@@ -39,4 +40,90 @@ function create_boundary_cache(mesh::Union{TreeMesh{2}}, equations, dg, uEltype,
    return LWBoundariesContainer(U, u, f, _U, _u, _f, outer_cache)
 end
 
+# Container data structure (structure-of-arrays style) for DG MPI interfaces
+mutable struct MPIInterfaceContainerLW2D{uEltype <: Real} <: AbstractContainer
+   u::Array{uEltype, 4}            # [leftright, variables, i, interfaces]
+   U::Array{uEltype, 4}
+   F::Array{uEltype, 4}
+   local_neighbor_ids::Vector{Int} # [interfaces]
+   orientations::Vector{Int}       # [interfaces]
+   remote_sides::Vector{Int}       # [interfaces]
+   # internal `resize!`able storage
+   _u::Vector{uEltype}
+   _U::Vector{uEltype}
+   _F::Vector{uEltype}
+end
 
+nvariables(mpi_interfaces::MPIInterfaceContainerLW2D) = size(mpi_interfaces.u, 2)
+nnodes(mpi_interfaces::MPIInterfaceContainerLW2D) = size(mpi_interfaces.u, 3)
+Base.eltype(mpi_interfaces::MPIInterfaceContainerLW2D) = eltype(mpi_interfaces.u)
+
+# See explanation of Base.resize! for the element container
+# For AMR, to be tested
+function Base.resize!(mpi_interfaces::MPIInterfaceContainerLW2D, capacity)
+   n_nodes = nnodes(mpi_interfaces)
+   n_variables = nvariables(mpi_interfaces)
+   @unpack _u, _U, _F, local_neighbor_ids, orientations, remote_sides = mpi_interfaces
+
+   resize!(_u, 2 * n_variables * n_nodes * capacity)
+   resize!(_U, 2 * n_variables * n_nodes * capacity)
+   resize!(_F, 2 * n_variables * n_nodes * capacity)
+
+   mpi_interfaces.u = unsafe_wrap(Array, pointer(_u),
+                                  (2, n_variables, n_nodes, capacity))
+   mpi_interfaces.u = unsafe_wrap(Array, pointer(_U),
+                                  (2, n_variables, n_nodes, capacity))
+   mpi_interfaces.u = unsafe_wrap(Array, pointer(_F),
+                                  (2, n_variables, n_nodes, capacity))
+
+   resize!(local_neighbor_ids, capacity)
+
+   resize!(orientations, capacity)
+
+   resize!(remote_sides, capacity)
+
+   return nothing
+end
+
+function MPIInterfaceContainerLW2D{uEltype}(capacity::Integer, n_variables,
+                                            n_nodes) where {uEltype <: Real}
+   nan = convert(uEltype, NaN)
+
+   # Initialize fields with defaults
+   _u = fill(nan, 2 * n_variables * n_nodes * capacity)
+   _U = fill(nan, 2 * n_variables * n_nodes * capacity)
+   _F = fill(nan, 2 * n_variables * n_nodes * capacity)
+   u = unsafe_wrap(Array, pointer(_u), (2, n_variables, n_nodes, capacity))
+   U = unsafe_wrap(Array, pointer(_U), (2, n_variables, n_nodes, capacity))
+   F = unsafe_wrap(Array, pointer(_F), (2, n_variables, n_nodes, capacity))
+
+   local_neighbor_ids = fill(typemin(Int), capacity)
+
+   orientations = fill(typemin(Int), capacity)
+
+   remote_sides = fill(typemin(Int), capacity)
+
+   return MPIInterfaceContainerLW2D{uEltype}(u, U, F, local_neighbor_ids, orientations,
+                                             remote_sides,
+                                             _u, _U, _F)
+end
+
+# Return number of interfaces
+function nmpiinterfaces(mpi_interfaces::MPIInterfaceContainerLW2D)
+   length(mpi_interfaces.orientations)
+end
+
+
+# Create MPI interface container and initialize MPI interface data in `elements`.
+function init_mpi_interfaces(cell_ids, mesh::ParallelTreeMesh, time_discretization::AbstractLWTimeDiscretization,
+                             elements::ElementContainer2D)
+   # Initialize container
+   n_mpi_interfaces = count_required_mpi_interfaces(mesh, cell_ids)
+   mpi_interfaces = MPIInterfaceContainerLW2D{eltype(elements)}(n_mpi_interfaces,
+                                                                nvariables(elements),
+                                                                nnodes(elements))
+
+   # Connect elements with interfaces
+   init_mpi_interfaces!(mpi_interfaces, elements, mesh)
+   return mpi_interfaces
+end

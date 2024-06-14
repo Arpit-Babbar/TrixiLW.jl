@@ -131,20 +131,6 @@ function create_cache(mesh::Union{TreeMesh{2}, P4estMesh{2}},
    #    @assert false "Incorrect bflux"
    # end
 
-   # Construct `cache_size` number of objects with `constructor`
-   # and store them in an SVector
-   function alloc(constructor, cache_size)
-      SVector{cache_size}(constructor(undef) for _ in Base.OneTo(cache_size))
-   end
-
-   # Create the result of `alloc` for each thread. Basically,
-   # for each thread, construct `cache_size` number of objects with
-   # `constructor` and store them in an SVector
-   function alloc_for_threads(constructor, cache_size)
-      nt = Threads.nthreads()
-      SVector{nt}([alloc(constructor, cache_size) for _ in Base.OneTo(nt)])
-   end
-
    MArr = MArray{Tuple{n_variables, n_nodes, n_nodes}, Float64}
    cell_arrays = alloc_for_threads(MArr, cell_array_size)
 

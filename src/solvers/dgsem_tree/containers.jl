@@ -1,8 +1,10 @@
+using Trixi: SerialTree
 import Trixi: ninterfaces, nboundaries
 using StaticArrays
 
 # Called within the create_cache function of dg_2d.jl
-function create_cache(mesh::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D,P4estMesh},
+
+function create_cache_serial(mesh::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D,P4estMesh},
    equations::AbstractEquations, time_discretization::AbstractLWTimeDiscretization,
    dg, RealT, uEltype, cache)
 
@@ -11,7 +13,7 @@ function create_cache(mesh::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D,P4e
 
    n_variables = nvariables(equations)
    n_nodes = nnodes(dg)
-n_elements = nelements(dg, cache)
+   n_elements = nelements(dg, cache)
 
    temporal_errors = fill(nan_uEltype, n_elements)
 
@@ -24,17 +26,6 @@ n_elements = nelements(dg, cache)
 
    interface_cache = create_interface_cache(mesh, equations, dg, uEltype, RealT,
       cache, time_discretization)
-
-   function alloc_for_threads(constructor, cache_size)
-      nt = Threads.nthreads()
-      SVector{nt}([alloc(constructor, cache_size) for _ in Base.OneTo(nt)])
-   end
-
-   # Construct `cache_size` number of objects with `constructor`
-   # and store them in an SVector
-   function alloc(constructor, cache_size)
-      SVector{cache_size}(constructor(undef) for _ in Base.OneTo(cache_size))
-   end
 
    # Create the result of `alloc` for each thread. Basically,
    # for each thread, construct `cache_size` number of objects with
@@ -67,9 +58,16 @@ n_elements = nelements(dg, cache)
 
    lw_res_cache = (; cell_arrays)
 
-   cache = (; element_cache, lw_res_cache, cfl_number, dt,
+   cache = (; cache..., element_cache, lw_res_cache, cfl_number, dt,
       temporal_errors, interface_cache, boundary_cache, lw_mortars)
    return cache
+end
+
+function create_cache(mesh::Union{TreeMesh{NDIMS, <:Trixi.SerialTree{NDIMS}},StructuredMesh,UnstructuredMesh2D,P4estMesh} where NDIMS,
+   equations::AbstractEquations, time_discretization::AbstractLWTimeDiscretization,
+   dg, RealT, uEltype, cache)
+
+   return create_cache_serial(mesh, equations, time_discretization, dg, RealT, uEltype, cache)
 end
 
 mutable struct LWElementContainer{uEltype<:Real, NDIMSP2, NDIMSP3, MDRKCache}
