@@ -117,63 +117,7 @@ function create_cache(mesh::ParallelTreeMesh{2}, equations,
                       dg::DG, RealT, ::Type{uEltype}, cache) where {uEltype <: Real}
 
 
-    # TODO - fix this repetition
-    # Serial LW part begin
-
-    nan_RealT   = convert(RealT, NaN)
-    nan_uEltype = convert(uEltype, NaN)
-
-    n_variables = nvariables(equations)
-    n_nodes = nnodes(dg)
-    n_elements = nelements(dg, cache)
-
-    temporal_errors = fill(nan_uEltype, n_elements)
-
-    NDIMS = ndims(equations)
-
-    # TODO - Put U, F, fn_low in cell_cache named tuple
-    # TODO - Don't pass so many things, only pass cache, equations etc.
-    element_cache = create_element_cache(mesh, nan_uEltype, NDIMS, n_variables,
-       n_nodes, n_elements, time_discretization)
-
-    interface_cache = create_interface_cache(mesh, equations, dg, uEltype, RealT,
-       cache, time_discretization)
-
-    # Create the result of `alloc` for each thread. Basically,
-    # for each thread, construct `cache_size` number of objects with
-    # `constructor` and store them in an SVector
-
-    MOuter = MArray{Tuple{n_variables},Float64}
-    outer_cache = alloc_for_threads(MOuter, 2)
-    boundary_cache = create_boundary_cache(mesh, equations, dg, uEltype, RealT,
-       cache, outer_cache, time_discretization)
-
-    lw_mortars = create_mortar_cache(mesh, equations, dg, uEltype, RealT,
-       cache, time_discretization)
-    cfl_number = fill(nan_RealT, 1)
-    dt = fill(nan_RealT, 1)
-
-    cell_array_sizes = Dict(1 => 12, 2 => 14, 3 => 17, 4 => 18)
-    degree = n_nodes - 1
-    cell_array_size = cell_array_sizes[min(4, degree)]
-
-    MArr = MArray{Tuple{n_variables, n_nodes, n_nodes},Float64}
-    N4() = NamedTuple{(:f, :g, :ftilde, :gtilde, :Ftilde, :Gtilde, :ut, :utt, :uttt, :utttt,
-                       :U, :up, :um, :upp, :umm, :S, :u_np1, :u_np1_low)}((MArr(undef) for _=1:18))
-
-    if degree >= 4
-       nt = Threads.nthreads()
-       cell_arrays = SVector{Threads.nthreads()}([N4() for _ in 1:Threads.nthreads()])
-    else
-       cell_arrays = alloc_for_threads(MArr, cell_array_size)
-    end
-
-    lw_res_cache = (; cell_arrays)
-
-    cache = (; cache..., element_cache, lw_res_cache, cfl_number, dt,
-       temporal_errors, interface_cache, boundary_cache, lw_mortars)
-
-    # Serial LW part end
+    cache = create_cache_serial(mesh, equations, time_discretization, dg, RealT, uEltype, cache)
 
     leaf_cell_ids = local_leaf_cells(mesh.tree)             # Extracting all leaf cells to create element
 

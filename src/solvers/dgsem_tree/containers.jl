@@ -3,7 +3,8 @@ import Trixi: ninterfaces, nboundaries
 using StaticArrays
 
 # Called within the create_cache function of dg_2d.jl
-function create_cache(mesh::Union{TreeMesh{NDIMS, <:Trixi.SerialTree{NDIMS}},StructuredMesh,UnstructuredMesh2D,P4estMesh} where NDIMS,
+
+function create_cache_serial(mesh::Union{TreeMesh,StructuredMesh,UnstructuredMesh2D,P4estMesh},
    equations::AbstractEquations, time_discretization::AbstractLWTimeDiscretization,
    dg, RealT, uEltype, cache)
 
@@ -60,6 +61,13 @@ function create_cache(mesh::Union{TreeMesh{NDIMS, <:Trixi.SerialTree{NDIMS}},Str
    cache = (; cache..., element_cache, lw_res_cache, cfl_number, dt,
       temporal_errors, interface_cache, boundary_cache, lw_mortars)
    return cache
+end
+
+function create_cache(mesh::Union{TreeMesh{NDIMS, <:Trixi.SerialTree{NDIMS}},StructuredMesh,UnstructuredMesh2D,P4estMesh} where NDIMS,
+   equations::AbstractEquations, time_discretization::AbstractLWTimeDiscretization,
+   dg, RealT, uEltype, cache)
+
+   return create_cache_serial(mesh, equations, time_discretization, dg, RealT, uEltype, cache)
 end
 
 mutable struct LWElementContainer{uEltype<:Real, NDIMSP2, NDIMSP3, MDRKCache}
