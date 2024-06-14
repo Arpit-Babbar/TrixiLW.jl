@@ -23,14 +23,14 @@ using MuladdMacro
 function start_mpi_send!(mpi_cache::MPICache, mesh, equations,
                          time_discretization::AbstractLWTimeDiscretization,
                          dg, cache)
-    lw_extras = 3
+    lw_data_size_factor = 3 # LW requires thrice the amount of data transfer than RK
     data_size = nvariables(equations) * nnodes(dg)^(ndims(mesh) - 1)
 
     for d in 1:length(mpi_cache.mpi_neighbor_ranks)
         send_buffer = mpi_cache.mpi_send_buffers[d]
 
         for (index, interface) in enumerate(mpi_cache.mpi_neighbor_interfaces[d])
-            first1 = lw_extras * (index - 1) * data_size + 1        # for u
+            first1 = lw_data_size_factor * (index - 1) * data_size + 1        # for u
             last1 = first1 + data_size - 1
 
             first2 = last1 + 1      # for U
@@ -73,7 +73,7 @@ end
 function finish_mpi_receive!(mpi_cache::MPICache, mesh, equations,
                              time_discretization::AbstractLWTimeDiscretization,
                              dg, cache)
-    lw_extras = 3
+    lw_data_size_factor = 3 # LW requires thrice the amount of data transfer than RK
     data_size = nvariables(equations) * nnodes(dg)^(ndims(mesh) - 1)
 
     # Start receiving and unpack received data until all communication is finished
@@ -83,7 +83,7 @@ function finish_mpi_receive!(mpi_cache::MPICache, mesh, equations,
         recv_buffer = mpi_cache.mpi_recv_buffers[d]
 
         for (index, interface) in enumerate(mpi_cache.mpi_neighbor_interfaces[d])
-            first1 = lw_extras * (index - 1) * data_size + 1        # for u
+            first1 = lw_data_size_factor * (index - 1) * data_size + 1        # for u
             last1 = first1 + data_size - 1
 
             first2 = last1 + 1      # for U

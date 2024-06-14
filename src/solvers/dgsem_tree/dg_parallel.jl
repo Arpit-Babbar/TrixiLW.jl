@@ -9,8 +9,8 @@ using Trixi: MPI
 # `TreeMesh` and the `P4estMesh` and is dimension-agnostic.
 function init_mpi_data_structures(mpi_neighbor_interfaces, mpi_neighbor_mortars, n_dims,
                                   nvars, n_nodes, uEltype, time_discretization::AbstractLWTimeDiscretization)
-    lw_extras = 3 
-    data_size = nvars * lw_extras * n_nodes^(n_dims - 1)
+    lw_data_size_factor = 3 # LW requires thrice the amount of data transfer than RK
+    data_size = nvars * lw_data_size_factor * n_nodes^(n_dims - 1)
     n_small_elements = 2^(n_dims - 1)
     mpi_send_buffers = Vector{Vector{uEltype}}(undef, length(mpi_neighbor_interfaces))
     mpi_recv_buffers = Vector{Vector{uEltype}}(undef, length(mpi_neighbor_interfaces))

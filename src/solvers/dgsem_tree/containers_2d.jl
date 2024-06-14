@@ -86,31 +86,31 @@ function Base.resize!(mpi_interfaces::MPIInterfaceContainerLW2D, capacity)
 end
 
 function MPIInterfaceContainerLW2D{uEltype}(capacity::Integer, n_variables,
-   n_nodes) where {uEltype <: Real}
-nan = convert(uEltype, NaN)
+                                            n_nodes) where {uEltype <: Real}
+   nan = convert(uEltype, NaN)
 
-# Initialize fields with defaults
-_u = fill(nan, 2 * n_variables * n_nodes * capacity)
-_U = fill(nan, 2 * n_variables * n_nodes * capacity)
-_F = fill(nan, 2 * n_variables * n_nodes * capacity)
-u = unsafe_wrap(Array, pointer(_u), (2, n_variables, n_nodes, capacity))
-U = unsafe_wrap(Array, pointer(_U), (2, n_variables, n_nodes, capacity))
-F = unsafe_wrap(Array, pointer(_F), (2, n_variables, n_nodes, capacity))
+   # Initialize fields with defaults
+   _u = fill(nan, 2 * n_variables * n_nodes * capacity)
+   _U = fill(nan, 2 * n_variables * n_nodes * capacity)
+   _F = fill(nan, 2 * n_variables * n_nodes * capacity)
+   u = unsafe_wrap(Array, pointer(_u), (2, n_variables, n_nodes, capacity))
+   U = unsafe_wrap(Array, pointer(_U), (2, n_variables, n_nodes, capacity))
+   F = unsafe_wrap(Array, pointer(_F), (2, n_variables, n_nodes, capacity))
 
-local_neighbor_ids = fill(typemin(Int), capacity)
+   local_neighbor_ids = fill(typemin(Int), capacity)
 
-orientations = fill(typemin(Int), capacity)
+   orientations = fill(typemin(Int), capacity)
 
-remote_sides = fill(typemin(Int), capacity)
+   remote_sides = fill(typemin(Int), capacity)
 
-return MPIInterfaceContainerLW2D{uEltype}(u, U, F, local_neighbor_ids, orientations,
-                                          remote_sides,
-                                          _u, _U, _F)
+   return MPIInterfaceContainerLW2D{uEltype}(u, U, F, local_neighbor_ids, orientations,
+                                             remote_sides,
+                                             _u, _U, _F)
 end
 
 # Return number of interfaces
 function nmpiinterfaces(mpi_interfaces::MPIInterfaceContainerLW2D)
-    length(mpi_interfaces.orientations)
+   length(mpi_interfaces.orientations)
 end
 
 
