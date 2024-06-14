@@ -10,21 +10,21 @@ using Trixi: MPI
 function init_mpi_data_structures(mpi_neighbor_interfaces, mpi_neighbor_mortars, n_dims,
                                   nvars, n_nodes, uEltype, time_discretization::AbstractLWTimeDiscretization)
     lw_data_size_factor = 3 # LW requires thrice the amount of data transfer than RK
-    data_size = nvars * lw_data_size_factor * n_nodes^(n_dims - 1)
+    lw_data_size = nvars * lw_data_size_factor * n_nodes^(n_dims - 1)
     n_small_elements = 2^(n_dims - 1)
     mpi_send_buffers = Vector{Vector{uEltype}}(undef, length(mpi_neighbor_interfaces))
     mpi_recv_buffers = Vector{Vector{uEltype}}(undef, length(mpi_neighbor_interfaces))
     for index in 1:length(mpi_neighbor_interfaces)
         mpi_send_buffers[index] = Vector{uEltype}(undef,
                                                     length(mpi_neighbor_interfaces[index]) *
-                                                    data_size +
+                                                    lw_data_size +
                                                     length(mpi_neighbor_mortars[index]) *
-                                                    n_small_elements * 2 * data_size)
+                                                    n_small_elements * 2 * lw_data_size)
         mpi_recv_buffers[index] = Vector{uEltype}(undef,
                                                     length(mpi_neighbor_interfaces[index]) *
-                                                    data_size +
+                                                    lw_data_size +
                                                     length(mpi_neighbor_mortars[index]) *
-                                                    n_small_elements * 2 * data_size)
+                                                    n_small_elements * 2 * lw_data_size)
     end
 
     mpi_send_requests = Vector{MPI.Request}(undef, length(mpi_neighbor_interfaces))
@@ -33,4 +33,3 @@ function init_mpi_data_structures(mpi_neighbor_interfaces, mpi_neighbor_mortars,
     return mpi_send_buffers, mpi_recv_buffers, mpi_send_requests, mpi_recv_requests
 end
 end # muladd
-    
