@@ -12,8 +12,9 @@ function prolong2mpiinterfaces!(cache, u,
                                 equations, surface_integral,
                                 time_discretization::AbstractLWTimeDiscretization,
                                 dg::DG)
-    @unpack mpi_interfaces = cache
+    @unpack mpi_interfaces, elements = cache
     @unpack U, F = cache.element_cache
+    @unpack contravariant_vectors = elements
     index_range = eachnode(dg)
 
     @threaded for interface in eachmpiinterface(dg, cache)
@@ -26,6 +27,8 @@ function prolong2mpiinterfaces!(cache, u,
         local_element = mpi_interfaces.local_neighbor_ids[interface]
         local_indices = mpi_interfaces.node_indices[interface]
 
+        local_direction = indices2direction(local_indices)
+
         i_element_start, i_element_step = index_to_start_step_2d(local_indices[1],
                                                                  index_range)
         j_element_start, j_element_step = index_to_start_step_2d(local_indices[2],
@@ -34,6 +37,13 @@ function prolong2mpiinterfaces!(cache, u,
         i_element = i_element_start
         j_element = j_element_start
         for i in eachnode(dg)
+            # Get the normal direction on the local element. The above `local_indices`
+            # will take care of giving us the outward unit normal. The main point is that
+            # this is the normal_direction used in `calc_mpi_interface_flux!` function.
+            normal_direction = get_normal_direction(local_direction, contravariant_vectors,
+            i_element, j_element, local_element)
+            f = get_flux_vars(F, equations, dg, i_element, j_element, local_element)
+            f_normal = normal_product(f, equations, normal_direction)
             for v in eachvariable(equations)
                 mpi_interfaces.u[local_side, v, i, interface] = u[v, i_element,
                                                                   j_element,
@@ -41,10 +51,7 @@ function prolong2mpiinterfaces!(cache, u,
                 mpi_interfaces.U[local_side, v, i, interface] = U[v, i_element,
                                                                   j_element,
                                                                   local_element]
-                # Will F here have two components??
-                mpi_interfaces.F[local_side, v, i, interface] = F[v, i_element,
-                                                                  j_element,
-                                                                  local_element]
+                mpi_interfaces.F[local_side, v, i, interface] = f_normal[v]
             end
             i_element += i_element_step
             j_element += j_element_step
