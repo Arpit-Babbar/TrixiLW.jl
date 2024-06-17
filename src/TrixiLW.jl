@@ -58,6 +58,7 @@ include(solvers_dir() * "/dgsem_unstructured_2d/containers.jl")
 include(solvers_dir() * "/dgsem_p4est/dg_2d.jl")
 include(solvers_dir() * "/dgsem_p4est/dg_2d_parabolic.jl")
 include(solvers_dir() * "/dgsem_p4est/containers.jl")
+include(solvers_dir() * "/dgsem_p4est/containers_parallel.jl")
 
 # AMR
 include(callback_dir() * "/amr.jl")
@@ -71,6 +72,9 @@ include(src_dir() * "/callbacks/callbacks_step/analysis_dg2d.jl")
 # Parallel code
 include(solvers_dir() * "/dgsem_tree/dg_parallel.jl")
 include(solvers_dir() * "/dgsem_tree/dg_2d_parallel.jl")
+
+include(solvers_dir() * "/dgsem_p4est/dg_parallel.jl")
+include(solvers_dir() * "/dgsem_p4est/dg_2d_parallel.jl")
 
 export get_time_discretization, SurfaceIntegralDiffusive, SemidiscretizationHyperbolic,
        RadialIndicator, BoundaryConditionsNavierStokesInflow, AnalysisSurfaceFrictionCoefficient
