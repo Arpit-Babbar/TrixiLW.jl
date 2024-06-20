@@ -1221,7 +1221,6 @@ using LoopVectorization: @turbo
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
             multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], G_node, equations, dg, i, jj, element)
-
             multiply_add_to_node_vars!(u_np1, -dt * inv_jacobian * derivative_matrix[jj, j],
                G_node, equations, dg, i, jj)
          end

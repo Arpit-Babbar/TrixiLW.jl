@@ -45,7 +45,7 @@ summary_callback = SummaryCallback()
 
 # The AnalysisCallback allows to analyse the solution in regular intervals and prints the results
 analysis_interval = 100
-analysis_callback = AnalysisCallback(semi, interval=analysis_interval)
+analysis_callback = AnalysisCallback(semi, interval=analysis_interval, analysis_integrals = Symbol[])
 alive_callback = AliveCallback(analysis_interval=analysis_interval)
 
 # The SaveSolutionCallback allows to save the solution to a file in regular intervals

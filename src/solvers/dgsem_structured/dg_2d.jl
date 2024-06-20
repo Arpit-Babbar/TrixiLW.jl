@@ -1688,7 +1688,6 @@ function lw_volume_kernel_4!(du, u, t, dt, tolerances,
    element, mesh::Union{StructuredMesh{2},UnstructuredMesh2D,P4estMesh{2}},
    nonconservative_terms::False, source_terms, equations, dg::DGSEM, cache, alpha=true)
 
-
    # true * [some floating point value] == [exactly the same floating point value]
    # This can (hopefully) be optimized away due to constant propagation.
    @unpack derivative_dhat, derivative_matrix = dg.basis

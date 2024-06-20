@@ -30,6 +30,7 @@ function prolong2interfaces!(cache, u,
       j_primary = j_primary_start
       for i in eachnode(dg)
          f = get_flux_vars(F, equations, dg, i_primary, j_primary, primary_element)
+         # This is the normal used in calc_interface_flux! function
          normal_direction = get_normal_direction(primary_direction, contravariant_vectors,
             i_primary, j_primary, primary_element)
          fn_node = normal_product(f, equations, normal_direction)
@@ -56,6 +57,10 @@ function prolong2interfaces!(cache, u,
       j_secondary = j_secondary_start
       for i in eachnode(dg)
          f = get_flux_vars(F, equations, dg, i_secondary, j_secondary, secondary_element)
+         # Putting the minus will point the normal into the primary direction which is what we
+         # use in the calc_interface_flux! function. Basically, the same normal direction is to be
+         # used in both the normal products. We can't use `primary_direction`, `primary_element`
+         # because their indices run in the opposite direction.
          normal_direction = -get_normal_direction(secondary_direction, contravariant_vectors,
             i_secondary, j_secondary, secondary_element)
          fn_node = normal_product(f, equations, normal_direction)
