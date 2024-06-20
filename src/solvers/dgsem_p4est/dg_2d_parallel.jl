@@ -1,6 +1,5 @@
 using Trixi: indices2direction, index_to_start_step_2d, eachmpiinterface, eachnode, get_normal_direction,
-             eachvariable, ParallelP4estMesh, get_surface_node_vars, prolong2mpiinterfaces!
-            #  finish_mpi_receive!
+             eachvariable, ParallelP4estMesh, get_surface_node_vars
 
 import Trixi: prolong2mpiinterfaces!, calc_mpi_interface_flux!
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
@@ -20,7 +19,6 @@ function prolong2mpiinterfaces!(cache, u,
 
     @unpack contravariant_vectors = elements
     index_range = eachnode(dg)
-    # @assert false "prolong"
 
     @threaded for interface in eachmpiinterface(dg, cache)
         # Copy solution data from the local element using "delayed indexing" with
@@ -41,7 +39,6 @@ function prolong2mpiinterfaces!(cache, u,
 
         i_element = i_element_start
         j_element = j_element_start
-        # @assert false mpi_interfaceslw
         for i in eachnode(dg)
             # Get the normal direction on the local element. The above `local_indices`
             # will take care of giving us the outward unit normal. The main point is that
@@ -61,8 +58,8 @@ function prolong2mpiinterfaces!(cache, u,
 
             for v in eachvariable(equations)
                 mpi_interfaceslw.mpi_interfaces_.u[local_side, v, i, interface] = u[v, i_element,
-                                                                  j_element,
-                                                                  local_element]
+                                                                                  j_element,
+                                                                                  local_element]
                 mpi_interfaceslw.U[local_side, v, i, interface] = U[v, i_element,
                                                                   j_element,
                                                                   local_element]
@@ -81,7 +78,6 @@ function calc_mpi_interface_flux!(surface_flux_values, mesh::ParallelP4estMesh,
                                   time_discretization::AbstractLWTimeDiscretization,
                                   dg::DG, cache)
     @unpack local_neighbor_ids, node_indices, local_sides = cache.mpi_interfaceslw
-    # @assert false local_sides
     @unpack contravariant_vectors = cache.elements
     index_range = eachnode(dg)
     index_end = last(index_range)
@@ -148,8 +144,6 @@ end
                                           interface_node_index, local_side,
                                           surface_node_index, local_direction_index,
                                           local_element_index)
-    # @assert false "I am calc_flux_inline"
-
     @unpack u = cache.mpi_interfaceslw.mpi_interfaces_
     @unpack U, F = cache.mpi_interfaceslw
 
@@ -164,10 +158,8 @@ end
 
     if local_side == 1
         flux_ = surface_flux(F_ll, F_rr, u_ll, u_rr, U_ll, U_rr, normal_direction, equations)
-        # flux_ = surface_flux(u_ll, u_rr, normal_direction, equations)
     else # local_side == 2
         flux_ = -surface_flux(F_ll, F_rr, u_ll, u_rr, U_ll, U_rr, -normal_direction, equations)
-        # flux_ = -surface_flux(u_ll, u_rr, -normal_direction, equations)
     end
 
     for v in eachvariable(equations)
