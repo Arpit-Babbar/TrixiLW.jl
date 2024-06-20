@@ -1,7 +1,7 @@
-import Trixi: nmpiinterfaces, init_mpi_interfaces
+import Trixi: init_mpi_interfaces, init_mpi_interface_node_indices!, nmpiinterfaces
 
 using Trixi: count_required_surfaces, init_surfaces!, init_mpi_interfaces!, P4estMPICache,
-             ParallelP4estMesh
+             ParallelP4estMesh, P4estMPIInterfaceContainer
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
@@ -10,29 +10,26 @@ using Trixi: count_required_surfaces, init_surfaces!, init_mpi_interfaces!, P4es
 @muladd begin
 #! format: noindent
 
-mutable struct P4estMPIInterfaceContainer{NDIMS, uEltype <: Real, NDIMSP2} <:
+mutable struct P4estMPIInterfaceContainerLW{NDIMS, uEltype <: Real, NDIMSP2} <:
                AbstractContainer
-    u::Array{uEltype, NDIMSP2}       # [primary/secondary, variable, i, j, interface]
+    mpi_interfaces_::P4estMPIInterfaceContainer
     U::Array{uEltype, NDIMSP2}       # [primary/secondary, variable, i, j, interface]
     F::Array{uEltype, NDIMSP2}       # [primary/secondary, variable, i, j, interface]
-
     local_neighbor_ids::Vector{Int}                   # [interface]
     node_indices::Vector{NTuple{NDIMS, Symbol}} # [interface]
     local_sides::Vector{Int}                   # [interface]
-
     # internal `resize!`able storage
-    _u::Vector{uEltype}
     _U::Vector{uEltype}
     _F::Vector{uEltype}
 end
 
-@inline function nmpiinterfaces(interfaces::P4estMPIInterfaceContainer)
+@inline function nmpiinterfaces(interfaces::P4estMPIInterfaceContainerLW)
     length(interfaces.local_sides)
 end
 
 # @inline Base.ndims(::P4estMPIInterfaceContainer{NDIMS}) where {NDIMS} = NDIMS
 # For AMR, to be tested
-function Base.resize!(mpi_interfaces::P4estMPIInterfaceContainer, capacity)
+function Base.resize!(mpi_interfaces::P4estMPIInterfaceContainerLW, capacity)
     @unpack _u, _U, _F, local_neighbor_ids, node_indices, local_sides = mpi_interfaces
 
     n_dims = ndims(mpi_interfaces)
@@ -98,17 +95,59 @@ function init_mpi_interfaces(mesh::ParallelP4estMesh,
 
     local_sides = Vector{Int}(undef, n_mpi_interfaces)
     # @assert false @show(NDIMS)
+    # @assert false mpi_interfaces.u
 
-    mpi_interfaces = P4estMPIInterfaceContainer{NDIMS, uEltype, NDIMS + 2}(u, U, F,
+    mpi_interfaces = P4estMPIInterfaceContainer{NDIMS, uEltype, NDIMS + 2}(u,
                                                                            local_neighbor_ids,
                                                                            node_indices,
                                                                            local_sides,
-                                                                           _u, _U, _F)
+                                                                           _u)
+    mpi_interfaceslw = P4estMPIInterfaceContainerLW{NDIMS, uEltype, NDIMS + 2}(mpi_interfaces,
+                                                                               U, F,
+                                                                               local_neighbor_ids,
+                                                                               node_indices,
+                                                                               local_sides,
+                                                                               _U, _F)
 
-    init_mpi_interfaces!(mpi_interfaces, mesh)
+    init_mpi_interfaces!(mpi_interfaceslw, mesh)
 
-    return mpi_interfaces
+    return mpi_interfaceslw
 end
+
+# Initialize node_indices of MPI interface container
+@inline function init_mpi_interface_node_indices!(mpi_interfaceslw::P4estMPIInterfaceContainerLW{2},
+                                                  faces, local_side, orientation,
+                                                  mpi_interface_id)
+    # Align interface in positive coordinate direction of primary element.
+    # For orientation == 1, the secondary element needs to be indexed backwards
+    # relative to the interface.
+    if local_side == 1 || orientation == 0
+        # Forward indexing
+        i = :i_forward
+    else
+        # Backward indexing
+        i = :i_backward
+    end
+    # @show mpi_interfaceslw.node_indices
+
+    if faces[local_side] == 0
+        # Index face in negative x-direction
+        mpi_interfaceslw.node_indices[mpi_interface_id] = (:begin, i)
+    elseif faces[local_side] == 1
+        # Index face in positive x-direction
+        mpi_interfaceslw.node_indices[mpi_interface_id] = (:end, i)
+    elseif faces[local_side] == 2
+        # Index face in negative y-direction
+        mpi_interfaceslw.node_indices[mpi_interface_id] = (i, :begin)
+    else # faces[local_side] == 3
+        # Index face in positive y-direction
+        mpi_interfaceslw.node_indices[mpi_interface_id] = (i, :end)
+    end
+    # @assert false mpi_interfaceslw.node_indices
+
+    return mpi_interfaceslw
+end
+
 
 # TODO: mortar code
 

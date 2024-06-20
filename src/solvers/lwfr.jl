@@ -242,12 +242,14 @@ function solve_lwfr(lw_update, callbacks, dt_initial, tolerances;
    integrator = LWIntegrator(lw_update, time_discretization, sol, callbacks, tolerances,
       time_step_computation=time_step_computation)
 
-   initialize_callbacks!(callbacks, integrator)
 
    # Initialize the dt in integrator, semi.cache
    set_dt!(integrator, dt_initial)
+
+   initialize_callbacks!(callbacks, integrator)
+
    apply_limiters!(limiters, integrator)
-   apply_callbacks!(callbacks, integrator) # stepsize, analysis callbacks
+   # apply_callbacks!(callbacks, integrator) # stepsize, analysis callbacks
    while !(isfinished(integrator)) # Check t < final_time
       perform_step!(integrator, limiters, callbacks, lw_update, time_step_computation,
                     time_discretization)

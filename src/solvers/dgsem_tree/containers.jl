@@ -63,7 +63,7 @@ function create_cache_serial(mesh::Union{TreeMesh,StructuredMesh,UnstructuredMes
    return cache
 end
 
-function create_cache(mesh::Union{TreeMesh{NDIMS, <:Trixi.SerialTree{NDIMS}},StructuredMesh,UnstructuredMesh2D} where NDIMS,
+function create_cache(mesh::Union{TreeMesh{NDIMS, <:Trixi.SerialTree{NDIMS}},StructuredMesh,UnstructuredMesh2D,P4estMesh{<:Any, <:Any, <:False}} where NDIMS,
    equations::AbstractEquations, time_discretization::AbstractLWTimeDiscretization,
    dg, RealT, uEltype, cache)
 
