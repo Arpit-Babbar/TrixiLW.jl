@@ -100,23 +100,23 @@ function init_mpi_interfaces(mesh::ParallelP4estMesh,
     # This is the container from Trixi, we only use it because the `init_mpi_interfaces!`
     # function from trixi initializes some connectivity information for which we want to
     # use the Trixi function without duplication
-    mpi_interfaces = P4estMPIInterfaceContainer{NDIMS, uEltype, NDIMS + 2}(u,
+    mpi_interfaces_ = P4estMPIInterfaceContainer{NDIMS, uEltype, NDIMS + 2}(u,
                                                                            local_neighbor_ids,
                                                                            node_indices,
                                                                            local_sides,
                                                                            _u)
-    init_mpi_interfaces!(mpi_interfaces, mesh)
+    init_mpi_interfaces!(mpi_interfaces_, mesh)
 
     # Now we just move what we get from the Trixi function into our own container
-    mpi_interfaceslw = P4estMPIInterfaceContainerLW{NDIMS, uEltype, NDIMS + 2}(mpi_interfaces.u,
+    mpi_interfaces = P4estMPIInterfaceContainerLW{NDIMS, uEltype, NDIMS + 2}(mpi_interfaces_.u,
                                                                                U, F,
-                                                                               mpi_interfaces.local_neighbor_ids,
-                                                                               mpi_interfaces.node_indices,
-                                                                               mpi_interfaces.local_sides,
-                                                                               mpi_interfaces._u,
+                                                                               mpi_interfaces_.local_neighbor_ids,
+                                                                               mpi_interfaces_.node_indices,
+                                                                               mpi_interfaces_.local_sides,
+                                                                               mpi_interfaces_._u,
                                                                                _U, _F)
 
-    return mpi_interfaceslw
+    return mpi_interfaces
 end
 
 # TODO: mortar code

@@ -32,11 +32,11 @@ function start_mpi_send!(mpi_cache::P4estMPICache, mesh, equations,
             last3 = first3 + data_size - 1
 
             local_side = cache.mpi_interfaces.local_sides[interface]
-            @views send_buffer[first1:last1] .= vec(cache.mpi_interfaceslw.u[local_side, ..,
+            @views send_buffer[first1:last1] .= vec(cache.mpi_interfaces.u[local_side, ..,
                                                                                             interface])
-            @views send_buffer[first2:last2] .= vec(cache.mpi_interfaceslw.U[local_side, ..,
+            @views send_buffer[first2:last2] .= vec(cache.mpi_interfaces.U[local_side, ..,
                                                                             interface])
-            @views send_buffer[first3:last3] .= vec(cache.mpi_interfaceslw.F[local_side, ..,
+            @views send_buffer[first3:last3] .= vec(cache.mpi_interfaces.F[local_side, ..,
                                                                             interface])
         end
         # TODO: Mortar code here
@@ -72,13 +72,13 @@ function finish_mpi_receive!(mpi_cache::P4estMPICache, mesh, equations,
             last3 = first3 + data_size - 1
 
             if cache.mpi_interfaces.local_sides[interface] == 1 # local element on primary side
-                @views vec(cache.mpi_interfaceslw.u[2, .., interface]) .= recv_buffer[first1:last1]
-                @views vec(cache.mpi_interfaceslw.U[2, .., interface]) .= recv_buffer[first2:last2]
-                @views vec(cache.mpi_interfaceslw.F[2, .., interface]) .= recv_buffer[first3:last3]
+                @views vec(cache.mpi_interfaces.u[2, .., interface]) .= recv_buffer[first1:last1]
+                @views vec(cache.mpi_interfaces.U[2, .., interface]) .= recv_buffer[first2:last2]
+                @views vec(cache.mpi_interfaces.F[2, .., interface]) .= recv_buffer[first3:last3]
             else # local element at secondary side
-                @views vec(cache.mpi_interfaceslw.u[1, .., interface]) .= recv_buffer[first1:last1]
-                @views vec(cache.mpi_interfaceslw.U[1, .., interface]) .= recv_buffer[first2:last2]
-                @views vec(cache.mpi_interfaceslw.F[1, .., interface]) .= recv_buffer[first3:last3]
+                @views vec(cache.mpi_interfaces.u[1, .., interface]) .= recv_buffer[first1:last1]
+                @views vec(cache.mpi_interfaces.U[1, .., interface]) .= recv_buffer[first2:last2]
+                @views vec(cache.mpi_interfaces.F[1, .., interface]) .= recv_buffer[first3:last3]
             end
         end
         d = MPI.Waitany(mpi_cache.mpi_recv_requests)
@@ -103,9 +103,9 @@ function create_cache(mesh::ParallelP4estMesh, equations,
 
     elements = init_elements(mesh, equations, dg.basis, uEltype)
 
-    mpi_interfaceslw = init_mpi_interfaces(mesh, equations, dg.basis, time_discretization, elements)
+    mpi_interfaces = init_mpi_interfaces(mesh, equations, dg.basis, time_discretization, elements)
     mpi_mortars = init_mpi_mortars(mesh, equations, dg.basis, elements)
-    mpi_cache = init_mpi_cache(mesh, mpi_interfaceslw, mpi_mortars,
+    mpi_cache = init_mpi_cache(mesh, mpi_interfaces, mpi_mortars,
                                nvariables(equations), nnodes(dg),
                                time_discretization, uEltype)
 
@@ -115,7 +115,7 @@ function create_cache(mesh::ParallelP4estMesh, equations,
     boundaries = init_boundaries(mesh, equations, dg.basis, elements)
     mortars = init_mortars(mesh, equations, dg.basis, elements)
 
-    cache = (; cache..., elements, interfaces, mpi_interfaceslw, boundaries, mortars, mpi_mortars,
+    cache = (; cache..., elements, interfaces, mpi_interfaces, boundaries, mortars, mpi_mortars,
              mpi_cache)
 
     # Add specialized parts of the cache required to compute the volume integral etc.
@@ -126,21 +126,21 @@ function create_cache(mesh::ParallelP4estMesh, equations,
     return cache
 end
 
-function init_mpi_cache(mesh::ParallelP4estMesh, mpi_interfaceslw, mpi_mortars, nvars,
+function init_mpi_cache(mesh::ParallelP4estMesh, mpi_interfaces, mpi_mortars, nvars,
                         nnodes, time_discretization::AbstractLWTimeDiscretization,
                         uEltype)
     mpi_cache = P4estMPICache(uEltype)
-    init_mpi_cache!(mpi_cache, mesh, mpi_interfaceslw, mpi_mortars, nvars, nnodes, time_discretization,
+    init_mpi_cache!(mpi_cache, mesh, mpi_interfaces, mpi_mortars, nvars, nnodes, time_discretization,
                     uEltype)
 
     return mpi_cache
 end
 
 function init_mpi_cache!(mpi_cache::P4estMPICache, mesh::ParallelP4estMesh,
-                         mpi_interfaceslw, mpi_mortars, nvars, n_nodes,
+                         mpi_interfaces, mpi_mortars, nvars, n_nodes,
                          time_discretization::AbstractLWTimeDiscretization,
                          uEltype)
-    mpi_neighbor_ranks, mpi_neighbor_interfaces, mpi_neighbor_mortars = init_mpi_neighbor_connectivity(mpi_interfaceslw,
+    mpi_neighbor_ranks, mpi_neighbor_interfaces, mpi_neighbor_mortars = init_mpi_neighbor_connectivity(mpi_interfaces,
                                                                                                        mpi_mortars,
                                                                                                        mesh)
 

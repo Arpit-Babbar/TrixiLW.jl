@@ -14,7 +14,7 @@ function prolong2mpiinterfaces!(cache, u,
                                 equations, surface_integral,
                                 time_discretization::AbstractLWTimeDiscretization,
                                 dg::DG)
-    @unpack mpi_interfaceslw, elements = cache
+    @unpack mpi_interfaces, elements = cache
     @unpack U, F = cache.element_cache
     @unpack contravariant_vectors = elements
     index_range = eachnode(dg)
@@ -25,9 +25,9 @@ function prolong2mpiinterfaces!(cache, u,
         # Note that in the current implementation, the interface will be
         # "aligned at the primary element", i.e., the index of the primary side
         # will always run forwards.
-        local_side = mpi_interfaceslw.local_sides[interface]
-        local_element = mpi_interfaceslw.local_neighbor_ids[interface]
-        local_indices = mpi_interfaceslw.node_indices[interface]
+        local_side = mpi_interfaces.local_sides[interface]
+        local_element = mpi_interfaces.local_neighbor_ids[interface]
+        local_indices = mpi_interfaces.node_indices[interface]
 
         local_direction = indices2direction(local_indices)
 
@@ -56,13 +56,13 @@ function prolong2mpiinterfaces!(cache, u,
             end
 
             for v in eachvariable(equations)
-                mpi_interfaceslw.u[local_side, v, i, interface] = u[v, i_element,
+                mpi_interfaces.u[local_side, v, i, interface] = u[v, i_element,
                                                                                   j_element,
                                                                                   local_element]
-                mpi_interfaceslw.U[local_side, v, i, interface] = U[v, i_element,
+                mpi_interfaces.U[local_side, v, i, interface] = U[v, i_element,
                                                                   j_element,
                                                                   local_element]
-                mpi_interfaceslw.F[local_side, v, i, interface] = f_normal[v]
+                mpi_interfaces.F[local_side, v, i, interface] = f_normal[v]
             end
             i_element += i_element_step
             j_element += j_element_step
@@ -76,7 +76,7 @@ function calc_mpi_interface_flux!(surface_flux_values, mesh::ParallelP4estMesh,
                                   nonconservative_terms, equations, surface_integral,
                                   time_discretization::AbstractLWTimeDiscretization,
                                   dg::DG, cache)
-    @unpack local_neighbor_ids, node_indices, local_sides = cache.mpi_interfaceslw
+    @unpack local_neighbor_ids, node_indices, local_sides = cache.mpi_interfaces
     @unpack contravariant_vectors = cache.elements
     index_range = eachnode(dg)
     index_end = last(index_range)
@@ -144,8 +144,8 @@ end
                                           interface_node_index, local_side,
                                           surface_node_index, local_direction_index,
                                           local_element_index)
-    @unpack u = cache.mpi_interfaceslw
-    @unpack U, F = cache.mpi_interfaceslw
+    @unpack u = cache.mpi_interfaces
+    @unpack U, F = cache.mpi_interfaces
     @unpack surface_flux = surface_integral
 
     u_ll, u_rr = get_surface_node_vars(u, equations, dg, interface_node_index,
