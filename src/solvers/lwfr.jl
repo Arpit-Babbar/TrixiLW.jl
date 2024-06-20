@@ -249,7 +249,7 @@ function solve_lwfr(lw_update, callbacks, dt_initial, tolerances;
    initialize_callbacks!(callbacks, integrator)
 
    apply_limiters!(limiters, integrator)
-   # apply_callbacks!(callbacks, integrator) # stepsize, analysis callbacks
+   apply_callbacks!(callbacks, integrator) # stepsize, analysis callbacks
    while !(isfinished(integrator)) # Check t < final_time
       perform_step!(integrator, limiters, callbacks, lw_update, time_step_computation,
                     time_discretization)
