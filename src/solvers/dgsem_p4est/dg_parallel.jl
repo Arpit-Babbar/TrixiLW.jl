@@ -2,10 +2,9 @@ using Trixi: balance!, partition!, update_ghost_layer!, init_elements,
              mpi_nranks, mpi_rank, nmpiinterfaces, init_mpi_neighbor_connectivity,
              InitNeighborRankConnectivityIterFaceUserData, exchange_normal_directions!,
              init_interfaces, init_boundaries, init_mpi_mortars, init_mortars,
-             finish_mpi_send!, start_mpi_receive!
+             finish_mpi_send!, start_mpi_receive!, init_mpi_interfaces
 
-import Trixi: init_mpi_cache, init_mpi_cache!, init_mpi_interfaces, init_mpi_cache,
-              start_mpi_send!, finish_mpi_receive!, create_cache
+import Trixi: init_mpi_cache, init_mpi_cache!,start_mpi_send!, finish_mpi_receive!, create_cache
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
 # we need to opt-in explicitly.
@@ -16,7 +15,6 @@ import Trixi: init_mpi_cache, init_mpi_cache!, init_mpi_interfaces, init_mpi_cac
 function start_mpi_send!(mpi_cache::P4estMPICache, mesh, equations,
                          time_discretization::AbstractLWTimeDiscretization,
                          dg, cache)
-    # @assert false "start_mpi_send!"
     lw_data_size_factor = 3 # LW requires thrice the amount of data transfer than RK
     data_size = nvariables(equations) * nnodes(dg)^(ndims(mesh) - 1)
 

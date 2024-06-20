@@ -49,7 +49,7 @@ analysis_callback = AnalysisCallback(semi, interval=analysis_interval, analysis_
 alive_callback = AliveCallback(analysis_interval=analysis_interval)
 
 # The SaveSolutionCallback allows to save the solution to a file in regular intervals
-save_solution = SaveSolutionCallback(interval=1,
+save_solution = SaveSolutionCallback(interval=100,
                                      solution_variables=cons2prim)
 
 
@@ -72,4 +72,3 @@ sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
 
 # Print the timer summary
 summary_callback()
-
