@@ -56,7 +56,7 @@ function prolong2mpiinterfaces!(cache, u,
             end
 
             for v in eachvariable(equations)
-                mpi_interfaceslw.mpi_interfaces_.u[local_side, v, i, interface] = u[v, i_element,
+                mpi_interfaceslw.u[local_side, v, i, interface] = u[v, i_element,
                                                                                   j_element,
                                                                                   local_element]
                 mpi_interfaceslw.U[local_side, v, i, interface] = U[v, i_element,
@@ -144,7 +144,7 @@ end
                                           interface_node_index, local_side,
                                           surface_node_index, local_direction_index,
                                           local_element_index)
-    @unpack u = cache.mpi_interfaceslw.mpi_interfaces_
+    @unpack u = cache.mpi_interfaceslw
     @unpack U, F = cache.mpi_interfaceslw
     @unpack surface_flux = surface_integral
 

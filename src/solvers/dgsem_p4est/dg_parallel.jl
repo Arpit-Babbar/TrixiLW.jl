@@ -32,7 +32,7 @@ function start_mpi_send!(mpi_cache::P4estMPICache, mesh, equations,
             last3 = first3 + data_size - 1
 
             local_side = cache.mpi_interfaces.local_sides[interface]
-            @views send_buffer[first1:last1] .= vec(cache.mpi_interfaceslw.mpi_interfaces_.u[local_side, ..,
+            @views send_buffer[first1:last1] .= vec(cache.mpi_interfaceslw.u[local_side, ..,
                                                                                             interface])
             @views send_buffer[first2:last2] .= vec(cache.mpi_interfaceslw.U[local_side, ..,
                                                                             interface])
@@ -72,11 +72,11 @@ function finish_mpi_receive!(mpi_cache::P4estMPICache, mesh, equations,
             last3 = first3 + data_size - 1
 
             if cache.mpi_interfaces.local_sides[interface] == 1 # local element on primary side
-                @views vec(cache.mpi_interfaceslw.mpi_interfaces_.u[2, .., interface]) .= recv_buffer[first1:last1]
+                @views vec(cache.mpi_interfaceslw.u[2, .., interface]) .= recv_buffer[first1:last1]
                 @views vec(cache.mpi_interfaceslw.U[2, .., interface]) .= recv_buffer[first2:last2]
                 @views vec(cache.mpi_interfaceslw.F[2, .., interface]) .= recv_buffer[first3:last3]
             else # local element at secondary side
-                @views vec(cache.mpi_interfaceslw.mpi_interfaces_.u[1, .., interface]) .= recv_buffer[first1:last1]
+                @views vec(cache.mpi_interfaceslw.u[1, .., interface]) .= recv_buffer[first1:last1]
                 @views vec(cache.mpi_interfaceslw.U[1, .., interface]) .= recv_buffer[first2:last2]
                 @views vec(cache.mpi_interfaceslw.F[1, .., interface]) .= recv_buffer[first3:last3]
             end

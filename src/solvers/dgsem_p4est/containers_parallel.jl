@@ -12,7 +12,7 @@ using Trixi: count_required_surfaces, init_surfaces!, init_mpi_interfaces!, P4es
 
 mutable struct P4estMPIInterfaceContainerLW{NDIMS, uEltype <: Real, NDIMSP2} <:
                AbstractContainer
-    mpi_interfaces_::P4estMPIInterfaceContainer
+    u::Array{uEltype, NDIMSP2}       # [primary/secondary, variable, i, j, interface]
     U::Array{uEltype, NDIMSP2}       # [primary/secondary, variable, i, j, interface]
     F::Array{uEltype, NDIMSP2}       # [primary/secondary, variable, i, j, interface]
 
@@ -21,6 +21,7 @@ mutable struct P4estMPIInterfaceContainerLW{NDIMS, uEltype <: Real, NDIMSP2} <:
     local_sides::Vector{Int}                            # [interface]
 
     # internal `resize!`able storage
+    _u::Vector{uEltype}
     _U::Vector{uEltype}
     _F::Vector{uEltype}
 end
@@ -96,52 +97,24 @@ function init_mpi_interfaces(mesh::ParallelP4estMesh,
 
     local_sides = Vector{Int}(undef, n_mpi_interfaces)
 
+    # This is the container from Trixi, we only use it because the `init_mpi_interfaces!`
+    # function from trixi initializes some connectivity information for which we want to
+    # use the Trixi function without duplication
     mpi_interfaces = P4estMPIInterfaceContainer{NDIMS, uEltype, NDIMS + 2}(u,
                                                                            local_neighbor_ids,
                                                                            node_indices,
                                                                            local_sides,
                                                                            _u)
-    mpi_interfaceslw = P4estMPIInterfaceContainerLW{NDIMS, uEltype, NDIMS + 2}(mpi_interfaces,
+    init_mpi_interfaces!(mpi_interfaces, mesh)
+
+    # Now we just move what we get from the Trixi function into our own container
+    mpi_interfaceslw = P4estMPIInterfaceContainerLW{NDIMS, uEltype, NDIMS + 2}(mpi_interfaces.u,
                                                                                U, F,
-                                                                               local_neighbor_ids,
-                                                                               node_indices,
-                                                                               local_sides,
+                                                                               mpi_interfaces.local_neighbor_ids,
+                                                                               mpi_interfaces.node_indices,
+                                                                               mpi_interfaces.local_sides,
+                                                                               mpi_interfaces._u,
                                                                                _U, _F)
-
-    init_mpi_interfaces!(mpi_interfaceslw, mesh)
-
-    return mpi_interfaceslw
-end
-
-# Initialize node_indices of MPI interface container
-@inline function init_mpi_interface_node_indices!(mpi_interfaceslw::P4estMPIInterfaceContainerLW{2},
-                                                  faces, local_side, orientation,
-                                                  mpi_interface_id)
-    # Align interface in positive coordinate direction of primary element.
-    # For orientation == 1, the secondary element needs to be indexed backwards
-    # relative to the interface.
-    if local_side == 1 || orientation == 0
-        # Forward indexing
-        i = :i_forward
-    else
-        # Backward indexing
-        i = :i_backward
-    end
-    # @show mpi_interfaceslw.node_indices
-
-    if faces[local_side] == 0
-        # Index face in negative x-direction
-        mpi_interfaceslw.node_indices[mpi_interface_id] = (:begin, i)
-    elseif faces[local_side] == 1
-        # Index face in positive x-direction
-        mpi_interfaceslw.node_indices[mpi_interface_id] = (:end, i)
-    elseif faces[local_side] == 2
-        # Index face in negative y-direction
-        mpi_interfaceslw.node_indices[mpi_interface_id] = (i, :begin)
-    else # faces[local_side] == 3
-        # Index face in positive y-direction
-        mpi_interfaceslw.node_indices[mpi_interface_id] = (i, :end)
-    end
 
     return mpi_interfaceslw
 end
