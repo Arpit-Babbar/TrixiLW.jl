@@ -33,7 +33,7 @@ function start_mpi_send!(mpi_cache::P4estMPICache, mesh, equations,
 
             local_side = cache.mpi_interfaces.local_sides[interface]
             @views send_buffer[first1:last1] .= vec(cache.mpi_interfaces.u[local_side, ..,
-                                                                                            interface])
+                                                                           interface])
             @views send_buffer[first2:last2] .= vec(cache.mpi_interfaces.U[local_side, ..,
                                                                             interface])
             @views send_buffer[first3:last3] .= vec(cache.mpi_interfaces.F[local_side, ..,
@@ -94,9 +94,10 @@ end
 function create_cache(mesh::ParallelP4estMesh, equations,
                       time_discretization::AbstractLWTimeDiscretization, dg::DG,
                       RealT, ::Type{uEltype}, cache) where {uEltype <: Real}
+    cache = create_cache_serial(mesh, equations, time_discretization, dg, RealT, uEltype, cache)
+
     # Make sure to balance and partition the p4est and create a new ghost layer before creating any
     # containers in case someone has tampered with the p4est after creating the mesh
-    cache = create_cache_serial(mesh, equations, time_discretization, dg, RealT, uEltype, cache)
     balance!(mesh)
     partition!(mesh)
     update_ghost_layer!(mesh)
