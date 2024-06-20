@@ -16,7 +16,6 @@ function prolong2mpiinterfaces!(cache, u,
                                 dg::DG)
     @unpack mpi_interfaceslw, elements = cache
     @unpack U, F = cache.element_cache
-
     @unpack contravariant_vectors = elements
     index_range = eachnode(dg)
 
@@ -116,8 +115,8 @@ function calc_mpi_interface_flux!(surface_flux_values, mesh::ParallelP4estMesh,
                                                     i_element, j_element, local_element)
 
             calc_mpi_interface_flux!(surface_flux_values, mesh, nonconservative_terms,
-                                     equations, surface_integral, time_discretization,
-                                     dg, cache,
+                                     equations, surface_integral,
+                                     time_discretization, dg, cache,
                                      interface, normal_direction,
                                      node, local_side,
                                      surface_node, local_direction, local_element)
@@ -138,7 +137,8 @@ end
 @inline function calc_mpi_interface_flux!(surface_flux_values,
                                           mesh::ParallelP4estMesh{2},
                                           nonconservative_terms::False, equations,
-                                          surface_integral, time_discretization::AbstractLWTimeDiscretization,
+                                          surface_integral,
+                                          time_discretization::AbstractLWTimeDiscretization,
                                           dg::DG, cache,
                                           interface_index, normal_direction,
                                           interface_node_index, local_side,
@@ -146,7 +146,6 @@ end
                                           local_element_index)
     @unpack u = cache.mpi_interfaceslw.mpi_interfaces_
     @unpack U, F = cache.mpi_interfaceslw
-
     @unpack surface_flux = surface_integral
 
     u_ll, u_rr = get_surface_node_vars(u, equations, dg, interface_node_index,

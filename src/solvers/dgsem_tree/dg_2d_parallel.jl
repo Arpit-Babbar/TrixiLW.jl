@@ -4,7 +4,7 @@ using Trixi: prolong2mpimortars!, start_mpi_receive!, MPICache, init_elements, l
              init_mpi_neighbor_connectivity, nmpiinterfaces, reset_du!, get_surface_node_vars,
              finish_mpi_send!, calc_mpi_mortar_flux!, mpi_mortar_fluxes_to_elements!,
              ParallelTreeMesh, ParallelP4estMesh, eachmpiinterface, mpi_nranks, mpi_rank, mpi_comm,
-             mpi_isroot, calc_sources!, calc_surface_integral!, calc_mpi_interface_flux!, prolong2mpiinterfaces!
+             mpi_isroot, calc_sources!, calc_surface_integral!
 
 import Trixi: init_mpi_cache, init_mpi_cache!, start_mpi_send!, finish_mpi_receive!, prolong2mpiinterfaces!,
 calc_mpi_interface_flux!

@@ -1221,7 +1221,6 @@ using LoopVectorization: @turbo
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
             multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], G_node, equations, dg, i, jj, element)
-
             multiply_add_to_node_vars!(u_np1, -dt * inv_jacobian * derivative_matrix[jj, j],
                G_node, equations, dg, i, jj)
          end
@@ -1242,7 +1241,6 @@ using LoopVectorization: @turbo
          set_node_vars!(element_cache.F, F_node, equations, dg, 1, i, j, element)
          set_node_vars!(element_cache.F, G_node, equations, dg, 2, i, j, element)
          set_node_vars!(element_cache.U, U_node, equations, dg, i, j, element)
-         # @assert false element_cache.F
 
          S_node = get_node_vars(S, equations, dg, i, j)
          # inv_jacobian = inverse_jacobian[i, j, element]
