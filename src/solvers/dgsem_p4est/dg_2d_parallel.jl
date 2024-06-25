@@ -47,7 +47,7 @@ function prolong2mpiinterfaces!(cache, u,
             f = get_flux_vars(F, equations, dg, i_element, j_element, local_element)
 
             # The flux should be in the same normal direction when the surface flux function is
-            # called. This involves flipping signs to be combatible with the second call of
+            # called. This involves flipping signs to be compatible with the second call of
             # `calc_mpi_interface_flux!``
             if local_side == 1
                 f_normal = normal_product(f, equations, normal_direction)
@@ -57,8 +57,8 @@ function prolong2mpiinterfaces!(cache, u,
 
             for v in eachvariable(equations)
                 mpi_interfaces.u[local_side, v, i, interface] = u[v, i_element,
-                                                                                  j_element,
-                                                                                  local_element]
+                                                                  j_element,
+                                                                  local_element]
                 mpi_interfaces.U[local_side, v, i, interface] = U[v, i_element,
                                                                   j_element,
                                                                   local_element]
