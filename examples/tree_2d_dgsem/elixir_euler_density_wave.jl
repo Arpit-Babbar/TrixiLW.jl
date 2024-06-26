@@ -15,7 +15,7 @@ coordinates_min = (-1.0, -1.0)
 coordinates_max = ( 1.0,  1.0)
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level=3,
-                n_cells_max=30_000)
+                n_cells_max=30_00000)
 
 
 cfl_number = 0.5
@@ -61,8 +61,8 @@ callbacks = (
 time_int_tol = 1e-8
 tolerances = (;abstol = time_int_tol, reltol = time_int_tol)
 dt_initial = 1e-6
-sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
+@time sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
                      #  time_step_computation = TrixiLW.Adaptive()
                       time_step_computation = TrixiLW.CFLBased(cfl_number)
                       );
-summary_callback() # print the timer summary
+# summary_callback() # print the timer summary
