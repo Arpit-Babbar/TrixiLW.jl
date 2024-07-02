@@ -4,7 +4,8 @@ using Trixi: balance!, partition!, update_ghost_layer!, init_elements,
              init_interfaces, init_boundaries, init_mpi_mortars, init_mortars,
              finish_mpi_send!, start_mpi_receive!, init_mpi_interfaces
 
-import Trixi: init_mpi_cache, init_mpi_cache!,start_mpi_send!, finish_mpi_receive!, create_cache
+import Trixi: init_mpi_cache, init_mpi_cache!,start_mpi_send!, finish_mpi_receive!, create_cache,
+              buffer_mortar_indices
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
 # we need to opt-in explicitly.
@@ -17,6 +18,7 @@ function start_mpi_send!(mpi_cache::P4estMPICache, mesh, equations,
                          dg, cache)
     lw_data_size_factor = 3 # LW requires thrice the amount of data transfer than RK
     data_size = nvariables(equations) * nnodes(dg)^(ndims(mesh) - 1)
+    n_small_elements = 2^(ndims(mesh) - 1)
 
     for d in 1:length(mpi_cache.mpi_neighbor_ranks)
         send_buffer = mpi_cache.mpi_send_buffers[d]
@@ -39,7 +41,49 @@ function start_mpi_send!(mpi_cache::P4estMPICache, mesh, equations,
             @views send_buffer[first3:last3] .= vec(cache.mpi_interfaces.F[local_side, ..,
                                                                             interface])
         end
-        # TODO: Mortar code here
+
+        # Set send_buffer corresponding to mortar data to NaN and overwrite the parts where local
+        # data exists
+        # TODO: Do lw_data_size_factor needed here?
+        interfaces_data_size = length(mpi_cache.mpi_neighbor_interfaces[d]) * data_size * lw_data_size_factor
+        mortars_data_size = length(mpi_cache.mpi_neighbor_mortars[d]) *
+                            n_small_elements * 2 * data_size * lw_data_size_factor
+        # `NaN |> eltype(...)` ensures that the NaN's are of the appropriate floating point type
+        send_buffer[(interfaces_data_size + 1):(interfaces_data_size + mortars_data_size)] .= NaN |>
+                                                                                              eltype(mpi_cache)
+
+        for (index, mortar) in enumerate(mpi_cache.mpi_neighbor_mortars[d])
+            index_base = interfaces_data_size +
+                         (index - 1) * n_small_elements * 2 * data_size * lw_data_size_factor
+            indices = buffer_mortar_indices(mesh, index_base, data_size, time_discretization)
+
+            for position in cache.mpi_mortars.local_neighbor_positions[mortar]
+                first1, last1 = indices[position]                                 # For u
+                first2, last2 = last1 + 1, last1 + (last1 - first1)               # For U
+                first3, last3 = last2 + 1, last2 + (last1 - first1)               # For F
+                if position > n_small_elements # large element
+                    @views send_buffer[first1:last1] .= vec(cache.mpi_mortars.u[2, :, :,
+                                                                              ..,
+                                                                              mortar])
+                    @views send_buffer[first2:last2] .= vec(cache.mpi_mortars.U[2, :, :,
+                                                                              ..,
+                                                                              mortar])
+                    @views send_buffer[first3:last3] .= vec(cache.mpi_mortars.F[2, :, :,
+                                                                              ..,
+                                                                              mortar])
+                else # small element
+                    @views send_buffer[first1:last1] .= vec(cache.mpi_mortars.u[1, :, :,
+                                                                              ..,
+                                                                              mortar])
+                    @views send_buffer[first2:last2] .= vec(cache.mpi_mortars.U[1, :, :,
+                                                                              ..,
+                                                                              mortar])
+                    @views send_buffer[first3:last3] .= vec(cache.mpi_mortars.F[1, :, :,
+                                                                              ..,
+                                                                              mortar])
+                end
+            end
+        end
     end
     # Start sending
     for (index, d) in enumerate(mpi_cache.mpi_neighbor_ranks)
@@ -55,6 +99,8 @@ function finish_mpi_receive!(mpi_cache::P4estMPICache, mesh, equations,
                              dg, cache)
     lw_data_size_factor = 3 # LW requires thrice the amount of data transfer than RK
     data_size = nvariables(equations) * nnodes(dg)^(ndims(mesh) - 1)
+    n_small_elements = 2^(ndims(mesh) - 1)
+    n_positions = n_small_elements + 1
 
     # Start receiving and unpack received data until all communication is finished
     d = MPI.Waitany(mpi_cache.mpi_recv_requests)
@@ -81,12 +127,59 @@ function finish_mpi_receive!(mpi_cache::P4estMPICache, mesh, equations,
                 @views vec(cache.mpi_interfaces.F[1, .., interface]) .= recv_buffer[first3:last3]
             end
         end
+
+        interfaces_data_size = length(mpi_cache.mpi_neighbor_interfaces[d]) * data_size * lw_data_size_factor
+        for (index, mortar) in enumerate(mpi_cache.mpi_neighbor_mortars[d])
+            index_base = interfaces_data_size +
+                         (index - 1) * n_small_elements * 2 * data_size * lw_data_size_factor
+            indices = buffer_mortar_indices(mesh, index_base, data_size, time_discretization)
+
+            for position in 1:n_positions
+                # Skip if received data for `position` is NaN as no real data has been sent for the
+                # corresponding element
+                if isnan(recv_buffer[Base.first(indices[position])])
+                    continue
+                end
+
+                first1, last1 = indices[position]                                 # For u
+                first2, last2 = last1 + 1, last1 + (last1 - first1)               # For U
+                first3, last3 = last2 + 1, last2 + (last1 - first1)               # For F
+                if position == n_positions # large element
+                    @views vec(cache.mpi_mortars.u[2, :, :, .., mortar]) .= recv_buffer[first1:last1]
+                    @views vec(cache.mpi_mortars.U[2, :, :, .., mortar]) .= recv_buffer[first2:last2]
+                    @views vec(cache.mpi_mortars.F[2, :, :, .., mortar]) .= recv_buffer[first3:last3]
+                else # small element
+                    @views vec(cache.mpi_mortars.u[1, :, position, .., mortar]) .= recv_buffer[first1:last1]
+                    @views vec(cache.mpi_mortars.U[1, :, position, .., mortar]) .= recv_buffer[first2:last2]
+                    @views vec(cache.mpi_mortars.F[1, :, position, .., mortar]) .= recv_buffer[first3:last3]
+                end
+            end
+        end
+
         d = MPI.Waitany(mpi_cache.mpi_recv_requests)
     end
 
     return nothing
 end
 
+# Return a tuple `indices` where indices[position] is a `(first, last)` tuple for accessing the
+# data corresponding to the `position` part of a mortar in an MPI buffer. The mortar data must begin
+# at `index_base`+1 in the MPI buffer. `data_size` is the data size associated with each small
+# position (i.e. position 1 or 2). The data corresponding to the large side (i.e. position 3) has
+# size `2 * data_size`.
+@inline function buffer_mortar_indices(mesh::ParallelP4estMesh{2}, index_base, data_size,
+                                       time_discretization::AbstractLWTimeDiscretization)
+    return (
+            # first, last for local element in position 1 (small element)
+            (index_base + 1,
+             index_base + 1 * data_size),
+            # first, last for local element in position 2 (small element)
+            (index_base + 3 * data_size + 1,
+             index_base + 4 * data_size),
+            # first, last for local element in position 3 (large element)
+            (index_base + 6 * data_size + 1,
+             index_base + 8 * data_size))
+end
 
 # This method is called when a SemidiscretizationHyperbolic is constructed.
 # It constructs the basic `cache` used throughout the simulation to compute

@@ -456,7 +456,8 @@ function prolong2mortars!(cache, u,
       element = neighbor_ids[3, mortar]
       for i in eachnode(dg)
          f = get_flux_vars(F, equations, dg, i_large, j_large, element)
-         # TODO - Why this minus? Why this 0.5? Is it correct? Does it work on curved meshes?
+         # For getting the normal for interfaces, we can multiply 0.5 to normal of
+         # mortar and then flip the direction i.e. multiply by -0.5
          normal_direction = -0.5 * get_normal_direction(large_direction, contravariant_vectors,
             i_large, j_large, element)
          u_node = Trixi.get_node_vars(u, equations, dg, i_large, j_large, element)

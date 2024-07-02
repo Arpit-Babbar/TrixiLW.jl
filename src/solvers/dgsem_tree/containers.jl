@@ -34,10 +34,9 @@ function create_cache_serial(mesh::Union{TreeMesh,StructuredMesh,UnstructuredMes
    MOuter = MArray{Tuple{n_variables},Float64}
    outer_cache = alloc_for_threads(MOuter, 2)
    boundary_cache = create_boundary_cache(mesh, equations, dg, uEltype, RealT,
-      cache, outer_cache, time_discretization)
-
+   cache, outer_cache, time_discretization)
    lw_mortars = create_mortar_cache(mesh, equations, dg, uEltype, RealT,
-      cache, time_discretization)
+   cache, time_discretization)
    cfl_number = fill(nan_RealT, 1)
    dt = fill(nan_RealT, 1)
 
