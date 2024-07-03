@@ -1,3 +1,5 @@
+using Trixi: mpi_isparallel, count_required_surfaces
+
 # Called in AMR callback
 function DiffEqBase.resize!(integrator::LWIntegrator, i::Int)
    for c in integrator.cache
@@ -7,6 +9,9 @@ function DiffEqBase.resize!(integrator::LWIntegrator, i::Int)
 
    semi = integrator.p
    @unpack mesh, equations, solver, cache = semi
+   nvars = nvariables(equations)
+   n_nodes = nnodes(solver)
+
    n_elements = nelements(semi.solver, semi.cache)
    n_interfaces = ninterfaces(semi.solver, semi.cache)
    n_boundaries = nboundaries(semi.solver, semi.cache)
@@ -17,6 +22,18 @@ function DiffEqBase.resize!(integrator::LWIntegrator, i::Int)
    resize_interface_cache!(mesh, equations, solver, cache)
    resize_mortar_cache!(mesh, equations, solver, cache)
    resize_boundary_cache!(mesh, equations, solver, cache)
+
+   time_discretization = integrator.alg
+   if mpi_isparallel()
+      @unpack mpi_mortars, mpi_mortars_lw, mpi_interfaces, mpi_interfaces_lw,
+              mpi_cache = cache
+      required = count_required_surfaces(mesh)
+      resize!(mpi_mortars_lw, required.mpi_mortars)
+      resize!(mpi_interfaces_lw, required.mpi_interfaces)
+      init_mpi_cache!(mpi_cache, mesh, mpi_interfaces, mpi_mortars, nvars, n_nodes,
+                      time_discretization, Float64 # TODO - Fix in future
+                      )
+   end
 end
 
 resize_element_cache!(

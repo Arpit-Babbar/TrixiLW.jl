@@ -259,7 +259,7 @@ function init_mpi_mortars(mesh::ParallelP4estMesh, equations,
                                                      mpi_mortars.node_indices,
                                                      mpi_mortars.normal_directions,
                                                      mpi_mortars._u,
-                                                     _U, _F, 
+                                                     _U, _F,
                                                      mpi_mortars._node_indices,
                                                      mpi_mortars._normal_directions,
                                                      (; U_threaded, F_threaded))

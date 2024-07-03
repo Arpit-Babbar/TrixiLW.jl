@@ -44,7 +44,7 @@ lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan)
 # The AnalysisCallback allows to analyse the solution in regular intervals and prints the results
 analysis_interval = 100
 analysis_callback = AnalysisCallback(semi, interval=analysis_interval)
-alive_callback = AliveCallback(analysis_interval=analysis_interval)
+alive_callback = AliveCallback(analysis_interval=1)
 
 # The SaveSolutionCallback allows to save the solution to a file in regular intervals
 save_solution = SaveSolutionCallback(interval=100,
@@ -57,7 +57,7 @@ amr_controller = ControllerThreeLevel(semi, IndicatorMax(semi, variable=first),
 
 amr_callback = AMRCallback(semi, amr_controller,
    interval=5,
-   adapt_initial_condition=true,
+   adapt_initial_condition=false,
    adapt_initial_condition_only_refine=true)
 
 
