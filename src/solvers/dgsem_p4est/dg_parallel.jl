@@ -35,10 +35,10 @@ function start_mpi_send!(mpi_cache::P4estMPICache, mesh, equations,
 
             local_side = cache.mpi_interfaces.local_sides[interface]
             @views send_buffer[first1:last1] .= vec(cache.mpi_interfaces.u[local_side, ..,
-                                                                           interface])
-            @views send_buffer[first2:last2] .= vec(cache.mpi_interfaces.U[local_side, ..,
+                                                                           interface])                              
+            @views send_buffer[first2:last2] .= vec(cache.mpi_interfaces_lw.U[local_side, ..,
                                                                             interface])
-            @views send_buffer[first3:last3] .= vec(cache.mpi_interfaces.F[local_side, ..,
+            @views send_buffer[first3:last3] .= vec(cache.mpi_interfaces_lw.F[local_side, ..,
                                                                             interface])
         end
 
@@ -65,20 +65,20 @@ function start_mpi_send!(mpi_cache::P4estMPICache, mesh, equations,
                     @views send_buffer[first1:last1] .= vec(cache.mpi_mortars.u[2, :, :,
                                                                               ..,
                                                                               mortar])
-                    @views send_buffer[first2:last2] .= vec(cache.mpi_mortars.U[2, :, :,
+                    @views send_buffer[first2:last2] .= vec(cache.mpi_mortars_lw.U[2, :, :,
                                                                               ..,
                                                                               mortar])
-                    @views send_buffer[first3:last3] .= vec(cache.mpi_mortars.F[2, :, :,
+                    @views send_buffer[first3:last3] .= vec(cache.mpi_mortars_lw.F[2, :, :,
                                                                               ..,
                                                                               mortar])
                 else # small element
                     @views send_buffer[first1:last1] .= vec(cache.mpi_mortars.u[1, :, :,
                                                                               ..,
                                                                               mortar])
-                    @views send_buffer[first2:last2] .= vec(cache.mpi_mortars.U[1, :, :,
+                    @views send_buffer[first2:last2] .= vec(cache.mpi_mortars_lw.U[1, :, :,
                                                                               ..,
                                                                               mortar])
-                    @views send_buffer[first3:last3] .= vec(cache.mpi_mortars.F[1, :, :,
+                    @views send_buffer[first3:last3] .= vec(cache.mpi_mortars_lw.F[1, :, :,
                                                                               ..,
                                                                               mortar])
                 end
@@ -119,12 +119,12 @@ function finish_mpi_receive!(mpi_cache::P4estMPICache, mesh, equations,
 
             if cache.mpi_interfaces.local_sides[interface] == 1 # local element on primary side
                 @views vec(cache.mpi_interfaces.u[2, .., interface]) .= recv_buffer[first1:last1]
-                @views vec(cache.mpi_interfaces.U[2, .., interface]) .= recv_buffer[first2:last2]
-                @views vec(cache.mpi_interfaces.F[2, .., interface]) .= recv_buffer[first3:last3]
+                @views vec(cache.mpi_interfaces_lw.U[2, .., interface]) .= recv_buffer[first2:last2]
+                @views vec(cache.mpi_interfaces_lw.F[2, .., interface]) .= recv_buffer[first3:last3]
             else # local element at secondary side
                 @views vec(cache.mpi_interfaces.u[1, .., interface]) .= recv_buffer[first1:last1]
-                @views vec(cache.mpi_interfaces.U[1, .., interface]) .= recv_buffer[first2:last2]
-                @views vec(cache.mpi_interfaces.F[1, .., interface]) .= recv_buffer[first3:last3]
+                @views vec(cache.mpi_interfaces_lw.U[1, .., interface]) .= recv_buffer[first2:last2]
+                @views vec(cache.mpi_interfaces_lw.F[1, .., interface]) .= recv_buffer[first3:last3]
             end
         end
 
@@ -150,8 +150,8 @@ function finish_mpi_receive!(mpi_cache::P4estMPICache, mesh, equations,
                     @views vec(cache.mpi_mortars.F[2, :, :, .., mortar]) .= recv_buffer[first3:last3]
                 else # small element
                     @views vec(cache.mpi_mortars.u[1, :, position, .., mortar]) .= recv_buffer[first1:last1]
-                    @views vec(cache.mpi_mortars.U[1, :, position, .., mortar]) .= recv_buffer[first2:last2]
-                    @views vec(cache.mpi_mortars.F[1, :, position, .., mortar]) .= recv_buffer[first3:last3]
+                    @views vec(cache.mpi_mortars_lw.U[1, :, position, .., mortar]) .= recv_buffer[first2:last2]
+                    @views vec(cache.mpi_mortars_lw.F[1, :, position, .., mortar]) .= recv_buffer[first3:last3]
                 end
             end
         end
@@ -197,8 +197,8 @@ function create_cache(mesh::ParallelP4estMesh, equations,
 
     elements = init_elements(mesh, equations, dg.basis, uEltype)
 
-    mpi_interfaces = init_mpi_interfaces(mesh, equations, dg.basis, time_discretization, elements)
-    mpi_mortars = init_mpi_mortars(mesh, equations, dg.basis, elements)
+    mpi_interfaces, mpi_interfaces_lw = init_mpi_interfaces(mesh, equations, dg.basis, time_discretization, elements)
+    mpi_mortars, mpi_mortars_lw = init_mpi_mortars(mesh, equations, dg.basis, elements, cache)
     mpi_cache = init_mpi_cache(mesh, mpi_interfaces, mpi_mortars,
                                nvariables(equations), nnodes(dg),
                                time_discretization, uEltype)
@@ -209,8 +209,8 @@ function create_cache(mesh::ParallelP4estMesh, equations,
     boundaries = init_boundaries(mesh, equations, dg.basis, elements)
     mortars = init_mortars(mesh, equations, dg.basis, elements)
 
-    cache = (; cache..., elements, interfaces, mpi_interfaces, boundaries, mortars, mpi_mortars,
-             mpi_cache)
+    cache = (; cache..., elements, interfaces, mpi_interfaces, mpi_interfaces_lw, boundaries, mortars, mpi_mortars,
+             mpi_mortars_lw, mpi_cache)
 
     # Add specialized parts of the cache required to compute the volume integral etc.
     cache = (; cache...,

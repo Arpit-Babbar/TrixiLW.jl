@@ -14,7 +14,7 @@ function prolong2mpiinterfaces!(cache, u,
                                 equations, surface_integral,
                                 time_discretization::AbstractLWTimeDiscretization,
                                 dg::DG)
-    @unpack mpi_interfaces, elements = cache
+    @unpack mpi_interfaces, mpi_interfaces_lw, elements = cache
     @unpack U, F = cache.element_cache
     @unpack contravariant_vectors = elements
     index_range = eachnode(dg)
@@ -59,10 +59,10 @@ function prolong2mpiinterfaces!(cache, u,
                 mpi_interfaces.u[local_side, v, i, interface] = u[v, i_element,
                                                                   j_element,
                                                                   local_element]
-                mpi_interfaces.U[local_side, v, i, interface] = U[v, i_element,
+                mpi_interfaces_lw.U[local_side, v, i, interface] = U[v, i_element,
                                                                   j_element,
                                                                   local_element]
-                mpi_interfaces.F[local_side, v, i, interface] = f_normal[v]
+                mpi_interfaces_lw.F[local_side, v, i, interface] = f_normal[v]
             end
             i_element += i_element_step
             j_element += j_element_step
@@ -145,7 +145,7 @@ end
                                           surface_node_index, local_direction_index,
                                           local_element_index)
     @unpack u = cache.mpi_interfaces
-    @unpack U, F = cache.mpi_interfaces
+    @unpack U, F = cache.mpi_interfaces_lw
     @unpack surface_flux = surface_integral
 
     u_ll, u_rr = get_surface_node_vars(u, equations, dg, interface_node_index,
@@ -174,9 +174,10 @@ function prolong2mpimortars!(cache, u,
                              time_discretization::AbstractLWTimeDiscretization,
                              dg::DGSEM)
     @unpack node_indices, neighbor_ids = cache.mpi_mortars
-    @unpack U, F = cache.mpi_mortars
+    @unpack U, F = cache.mpi_mortars_lw
     @unpack contravariant_vectors = cache.elements
-    @unpack mortars, lw_mortars = cache
+    # @unpack mortars, lw_mortars = cache
+    @unpack mpi_mortars_lw = cache
     index_range = eachnode(dg)
     @threaded for mortar in eachmpimortar(dg, cache)
         local_neighbor_ids = cache.mpi_mortars.local_neighbor_ids[mortar]
@@ -203,8 +204,8 @@ function prolong2mpimortars!(cache, u,
                 # Buffer to copy solution values of the large element in the correct orientation
                 # before interpolating
                 u_buffer = cache.u_threaded[Threads.threadid()]
-                U_buffer = lw_mortars.tmp.U_threaded[Threads.threadid()]
-                F_buffer = lw_mortars.tmp.F_threaded[Threads.threadid()]
+                U_buffer = mpi_mortars_lw.tmp.U_threaded[Threads.threadid()]
+                F_buffer = mpi_mortars_lw.tmp.F_threaded[Threads.threadid()]
                 i_large = i_large_start
                 j_large = j_large_start
                 for i in eachnode(dg)
@@ -233,17 +234,17 @@ function prolong2mpimortars!(cache, u,
                                         mortar_l2.forward_upper,
                                         u_buffer)
 
-                multiply_dimensionwise!(view(cache.lw_mortars.U, 2, :, 1, :, mortar),
+                multiply_dimensionwise!(view(cache.mpi_mortars_lw.U, 2, :, 1, :, mortar),
                                         mortar_l2.forward_lower,
                                         U_buffer)
-                multiply_dimensionwise!(view(cache.lw_mortars.U, 2, :, 2, :, mortar),
+                multiply_dimensionwise!(view(cache.mpi_mortars_lw.U, 2, :, 2, :, mortar),
                                         mortar_l2.forward_upper,
                                         U_buffer)
 
-                multiply_dimensionwise!(view(cache.lw_mortars.F, 2, :, 1, :, mortar),
+                multiply_dimensionwise!(view(cache.mpi_mortars_lw.F, 2, :, 1, :, mortar),
                                         mortar_l2.forward_lower,
                                         F_buffer)
-                multiply_dimensionwise!(view(cache.lw_mortars.F, 2, :, 2, :, mortar),
+                multiply_dimensionwise!(view(cache.mpi_mortars_lw.F, 2, :, 2, :, mortar),
                                         mortar_l2.forward_upper,
                                         F_buffer)
             else # position in (1, 2) -> small element
@@ -260,10 +261,10 @@ function prolong2mpimortars!(cache, u,
                         cache.mpi_mortars.u[1, v, position, i, mortar] = u[v, i_small,
                                                                            j_small,
                                                                            element]
-                        lw_mortars.U[1, v, position, i, mortar] = U[v, i_small,
+                        mpi_mortars_lw.U[1, v, position, i, mortar] = U[v, i_small,
                                                                     j_small,
                                                                     element]
-                        lw_mortars.F[1, v, position, i, mortar] = fn_node[v]
+                        mpi_mortars_lw.F[1, v, position, i, mortar] = fn_node[v]
                     end
                     i_small += i_small_step
                     j_small += j_small_step
@@ -322,8 +323,8 @@ function calc_mpi_mortar_flux!(surface_flux_values,
         # Buffer to interpolate flux values of the large element to before
         # copying in the correct orientation
         u_buffer = cache.u_threaded[Threads.threadid()]
-        U_buffer = cache.lw_mortars.tmp.U_threaded[Threads.threadid()]
-        F_buffer = cache.lw_mortars.tmp.F_threaded[Threads.threadid()]
+        U_buffer = cache.mpi_mortars_lw.tmp.U_threaded[Threads.threadid()]
+        F_buffer = cache.mpi_mortars_lw.tmp.F_threaded[Threads.threadid()]
 
         mpi_mortar_fluxes_to_elements!(surface_flux_values,
                                        mesh, equations, mortar_l2,
@@ -345,7 +346,7 @@ end
                                        mortar_index, position_index, normal_direction,
                                        node_index)
     @unpack u = cache.mpi_mortars
-    @unpack U, F = cache.mpi_mortars
+    @unpack U, F = cache.mpi_mortars_lw
     @unpack surface_flux = surface_integral
 
     u_ll, u_rr = get_surface_node_vars(u, equations, dg, position_index, node_index,
