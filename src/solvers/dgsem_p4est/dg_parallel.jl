@@ -1,8 +1,7 @@
 using Trixi: balance!, partition!, update_ghost_layer!, init_elements,
              mpi_nranks, mpi_rank, nmpiinterfaces, init_mpi_neighbor_connectivity,
-             InitNeighborRankConnectivityIterFaceUserData, exchange_normal_directions!,
-             init_interfaces, init_boundaries, init_mpi_mortars, init_mortars,
-             finish_mpi_send!, start_mpi_receive!, init_mpi_interfaces
+             exchange_normal_directions!, init_interfaces, init_boundaries,
+             init_mortars, finish_mpi_send!, start_mpi_receive!
 
 import Trixi: init_mpi_cache, init_mpi_cache!,start_mpi_send!, finish_mpi_receive!, create_cache,
               buffer_mortar_indices
@@ -39,12 +38,11 @@ function start_mpi_send!(mpi_cache::P4estMPICache, mesh, equations,
             @views send_buffer[first2:last2] .= vec(cache.mpi_interfaces_lw.U[local_side, ..,
                                                                             interface])
             @views send_buffer[first3:last3] .= vec(cache.mpi_interfaces_lw.F[local_side, ..,
-                                                                            interface])
+                                                                              interface])
         end
 
         # Set send_buffer corresponding to mortar data to NaN and overwrite the parts where local
         # data exists
-        # TODO: Do lw_data_size_factor needed here?
         interfaces_data_size = length(mpi_cache.mpi_neighbor_interfaces[d]) * data_size * lw_data_size_factor
         mortars_data_size = length(mpi_cache.mpi_neighbor_mortars[d]) *
                             n_small_elements * 2 * data_size * lw_data_size_factor
@@ -58,9 +56,9 @@ function start_mpi_send!(mpi_cache::P4estMPICache, mesh, equations,
             indices = buffer_mortar_indices(mesh, index_base, data_size, time_discretization)
 
             for position in cache.mpi_mortars.local_neighbor_positions[mortar]
-                first1, last1 = indices[position]                                 # For u
-                first2, last2 = last1 + 1, last1 + (last1 - first1)               # For U
-                first3, last3 = last2 + 1, last2 + (last1 - first1)               # For F
+                first1, last1 = indices[position]                                     # For u
+                first2, last2 = last1 + 1, last1 + (last1 - first1) + 1               # For U
+                first3, last3 = last2 + 1, last2 + (last2 - first2) + 1               # For F
                 if position > n_small_elements # large element
                     @views send_buffer[first1:last1] .= vec(cache.mpi_mortars.u[2, :, :,
                                                                               ..,
@@ -72,13 +70,16 @@ function start_mpi_send!(mpi_cache::P4estMPICache, mesh, equations,
                                                                               ..,
                                                                               mortar])
                 else # small element
-                    @views send_buffer[first1:last1] .= vec(cache.mpi_mortars.u[1, :, :,
+                    @views send_buffer[first1:last1] .= vec(cache.mpi_mortars.u[1, :,
+                                                                              position,
                                                                               ..,
                                                                               mortar])
-                    @views send_buffer[first2:last2] .= vec(cache.mpi_mortars_lw.U[1, :, :,
+                    @views send_buffer[first2:last2] .= vec(cache.mpi_mortars_lw.U[1, :,
+                                                                              position,
                                                                               ..,
                                                                               mortar])
-                    @views send_buffer[first3:last3] .= vec(cache.mpi_mortars_lw.F[1, :, :,
+                    @views send_buffer[first3:last3] .= vec(cache.mpi_mortars_lw.F[1, :,
+                                                                              position, 
                                                                               ..,
                                                                               mortar])
                 end
@@ -140,14 +141,13 @@ function finish_mpi_receive!(mpi_cache::P4estMPICache, mesh, equations,
                 if isnan(recv_buffer[Base.first(indices[position])])
                     continue
                 end
-
-                first1, last1 = indices[position]                                 # For u
-                first2, last2 = last1 + 1, last1 + (last1 - first1)               # For U
-                first3, last3 = last2 + 1, last2 + (last1 - first1)               # For F
+                first1, last1 = indices[position]                                     # For u
+                first2, last2 = last1 + 1, last1 + (last1 - first1) + 1               # For U
+                first3, last3 = last2 + 1, last2 + (last1 - first1) + 1               # For F
                 if position == n_positions # large element
                     @views vec(cache.mpi_mortars.u[2, :, :, .., mortar]) .= recv_buffer[first1:last1]
-                    @views vec(cache.mpi_mortars.U[2, :, :, .., mortar]) .= recv_buffer[first2:last2]
-                    @views vec(cache.mpi_mortars.F[2, :, :, .., mortar]) .= recv_buffer[first3:last3]
+                    @views vec(cache.mpi_mortars_lw.U[2, :, :, .., mortar]) .= recv_buffer[first2:last2]
+                    @views vec(cache.mpi_mortars_lw.F[2, :, :, .., mortar]) .= recv_buffer[first3:last3]
                 else # small element
                     @views vec(cache.mpi_mortars.u[1, :, position, .., mortar]) .= recv_buffer[first1:last1]
                     @views vec(cache.mpi_mortars_lw.U[1, :, position, .., mortar]) .= recv_buffer[first2:last2]

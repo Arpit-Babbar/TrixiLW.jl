@@ -2,6 +2,7 @@
 # to verify the StructuredMesh implementation against TreeMesh
 
 using TrixiLW
+using TrixiLW: AMRCallbackLW
 using Trixi
 
 ###############################################################################
@@ -60,13 +61,13 @@ amr_callback = AMRCallback(semi, amr_controller,
    adapt_initial_condition=false,
    adapt_initial_condition_only_refine=true)
 
+amr_callback_lw = AMRCallbackLW(amr_callback, get_time_discretization(solver))
 
 # Create a CallbackSet to collect all callbacks such that they can be passed to the ODE solver
 summary_callback = SummaryCallback()
-callbacks = ( analysis_callback, save_solution, alive_callback,
-               amr_callback, summary_callback
+callbacks = (analysis_callback, save_solution, alive_callback,
+             r_callback_lw, summary_callback
             )
-
 
 ###############################################################################
 # run the simulation

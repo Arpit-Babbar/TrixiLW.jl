@@ -1,4 +1,62 @@
-using Trixi: mpi_isparallel, count_required_surfaces
+using Trixi: mpi_isparallel, count_required_surfaces, DiscreteCallback, u_modified!
+
+import Trixi: initialize!
+
+struct AMRCallbackLW{AMRCallback}
+   amr_callback::AMRCallback
+end
+
+# This function will return a DiscreteCallback from SciMLBase along with amr_callback_lw
+function AMRCallbackLW(amr_callback, time_discretization)
+   amr_callback_lw = AMRCallbackLW(amr_callback)
+   return DiscreteCallback(amr_callback.condition, amr_callback_lw,
+                           save_positions = (false, false),
+                           initialize = amr_callback.initialize)
+end
+
+# Changing the action of the struct to modify it for TrixiLW. Basically, if in parallel code 
+# mesh has changed by AMR then call init_mpi_cache to re-initialize MPI containers related to LW. 
+function (amr_callback_lw::AMRCallbackLW)(integrator; kwargs...)
+   amr_callback = amr_callback_lw.amr_callback.affect!
+   u_ode = integrator.u
+   semi = integrator.p
+
+   @trixi_timeit timer() "AMR" begin
+      has_changed = amr_callback(u_ode, semi,
+                                 integrator.t, integrator.iter; kwargs...)
+      if has_changed
+         resize!(integrator, length(u_ode))
+         u_modified!(integrator, true)
+      end
+
+      if mpi_isparallel()
+      semi = integrator.p
+      @unpack mesh, equations, solver, cache = semi
+      nvars = nvariables(equations)
+      n_nodes = nnodes(solver)
+
+      time_discretization = integrator.alg
+      @unpack mpi_mortars, mpi_interfaces, mpi_cache = cache
+      init_mpi_cache!(mpi_cache, mesh, mpi_interfaces, mpi_mortars, nvars, n_nodes,
+                     time_discretization, Float64 # TODO - Fix in future
+                     )
+      end
+   end
+
+   return has_changed
+end
+
+function initialize!(cb::AMRCallbackLW, u, t,
+                     integrator)
+   initialize!(cb.amr_callback, u, t, integrator)
+   return nothing
+end
+
+function initialize!(cb::DiscreteCallback{Condition, Affect!}, u, t,
+                     integrator) where {Condition, Affect! <: AMRCallbackLW}
+   cb_trixi = cb.affect!.amr_callback
+   initialize!(cb_trixi, u, t, integrator)
+end
 
 # Called in AMR callback
 function DiffEqBase.resize!(integrator::LWIntegrator, i::Int)

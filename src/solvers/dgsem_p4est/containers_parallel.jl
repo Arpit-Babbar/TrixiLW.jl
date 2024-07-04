@@ -133,10 +133,10 @@ mutable struct P4estMPIMortarContainerLW{NDIMS, uEltype <: Real, RealT <: Real, 
     U::Array{uEltype, NDIMSP3} # [small/large side, variable, position, i, j, mortar]
     F::Array{uEltype, NDIMSP3} # [small/large side, variable, position, i, j, mortar]
 
-    local_neighbor_ids::Vector{Vector{Int}} # [mortar]
-    local_neighbor_positions::Vector{Vector{Int}} # [mortar]
-    node_indices::Matrix{NTuple{NDIMS, Symbol}} # [small/large, mortar]
-    normal_directions::Array{RealT, NDIMSP2} # [dimension, i, j, position, mortar]
+    local_neighbor_ids::Vector{Vector{Int}}             # [mortar]
+    local_neighbor_positions::Vector{Vector{Int}}       # [mortar]
+    node_indices::Matrix{NTuple{NDIMS, Symbol}}         # [small/large, mortar]
+    normal_directions::Array{RealT, NDIMSP2}            # [dimension, i, j, position, mortar]
 
     # internal `resize!`able storage
     _u::Vector{uEltype}
