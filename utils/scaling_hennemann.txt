@@ -1,0 +1,16 @@
+#------------------------- maxwell's data ---------------------------#
+Refinement level: 3
+ranks: 1	 time(sec): 4697.281653
+ranks: 2	 time(sec): 2509.419143
+ranks: 4	 time(sec): 1393.342354
+ranks: 8	 time(sec): 862.878068
+ranks: 16	 time(sec): 539.169653
+
+
+Refinement level: 4
+ranks: 2	 time(sec): 20286.350448
+ranks: 4	 time(sec): 11722.826352
+ranks: 8	 time(sec): 7308.142459
+ranks: 16	 time(sec): 5066.92142
+
+#-------------------------- fourier's data ---------------------------#

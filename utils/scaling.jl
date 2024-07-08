@@ -1,26 +1,30 @@
 using MPI
 using DelimitedFiles
-# nprocs = 8
-timings = zeros(4)
+timings = zeros(5)		# 1, 2, 4, 8, 16 processes
 
-for np in 0:3
+a = 4		# refinement_level
+open("utils/scaling_hennemann.txt", "a") do file
+	write(file, "\nRefinement level: $a", '\n')
+end
+
+# Set the refinement_level in command below, as required.
+for np in 0:4
 	_np = Int(exp2(np))
 	mpiexec() do cmd
 		long_cmd = `$cmd -n $_np $(Base.julia_cmd()) --threads=1 --project=@. -e 'using Trixi, TrixiLW;
-					trixi_include("../examples/tree_2d_dgsem/elixir_euler_density_wave.jl", initial_refinement_level = 0);
-					trixi_include("../examples/tree_2d_dgsem/elixir_euler_density_wave.jl", initial_refinement_level = 8)'`
+					trixi_include("utils/elixir_euler_isentropic_hennemann.jl", refinement_level = 0);
+					trixi_include("utils/elixir_euler_isentropic_hennemann.jl", refinement_level = 4)'`
+
 		time_str = read(pipeline(long_cmd, `tail -1`, `awk '{print $1}'`), String)
+
 		# Removing '\n' character from last and parsing to Float64
 		t = parse(Float64, strip(time_str))
-		timings[np + 1] = t
-		open("scaling_density_wave.txt", "a") do file
-			writedlm(file, t, '\n')
+
+		open("utils/scaling_hennemann.txt", "a") do file
+			write(file, "ranks: $_np \t time(sec): $t", '\n')
 		end
 	end
 end
-
-println(timings)
-
 
 
 
