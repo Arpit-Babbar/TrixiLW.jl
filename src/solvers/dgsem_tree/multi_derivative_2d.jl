@@ -131,7 +131,7 @@ function calc_volume_integral_mdrk1!(du, u,
    return nothing
 end
 
-function calc_volume_integral_mdrk2!(du, u,
+function calc_volume_integral_mdrk2!(du, u, us,
    t, dt, tolerances::NamedTuple,
    mesh::Union{TreeMesh{2},StructuredMesh{2},UnstructuredMesh2D,P4estMesh{2}},
    nonconservative_terms, source_terms, equations,

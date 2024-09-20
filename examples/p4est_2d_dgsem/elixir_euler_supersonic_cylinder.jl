@@ -69,7 +69,6 @@ shock_indicator = IndicatorHennemannGassner(equations, basis,
   variable=density_pressure)
 volume_integral = TrixiLW.VolumeIntegralFRShockCapturing(
   shock_indicator;
-
   volume_flux_fv=surface_flux,
   # reconstruction = TrixiLW.FirstOrderReconstruction(),
   reconstruction=TrixiLW.MUSCLReconstruction()

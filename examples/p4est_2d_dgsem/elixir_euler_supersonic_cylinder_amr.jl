@@ -69,8 +69,9 @@ shock_indicator = IndicatorHennemannGassner(equations, basis,
   variable=density_pressure)
 volume_integral = TrixiLW.VolumeIntegralFRShockCapturing(
   shock_indicator;
+  volume_integralFR = TrixiLW.VolumeIntegralFR(TrixiLW.MDRK()),
   volume_flux_fv=surface_flux,
-  reconstruction = TrixiLW.FirstOrderReconstruction(),
+  reconstruction = TrixiLW.FirstOrderReconstruction()
   # reconstruction=TrixiLW.MUSCLReconstruction()
   # reconstruction=TrixiLW.MUSCLHancockReconstruction()
 )
@@ -127,7 +128,9 @@ amr_callback = AMRCallback(semi, amr_controller,
                            adapt_initial_condition=true,
                            adapt_initial_condition_only_refine=true)
 
-callbacks = ( analysis_callback, alive_callback, save_solution,
+callbacks = (
+              # analysis_callback,
+              alive_callback, save_solution,
               amr_callback,
               summary_callback
             )

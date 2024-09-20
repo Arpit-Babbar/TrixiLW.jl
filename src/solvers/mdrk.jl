@@ -15,7 +15,7 @@ function perform_step!(integrator, limiters, callbacks, lw_update,
    # Compute du = u^{n+1/2}-0.5*dt*u^n
    rhs_mdrk1!(du_ode, u, semi, integrator.t, dummy_tolerances)
    update_soln!(integrator, _us, uprev, du_ode) # us = uprev + dt * du
-   @unpack _u_low = cache.element_cache.mdrk_cache
+   # @unpack _u_low = cache.element_cache.mdrk_cache
    apply_limiters!(limiters, integrator)
 
    # Second stage

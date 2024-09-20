@@ -2,6 +2,8 @@ using Plots
 using Trixi: eachinterface, eachmortar, eachboundary, indices2direction,
              polynomial_interpolation_matrix, get_nodes, index_to_start_step_2d,
              get_node_coords
+using SimpleUnPack
+using Trixi
 gr()
 
 function is_in_limit(nodes_array, xlimits, ylimits)
@@ -110,4 +112,9 @@ function plot_mesh(semi, mesh::P4estMesh{2}, dg::DG; nvisnodes = 10,
    end
 
    savefig(p, "test.pdf")
+   return p
 end
+
+plot_mesh(semi, mesh, solver; nvisnodes = 10,
+xlimits = (-4.0, 4.0), ylimits = (-4.0, 4.0))
+
