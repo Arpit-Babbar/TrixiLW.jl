@@ -36,7 +36,7 @@ initial_condition = initial_value_vortex_henneman
 solver = DGSEM(polydeg=3, surface_flux=flux_lax_friedrichs,
                volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.MDRK()))
 
-refinement_level = 3
+refinement_level = 2
 cells_per_dimension = (2^refinement_level * 16, 2^refinement_level * 16)
 
 function mapping_henneman_isentropic(ξ_, η_)
@@ -95,3 +95,5 @@ sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
                       time_step_computation = TrixiLW.CFLBased(cfl_number)
                       );
 summary_callback() # print the timer summary
+
+return sol
