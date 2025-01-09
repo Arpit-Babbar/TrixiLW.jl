@@ -20,7 +20,7 @@ function format_with_powers(y, _)
     end
 end
 
-function set_ticks!(ax, log_sub, ticks_formatter; dim = 2, base = 2.0)
+function set_ticks!(ax, log_sub, ticks_formatter; dim = 2, base_major = 2.0)
     # Remove scientific notation and set xticks
     # https://stackoverflow.com/a/49306588/3904031
 
@@ -41,12 +41,11 @@ function set_ticks!(ax, log_sub, ticks_formatter; dim = 2, base = 2.0)
     formatter = plt.matplotlib.ticker.FuncFormatter(ticks_formatter)
     # (y, _) -> format"{:.4g}".format(int(y)) ) # format"{:.4g}".format(int(y)))
     # https://stackoverflow.com/questions/30887920/how-to-show-minor-tick-labels-on-log-scale-with-plt.matplotlib
-    x_major = plt.matplotlib.ticker.LogLocator(base = base, subs = (log_sub,),
-                                               numticks = 20) # ticklabels at 2^i*log_sub
-    x_minor = plt.matplotlib.ticker.LogLocator(base = base,
+    x_major = plt.matplotlib.ticker.LogLocator(base = base_major, subs = (log_sub,),
+                                               numticks = 20) # ticklabels at base_major^i*log_sub
+    x_minor = plt.matplotlib.ticker.LogLocator(base = 2.0,
                                                subs = LinRange(1.0, 9.0, 9) * 0.1,
                                                numticks = 10)
-
     #  Used to manipulate tick labels. See help(plt.matplotlib.ticker.LogLocator) for details)
     ax.xaxis.set_major_formatter(anonymous_formatter)
     ax.xaxis.set_minor_formatter(plt.matplotlib.ticker.NullFormatter())
@@ -54,6 +53,13 @@ function set_ticks!(ax, log_sub, ticks_formatter; dim = 2, base = 2.0)
     ax.xaxis.set_minor_locator(x_minor)
     ax.tick_params(axis = "both", which = "major")
     ax.tick_params(axis = "both", which = "minor")
+
+    # Configure y-axis tick formatting
+    y_minor = plt.matplotlib.ticker.LogLocator(base=10.0, subs=range(2, 10) * 0.1, numticks=100)
+    ax.yaxis.set_minor_locator(y_minor)
+
+    # Use LogFormatter for y-axis to show labels for very small/large values
+    # ax.yaxis.set_major_formatter(plt.matplotlib.ticker.LogFormatter(base=10.0))
 end
 
 function add_theo_factors!(ax, ncells, error, degree, i,
@@ -138,7 +144,7 @@ function plot_python_ndofs_vs_y(files::Vector{String}, labels::Vector{String},
     ax_error.set_xlabel("Number of elements")
     ax_error.set_ylabel(error_label(error_norm))
 
-    set_ticks!(ax_error, log_sub, ticks_formatter; dim=2, base = base)
+    set_ticks!(ax_error, log_sub, ticks_formatter; dim=2, base_major = base)
 
     ax_error.grid(true, linestyle="--")
 
@@ -161,6 +167,14 @@ end
 #     plot_python_ndofs_vs_y(files, labels, degrees, saveto = "diff_$diff", log_sub = "2.0",
 #                         figsize = (6.0, 6.5))
 # end
+
+files = ["utils/isentropic_3.txt"]
+labels = [""]
+degrees = [3]
+
+plot_python_ndofs_vs_y(files, labels, degrees, saveto = "convergence_isentropic", log_sub = "2.0",
+                       figsize = (6.0, 6.5), title = "Degree \$ N = 3 \$")
+
 
 files = ["results/couette_conv_3.txt"]
 labels = [""]
