@@ -407,7 +407,7 @@ function calc_mpi_interface_flux!(surface_flux_values,
             U_ll, U_rr = get_surface_node_vars(U, equations, dg, i, interface)
             F_ll, F_rr = get_surface_node_vars(F, equations, dg, i, interface)
 
-            flux = surface_flux(F_ll, F_rr, U_ll, U_rr, u_ll, u_rr, orientations[interface], equations)
+            flux = surface_flux(F_ll, F_rr, u_ll, u_rr, U_ll, U_rr, orientations[interface], equations)
 
             # Copy flux to local element storage
             for v in eachvariable(equations)

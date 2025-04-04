@@ -21,7 +21,7 @@ function limit_slope(eq::CompressibleEulerEquations2D, slope, ufl, u_star_ll,
 end
 
 
-@inline function (numflux::FluxHLL)(f_ll, f_rr, U_ll, U_rr, u_ll, u_rr,
+@inline function (numflux::FluxHLL)(f_ll, f_rr, u_ll, u_rr, U_ll, U_rr,
                                     orientation_or_normal_direction, equations)
     λ_min, λ_max = numflux.min_max_speed(u_ll, u_rr, orientation_or_normal_direction,
                                          equations)
@@ -40,7 +40,7 @@ end
 end
 
 # Rotated surface flux computation (2D version)
-@inline function (flux_rotated::FluxRotated)(f_ll, f_rr, U_ll, U_rr, u_ll, u_rr,
+@inline function (flux_rotated::FluxRotated)(f_ll, f_rr, u_ll, u_rr, U_ll, U_rr,
    normal_direction::AbstractVector,
    equations::AbstractEquations{2})
 

@@ -1933,7 +1933,7 @@ function calc_interface_flux_hyperbolic_parabolic!(surface_flux_values, mesh::Tr
          U_ll, U_rr = get_surface_node_vars(interface_cache.U, equations, dg, i, interface)
          u_ll, u_rr = get_surface_node_vars(u, equations, dg, i, interface)
          f_ll, f_rr = get_surface_node_vars(interface_cache.f, equations, dg, i, interface)
-         flux_hyperbolic = surface_flux(f_ll, f_rr, U_ll, U_rr, u_ll, u_rr, orientations[interface], equations)
+         flux_hyperbolic = surface_flux(f_ll, f_rr, u_ll, u_rr, U_ll, U_rr, orientations[interface], equations)
          f_visc_ll, f_visc_rr = get_surface_node_vars(cache_parabolic.Fb, equations, dg, i, interface)
          flux_parabolic = 0.5 * (f_visc_ll + f_visc_rr)
          # Copy flux to left and right element storage

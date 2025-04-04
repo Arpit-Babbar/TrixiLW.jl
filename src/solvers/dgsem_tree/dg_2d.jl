@@ -1635,7 +1635,7 @@ using LoopVectorization: @turbo
          u_ll, u_rr = get_surface_node_vars(u_interfaces, equations, dg, i, interface)
          F_ll, F_rr = get_surface_node_vars(F_interfaces, equations, dg, i, interface)
          U_ll, U_rr = get_surface_node_vars(U_interfaces, equations, dg, i, interface)
-         flux = surface_flux(F_ll, F_rr, U_ll, U_rr, u_ll, u_rr, orientation, equations)
+         flux = surface_flux(F_ll, F_rr, u_ll, u_rr, U_ll, U_rr, orientation, equations)
          # flux = surface_flux(u_ll, u_rr, orientation, equations)
 
          # Copy flux to left and right element storage
@@ -1656,7 +1656,7 @@ using LoopVectorization: @turbo
       volume_integral::VolumeIntegralFRShockCapturing,
       ::AbstractLWTimeDiscretization,
       dg::DGSEM, cache)
-      
+
       @unpack volume_flux_fv, indicator = volume_integral
       degree = polydeg(dg)
 
@@ -1901,7 +1901,7 @@ using LoopVectorization: @turbo
             u_ll, u_rr = get_surface_node_vars(u, equations, dg, i, interface)
             f_ll, f_rr = get_surface_node_vars(f, equations, dg, i, interface)
             fn_inner_ll, fn_inner_rr = get_surface_node_vars(fn_low, equations, dg, i, interface)
-            Fn_ = surface_flux(f_ll, f_rr, U_ll, U_rr, u_ll, u_rr, orientations[interface], equations)
+            Fn_ = surface_flux(f_ll, f_rr, u_ll, u_rr, U_ll, U_rr, orientations[interface], equations)
             fn = surface_flux(u_ll, u_rr, orientations[interface], equations)
 
             Jl = Jr = cache.interface_cache.inverse_jacobian[i, interface]
