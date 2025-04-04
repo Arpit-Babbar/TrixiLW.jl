@@ -161,9 +161,8 @@ end
    f_ll, f_rr = get_surface_node_vars(f, equations, dg, primary_node_index, interface_index)
    fn_inner_ll, fn_inner_rr = get_surface_node_vars(fn_low, equations, dg, primary_node_index, interface_index)
 
-   # flux_ = surface_flux(u_ll, u_rr, normal_direction, equations)
-   Fn = surface_flux(f_ll, f_rr, u_ll, u_rr, U_ll, U_rr, normal_direction,
-      equations)
+   # Fn = surface_flux(u_ll, u_rr, normal_direction, equations)
+   Fn = surface_flux(f_ll, f_rr, u_ll, u_rr, U_ll, U_rr, normal_direction, equations)
 
    fn = surface_flux(u_ll, u_rr, normal_direction, equations)
 

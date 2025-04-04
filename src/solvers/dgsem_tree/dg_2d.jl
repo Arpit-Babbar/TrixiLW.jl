@@ -377,8 +377,8 @@ using LoopVectorization: @turbo
       @unpack derivative_dhat, derivative_matrix = dg.basis
       @unpack node_coordinates = cache.elements
 
-      @unpack lw_res_cache = cache
-      @unpack cell_arrays, eval_data = lw_res_cache
+      @unpack lw_res_cache, element_cache = cache
+      @unpack cell_arrays = lw_res_cache
 
       inv_jacobian = cache.elements.inverse_jacobian[element]
 
@@ -439,8 +439,8 @@ using LoopVectorization: @turbo
          multiply_add_to_node_vars!(um, -1.0, ut_node, equations, dg, i, j)
          um_node = get_node_vars(um, equations, dg, i, j)
          up_node = get_node_vars(up, equations, dg, i, j)
-         fm, gm = fluxes(um_node, 1, equations), fluxes(um_node, 2, equations)
-         fp, gp = fluxes(up_node, 1, equations), fluxes(up_node, 2, equations)
+         fm, gm = fluxes(um_node, equations)
+         fp, gp = fluxes(up_node, equations)
 
          multiply_add_to_node_vars!(ft, 0.5, fp, equations, dg, i, j)
          multiply_add_to_node_vars!(ft, -0.5, fm, equations, dg, i, j)
@@ -468,8 +468,8 @@ using LoopVectorization: @turbo
                dg, i, jj, element)
          end
 
-         set_node_vars!(cache.F, F_node, equations, dg, 1, i, j, element)
-         set_node_vars!(cache.F, G_node, equations, dg, 2, i, j, element)
+         set_node_vars!(element_cache.F, F_node, equations, dg, 1, i, j, element)
+         set_node_vars!(element_cache.F, G_node, equations, dg, 2, i, j, element)
 
          x = get_node_coords(node_coordinates, equations, dg, i, j, element)
          st = calc_source_t_N12(up_node, um_node, x, t, dt, source_terms, equations,
@@ -482,7 +482,7 @@ using LoopVectorization: @turbo
 
          # Ub = UT * V
          # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
-         set_node_vars!(cache.U, U_node, equations, dg, i, j, element)
+         set_node_vars!(element_cache.U, U_node, equations, dg, i, j, element)
 
          S_node = get_node_vars(S, equations, dg, i, j)
          # inv_jacobian = inverse_jacobian[i, j, element]
