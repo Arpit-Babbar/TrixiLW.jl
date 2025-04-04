@@ -5,7 +5,7 @@ import Trixi: create_cache, calc_volume_integral!, ninterfaces, nboundaries,
 
 # TODO - Reorder these
 using Trixi: TreeMesh, P4estMesh, BoundaryConditionPeriodic,
-   pure_and_blended_element_ids!, have_nonconservative_terms,
+   have_nonconservative_terms,
    calc_surface_integral!, apply_jacobian!, reset_du!,
    max_dt, calcflux_fv!, index_to_start_step_2d,
    AbstractMesh, StructuredMesh, UnstructuredMesh2D,
@@ -368,7 +368,7 @@ using LoopVectorization: @turbo
    fluxes(u, equations::AbstractEquations{2}) = (Trixi.flux(u, 1, equations), Trixi.flux(u, 2, equations))
 
    @inline function lw_volume_kernel_1!(du, u,
-      t, dt,
+      t, dt, tolerances,
       element, mesh::TreeMesh{2},
       nonconservative_terms::False, source_terms, equations,
       dg::DGSEM, cache, alpha=true)
@@ -493,7 +493,7 @@ using LoopVectorization: @turbo
    end
 
    @inline function lw_volume_kernel_2!(du, u,
-      t, dt,
+      t, dt, tolerances,
       element, mesh::TreeMesh{2},
       nonconservative_terms::False, source_terms, equations,
       dg::DGSEM, cache, alpha=true)
@@ -1656,147 +1656,123 @@ using LoopVectorization: @turbo
       volume_integral::VolumeIntegralFRShockCapturing,
       ::AbstractLWTimeDiscretization,
       dg::DGSEM, cache)
-
-      @unpack element_ids_dg, element_ids_dgfv = cache
+      
       @unpack volume_flux_fv, indicator = volume_integral
       degree = polydeg(dg)
 
       # Calculate blending factors α: u = u_DG * (1 - α) + u_FV * α
       alpha = @trixi_timeit timer() "blending factors" indicator(u, mesh, equations, dg, cache)
 
-      # Determine element ids for DG-only and blended DG-FV volume integral
-      pure_and_blended_element_ids!(element_ids_dg, element_ids_dgfv, alpha, dg, cache)
+      RealT = eltype(alpha)
+      atol = max(100 * eps(RealT), eps(RealT)^convert(RealT, 0.75f0))
 
       if degree == 1
-         # Loop over pure DG elements
-         @trixi_timeit timer() "pure DG" @threaded for idx_element in eachindex(element_ids_dg)
-            element = element_ids_dg[idx_element]
+         @threaded for element in eachelement(dg, cache)
             alpha_element = alpha[element]
+            # Clip blending factor for values close to zero (-> pure DG)
+            dg_only = isapprox(alpha_element, 0, atol = atol)
+            if dg_only
+               # Calculate DG volume integral contribution
+               lw_volume_kernel_1!(du, u, t, dt, tolerances, element, mesh,
+                  nonconservative_terms, source_terms, equations,
+                  dg, cache, 1 - alpha_element)
 
-            # Calculate DG volume integral contribution
-            lw_volume_kernel_1!(du, u, t, dt, element, mesh,
-               nonconservative_terms, equations,
-               dg, cache, 1 - alpha_element)
+               # Calculate fn_low because it is needed for admissibility preservation proof
+               calc_fn_low_kernel!(du, u,
+                  mesh,
+                  nonconservative_terms, equations,
+                  volume_flux_fv, dg, cache, element, alpha_element)
+            else
+               # Calculate DG volume integral contribution
+               lw_volume_kernel_1!(du, u, t, dt, tolerances, element, mesh,
+                                 nonconservative_terms, source_terms, equations,
+                                 dg, cache, 1 - alpha_element)
 
-            # Calculate fn_low because it is needed for admissibility preservation proof
-            calc_fn_low_kernel!(du, u,
-               mesh,
-               nonconservative_terms, equations,
-               volume_flux_fv, dg, cache, element, alpha_element)
-         end
-
-         # Loop over blended DG-FV elements
-         @trixi_timeit timer() "blended DG-FV" @threaded for idx_element in eachindex(element_ids_dgfv)
-            element = element_ids_dgfv[idx_element]
-            alpha_element = alpha[element]
-
-            # Calculate DG volume integral contribution
-            lw_volume_kernel_1!(du, u, t, dt, element, mesh,
-               nonconservative_terms, equations,
-               dg, cache, 1 - alpha_element)
-
-
-            fv_kernel!(du, u, dt, volume_integral.reconstruction, mesh,
-               nonconservative_terms, equations, volume_flux_fv,
-               dg, cache, element, alpha_element)
+               fv_kernel!(du, u, dt, volume_integral.reconstruction, mesh,
+                        nonconservative_terms, equations, volume_flux_fv,
+                        dg, cache, element, alpha_element)
+            end
          end
       elseif degree == 2
-         # Loop over pure DG elements
-         @trixi_timeit timer() "pure DG" @threaded for idx_element in eachindex(element_ids_dg)
-            element = element_ids_dg[idx_element]
+         @threaded for element in eachelement(dg, cache)
             alpha_element = alpha[element]
+            # Clip blending factor for values close to zero (-> pure DG)
+            dg_only = isapprox(alpha_element, 0, atol = atol)
+            if dg_only
+               # Calculate DG volume integral contribution
+               lw_volume_kernel_2!(du, u, t, dt, tolerances, element, mesh,
+                  nonconservative_terms, source_terms, equations,
+                  dg, cache, 1 - alpha_element)
 
-            # Calculate DG volume integral contribution
-            lw_volume_kernel_2!(du, u, t, dt, tolerances, element, mesh,
-               nonconservative_terms, source_terms, equations,
-               dg, cache, 1 - alpha_element)
+               # Calculate fn_low because it is needed for admissibility preservation proof
+               calc_fn_low_kernel!(du, u,
+                  mesh,
+                  nonconservative_terms, equations,
+                  volume_flux_fv, dg, cache, element, alpha_element)
+            else
+               # Calculate DG volume integral contribution
+               lw_volume_kernel_2!(du, u, t, dt, tolerances, element, mesh,
+                                 nonconservative_terms, source_terms, equations,
+                                 dg, cache, 1 - alpha_element)
 
-            # Calculate fn_low because it is needed for admissibility preservation proof
-            calc_fn_low_kernel!(du, u,
-               mesh,
-               nonconservative_terms, equations,
-               volume_flux_fv, dg, cache, element, alpha_element)
-         end
-
-         # Loop over blended DG-FV elements
-         @trixi_timeit timer() "blended DG-FV" @threaded for idx_element in eachindex(element_ids_dgfv)
-            element = element_ids_dgfv[idx_element]
-            alpha_element = alpha[element]
-
-            # Calculate DG volume integral contribution
-            lw_volume_kernel_2!(du, u, t, dt, tolerances, element, mesh,
-               nonconservative_terms, source_terms, equations,
-               dg, cache, 1 - alpha_element)
-
-
-            fv_kernel!(du, u, dt, volume_integral.reconstruction, mesh,
-               nonconservative_terms, equations, volume_flux_fv,
-               dg, cache, element, alpha_element)
+               fv_kernel!(du, u, dt, volume_integral.reconstruction, mesh,
+                        nonconservative_terms, equations, volume_flux_fv,
+                        dg, cache, element, alpha_element)
+            end
          end
       elseif degree == 3
-         # Loop over pure DG elements
-         @trixi_timeit timer() "pure DG" @threaded for idx_element in eachindex(element_ids_dg)
-            element = element_ids_dg[idx_element]
+         @threaded for element in eachelement(dg, cache)
             alpha_element = alpha[element]
+            # Clip blending factor for values close to zero (-> pure DG)
+            dg_only = isapprox(alpha_element, 0, atol = atol)
+            if dg_only
+               # Calculate DG volume integral contribution
+               lw_volume_kernel_3!(du, u, t, dt, tolerances, element, mesh,
+                  nonconservative_terms, source_terms, equations,
+                  dg, cache, 1 - alpha_element)
 
-            # Calculate DG volume integral contribution
-            lw_volume_kernel_3!(du, u, t, dt, tolerances, element, mesh,
-               nonconservative_terms, source_terms, equations,
-               dg, cache, 1 - alpha_element)
+               # Calculate fn_low because it is needed for admissibility preservation proof
+               calc_fn_low_kernel!(du, u,
+                  mesh,
+                  nonconservative_terms, equations,
+                  volume_flux_fv, dg, cache, element, alpha_element)
+            else
+               # Calculate DG volume integral contribution
+               lw_volume_kernel_3!(du, u, t, dt, tolerances, element, mesh,
+                                 nonconservative_terms, source_terms, equations,
+                                 dg, cache, 1 - alpha_element)
 
-            # Calculate fn_low because it is needed for admissibility preservation proof
-            calc_fn_low_kernel!(du, u,
-               mesh,
-               nonconservative_terms, equations,
-               volume_flux_fv, dg, cache, element, alpha_element)
-         end
-
-         # Loop over blended DG-FV elements
-         @trixi_timeit timer() "blended DG-FV" @threaded for idx_element in eachindex(element_ids_dgfv)
-            element = element_ids_dgfv[idx_element]
-            alpha_element = alpha[element]
-
-            # Calculate DG volume integral contribution
-            lw_volume_kernel_3!(du, u, t, dt, tolerances, element, mesh,
-               nonconservative_terms, source_terms, equations,
-               dg, cache, 1 - alpha_element)
-
-
-            fv_kernel!(du, u, dt, volume_integral.reconstruction, mesh,
-               nonconservative_terms, equations, volume_flux_fv,
-               dg, cache, element, alpha_element)
+               fv_kernel!(du, u, dt, volume_integral.reconstruction, mesh,
+                        nonconservative_terms, equations, volume_flux_fv,
+                        dg, cache, element, alpha_element)
+            end
          end
       else
-         # Loop over pure DG elements
-         @trixi_timeit timer() "pure DG" @threaded for idx_element in eachindex(element_ids_dg)
-            element = element_ids_dg[idx_element]
+         @threaded for element in eachelement(dg, cache)
             alpha_element = alpha[element]
+            # Clip blending factor for values close to zero (-> pure DG)
+            dg_only = isapprox(alpha_element, 0, atol = atol)
+            if dg_only
+               # Calculate DG volume integral contribution
+               lw_volume_kernel_4!(du, u, t, dt, tolerances, element, mesh,
+                  nonconservative_terms, source_terms, equations,
+                  dg, cache, 1 - alpha_element)
 
-            # Calculate DG volume integral contribution
-            lw_volume_kernel_4!(du, u, t, dt, tolerances, element, mesh,
-               nonconservative_terms, source_terms, equations,
-               dg, cache, 1 - alpha_element)
+               # Calculate fn_low because it is needed for admissibility preservation proof
+               calc_fn_low_kernel!(du, u,
+                  mesh,
+                  nonconservative_terms, equations,
+                  volume_flux_fv, dg, cache, element, alpha_element)
+            else
+               # Calculate DG volume integral contribution
+               lw_volume_kernel_4!(du, u, t, dt, tolerances, element, mesh,
+                                 nonconservative_terms, source_terms, equations,
+                                 dg, cache, 1 - alpha_element)
 
-            # Calculate fn_low because it is needed for admissibility preservation proof
-            calc_fn_low_kernel!(du, u,
-               mesh,
-               nonconservative_terms, equations,
-               volume_flux_fv, dg, cache, element, alpha_element)
-         end
-
-         # Loop over blended DG-FV elements
-         @trixi_timeit timer() "blended DG-FV" @threaded for idx_element in eachindex(element_ids_dgfv)
-            element = element_ids_dgfv[idx_element]
-            alpha_element = alpha[element]
-
-            # Calculate DG volume integral contribution
-            lw_volume_kernel_4!(du, u, t, dt, tolerances, element, mesh,
-               nonconservative_terms, source_terms, equations,
-               dg, cache, 1 - alpha_element)
-
-            fv_kernel!(du, u, dt, volume_integral.reconstruction, mesh,
-               nonconservative_terms, equations, volume_flux_fv,
-               dg, cache, element, alpha_element)
+               fv_kernel!(du, u, dt, volume_integral.reconstruction, mesh,
+                        nonconservative_terms, equations, volume_flux_fv,
+                        dg, cache, element, alpha_element)
+            end
          end
       end
 
