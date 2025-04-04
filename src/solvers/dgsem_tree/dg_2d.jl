@@ -502,8 +502,8 @@ using LoopVectorization: @turbo
       @unpack derivative_dhat, derivative_matrix = dg.basis
       @unpack node_coordinates = cache.elements
 
-      @unpack lw_res_cache = cache
-      @unpack cell_arrays, eval_data = lw_res_cache
+      @unpack lw_res_cache, element_cache = cache
+      @unpack cell_arrays = lw_res_cache
 
       inv_jacobian = cache.elements.inverse_jacobian[element]
 
@@ -659,9 +659,9 @@ using LoopVectorization: @turbo
 
          # Ub = UT * V
          # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
-         set_node_vars!(cache.U, U_node, equations, dg, i, j, element)
-         set_node_vars!(cache.F, F_node, equations, dg, 1, i, j, element)
-         set_node_vars!(cache.F, G_node, equations, dg, 2, i, j, element)
+         set_node_vars!(element_cache.U, U_node, equations, dg, i, j, element)
+         set_node_vars!(element_cache.F, F_node, equations, dg, 1, i, j, element)
+         set_node_vars!(element_cache.F, G_node, equations, dg, 2, i, j, element)
 
          S_node = get_node_vars(S, equations, dg, i, j)
          # inv_jacobian = inverse_jacobian[i, j, element]
