@@ -1920,12 +1920,12 @@ function lw_volume_kernel_4!(du, u, t, dt, tolerances,
       for ii in eachnode(dg)
          # ut              += -lam * D * ft for each variable
          # i.e.,  ut[ii,j] += -lam * Dm[ii,i] ft[i,j] (sum over i)
-         Trixi.multiply_add_to_node_vars!(utttt, -dt * derivative_matrix[ii, i], fttt, equations, dg, ii, j)
+         Trixi.multiply_add_to_node_vars!(utttt, -dt * derivative_matrix[ii, i], ftilde_ttt, equations, dg, ii, j)
       end
       for jj in eachnode(dg)
          # C += -lam*gt*Dm' for each variable
          # C[i,jj] += -lam*gt[i,j]*Dm[jj,j] (sum over j)
-         Trixi.multiply_add_to_node_vars!(utttt, -dt * derivative_matrix[jj, j], gttt, equations, dg, i, jj)
+         Trixi.multiply_add_to_node_vars!(utttt, -dt * derivative_matrix[jj, j], gtilde_ttt, equations, dg, i, jj)
       end
    end
 
