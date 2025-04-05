@@ -4,7 +4,7 @@ An implementation of Lax-Wendroff Flux Reconstruction scheme for curvilinear mes
 
 ## Users
 
-Using the multiple dispatch of `julia`, most things that you wish to do with the code (including developing your own algorithms) can be done by this approach. Execute the following in the `julia` REPL.
+Using the multiple dispatch of `julia`, most things that you wish to do with the code (including developing your own algorithms) can be done by working with `TrixiLW.jl` as a user. Execute the following in the `julia` REPL.
 
 ```julia
 julia> import Pkg; Pkg.add(url="https://github.com/arpit-babbar/TrixiLW.jl.git")

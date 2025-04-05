@@ -170,7 +170,7 @@ boundary_conditions = (; y_neg = boundary_condition_mixed_dirichlet_wall,
 
 surface_flux = flux_lax_friedrichs
 
-polydeg = 2
+polydeg = 4
 basis = LobattoLegendreBasis(polydeg)
 shock_indicator = IndicatorHennemannGassner(equations, basis,
   alpha_max=1.0,
@@ -186,7 +186,7 @@ volume_integral = TrixiLW.VolumeIntegralFRShockCapturing(
   # reconstruction=TrixiLW.MUSCLHancockReconstruction()
 )
 
-volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW())
+# volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW())
 
 solver = DGSEM(polydeg=polydeg, surface_flux=surface_flux,
   volume_integral=volume_integral)
@@ -201,14 +201,14 @@ mesh = TreeMesh(coordinates_min, coordinates_max,
                 n_cells_max=30_000,
                 periodicity = (false, false)) # set maximum capacity of tree data structure
 
-cfl_number = 1.0
+cfl_number = 0.5
 semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver),
   equations, initial_condition, solver, boundary_conditions=boundary_conditions)
 
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-tspan = (0.0, 2e-3)
+tspan = (0.0, 0.04)
 
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 
