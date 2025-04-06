@@ -78,7 +78,7 @@ See Section IV c on the paper below for details.
      p_star * normal[1],
      p_star * normal[2],
      zero(eltype(u_inner))) * norm_
- end
+end
 
 @inline function initial_condition_double_mach_reflection(x, t, equations::CompressibleEulerEquations2D)
 
@@ -201,14 +201,14 @@ mesh = TreeMesh(coordinates_min, coordinates_max,
                 n_cells_max=30_000,
                 periodicity = (false, false)) # set maximum capacity of tree data structure
 
-cfl_number = 0.5
+cfl_number = 1.0
 semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver),
   equations, initial_condition, solver, boundary_conditions=boundary_conditions)
 
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-tspan = (0.0, 0.04)
+tspan = (0.0, 0.2)
 
 lw_update = TrixiLW.semidiscretize(semi, get_time_discretization(solver), tspan);
 

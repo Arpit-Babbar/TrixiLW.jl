@@ -177,18 +177,12 @@ solver = DGSEM(polydeg=polydeg, surface_flux=surface_flux,
 coordinates_min = (0.0, 0.0)
 coordinates_max = (4.0, 4.0)
 
-trees_per_dimension = (4, 4)
-mesh = P4estMesh(trees_per_dimension,
-  coordinates_min=coordinates_min, coordinates_max=coordinates_max,
-  polydeg=2, initial_refinement_level=1,
-  # periodicity=(true, true)
-  periodicity=(false, false)
-  )
+mesh = StructuredMesh((8, 8), coordinates_min, coordinates_max)
 
-boundary_conditions = Dict(:y_neg => boundary_condition_mixed_dirichlet_wall,
-:y_pos => boundary_condition_inflow,
-:x_pos => boundary_condition_outflow,
-:x_neg => boundary_condition_inflow)
+boundary_conditions = (x_neg=boundary_condition_inflow,
+x_pos=boundary_condition_outflow,
+y_neg=boundary_condition_mixed_dirichlet_wall,
+y_pos=boundary_condition_inflow)
 
 cfl_number = 1.0
 semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver),
