@@ -66,7 +66,7 @@ macro test_trixilw_include(mesh_name, elixir_name, args...)
                                 "elixir_$(elixir_name).jl")
 
     trixi_include(@__MODULE__, full_elixir_name,
-                    tspan = (0.0, 0.01), initial_refinement_level = 2)
+                  tspan = (0.0, 0.01), initial_refinement_level = 2)
 
     return full_test_name, sol, analysis_callback
 end
@@ -77,7 +77,7 @@ macro test_trixilw_elixir_run(mesh_name, elixir_name, args...)
     full_elixir_name = joinpath(examples_dir_trixilw(), mesh_name,
                                 "elixir_$(elixir_name).jl")
     trixi_include(@__MODULE__, full_elixir_name,
-                    tspan = (0.0, 0.01), initial_refinement_level = 2)
+                  tspan = (0.0, 0.01), initial_refinement_level = 2)
 
     return full_test_name, sol, analysis_callback
 end
