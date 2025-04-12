@@ -22,6 +22,8 @@ get_time_discretization(volume_integral::VolumeIntegralFR) = volume_integral.tim
 create_cache(mesh, equations, ::VolumeIntegralFR, dg, uEltype) = (;)
 
 Base.show(io::IO, ::LW) = print(io, "Lax-Wendroff")
+Base.show(io::IO, ::LWADTaylorDiff) = print(io, "Lax-Wendroff AD Taylor Diff")
+Base.show(io::IO, ::LWADEnzyme) = print(io, "Lax-Wendroff AD Enzyme")
 Base.show(io::IO, ::MDRK) = print(io, "Multi-Derivative Runge-Kutta")
 Base.show(io::IO, ::RK) = print(io, "Runge-Kutta")
 

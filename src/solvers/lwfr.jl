@@ -210,7 +210,7 @@ function compute_dt(semi::SemidiscretizationHyperbolicParabolic,
 end
 
 function perform_step!(integrator, limiters, callbacks, lw_update,
-                       time_step_computation::CFLBased, ::LW)
+                       time_step_computation::CFLBased, ::AbstractLWTimeDiscretization)
    semi = integrator.p
    @unpack mesh = semi
    dt = compute_dt(semi, mesh, time_step_computation, integrator)

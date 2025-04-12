@@ -105,7 +105,7 @@ function dt_factor(epsilon, k, controller)
 end
 
 function perform_step!(integrator, limiters, callbacks, lw_update,
-   time_step_computation::Adaptive, time_discretization::LW,
+   time_step_computation::Adaptive, time_discretization::AbstractLWTimeDiscretization,
    n_fail_it = 0 # Keep track of number of recursive calls
    )
    semi = integrator.p
