@@ -1,12 +1,12 @@
 module TrixiLW
 
-src_dir()      = @__DIR__ # Directory of file
-base_dir()     = dirname(src_dir())
-eq_dir()       = joinpath(src_dir(),"equations")
-semi_dir()     = joinpath(src_dir(),"semidiscretization")
-solvers_dir()  = joinpath(src_dir(),"solvers")
-aux_dir()      = joinpath(src_dir(),"auxiliary")
-callback_dir() = joinpath(src_dir(),"callbacks")
+src_dir() = @__DIR__ # Directory of file
+base_dir() = dirname(src_dir())
+eq_dir() = joinpath(src_dir(), "equations")
+semi_dir() = joinpath(src_dir(), "semidiscretization")
+solvers_dir() = joinpath(src_dir(), "solvers")
+aux_dir() = joinpath(src_dir(), "auxiliary")
+callback_dir() = joinpath(src_dir(), "callbacks")
 utils_dir() = joinpath(base_dir(), "utils")
 data_dir() = joinpath(base_dir(), "data")
 
@@ -68,7 +68,6 @@ include(solvers_dir() * "/dgsem_p4est/indicators.jl")
 include(src_dir() * "/callbacks/callbacks_stage/positivity_zhang_shu.jl")
 include(src_dir() * "/callbacks/callbacks_step/analysis_dg2d.jl")
 
-
 # Parallel code
 include(solvers_dir() * "/dgsem_tree/dg_parallel.jl")
 include(solvers_dir() * "/dgsem_tree/dg_2d_parallel.jl")
@@ -77,6 +76,7 @@ include(solvers_dir() * "/dgsem_p4est/dg_parallel.jl")
 include(solvers_dir() * "/dgsem_p4est/dg_2d_parallel.jl")
 
 export get_time_discretization, SurfaceIntegralDiffusive, SemidiscretizationHyperbolic,
-       RadialIndicator, BoundaryConditionsNavierStokesInflow, AnalysisSurfaceFrictionCoefficient
+       RadialIndicator, BoundaryConditionsNavierStokesInflow,
+       AnalysisSurfaceFrictionCoefficient
 
 end # module

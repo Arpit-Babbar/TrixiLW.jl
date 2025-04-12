@@ -36,7 +36,8 @@ end
 @inline function convert_derivative_to_primitive(w, gradient_cons_vars,
    equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative})
 
-   # TODO: parabolic. This is inefficient to pass in transformed variables but then transform them back.
+   # TODO: parabolic. This is inefficient to pass in transformed variables but then transform them
+   # back.
    # We can fix this if we directly compute v1, v2, T from the entropy variables
    # w = (ρ, ρ*v1, ρ*v2, ρ*T/(gamma-1) + )
    u = cons2prim(w, equations) # calls a "modified" entropy2cons defined for CompressibleNavierStokesDiffusion2D
@@ -57,7 +58,8 @@ end
 end
 
 function compute_tau(u, gradients, normal_direction, equations)
-   # Here `gradients` is assumed to contain the gradients of the primitive variables (rho, v1, v2, T)
+   # Here `gradients` is assumed to contain the gradients of the primitive variables (rho, v1,
+   # v2, T)
    # either computed directly or reverse engineered from the gradient of the entropy variables
    # by way of the `convert_gradient_variables` function.
    _, dv1dx, dv2dx, _ = convert_derivative_to_primitive(u, gradients[1], equations)
@@ -79,7 +81,8 @@ function compute_tau(u, gradients, normal_direction, equations)
 end
 
 @inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:NoSlip,<:Adiabatic})(
-   flux_inner, u_inner, gradients, outer_cache, normal::AbstractVector, x, t, dt, dg, operator_type::Divergence,
+   flux_inner, u_inner, gradients, outer_cache, normal::AbstractVector, x, t, dt, dg,
+   operator_type::Divergence,
    equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
    ::AbstractLWTimeDiscretization, scaling_factor = 1)
    # rho, v1, v2, _ = u_inner
@@ -92,7 +95,8 @@ end
 
 @inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:NoSlip,<:Isothermal})(flux_inner, u_inner, normal::AbstractVector,
    x, t, operator_type::Gradient,
-   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative}, scaling_factor = 1)
+   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
+   scaling_factor = 1)
    v1, v2 = boundary_condition.boundary_condition_velocity.boundary_value_function(x, t, equations)
    T = boundary_condition.boundary_condition_heat_flux.boundary_value_function(x, t, equations)
    rho = u_inner[1]
@@ -124,9 +128,11 @@ end
    return u_outer
 end
 
-@inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:OutflowBC,<:Isothermal})(flux_inner, u_inner, normal::AbstractVector,
+@inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:OutflowBC,<:Isothermal})(
+    flux_inner, u_inner, normal::AbstractVector,
    x, t, operator_type::Gradient,
-   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative}, scaling_factor = 1)
+   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
+   scaling_factor = 1)
    # T = boundary_condition.boundary_condition_heat_flux.boundary_value_function(x, t, equations)
    # rho = u_inner[1]
    # v1, v2 = u_inner[2] / rho, u_inner[3] / rho
@@ -137,7 +143,8 @@ end
 
 @inline function (boundary_condition::OutflowBC)(flux_inner, u_inner, normal::AbstractVector,
    x, t, operator_type::Gradient,
-   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative}, scaling_factor = 1)
+   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
+   scaling_factor = 1)
    # T = boundary_condition.boundary_condition_heat_flux.boundary_value_function(x, t, equations)
    # rho = u_inner[1]
    # v1, v2 = u_inner[2] / rho, u_inner[3] / rho
@@ -162,9 +169,9 @@ end
    return flux_inner
 end
 
-
 @inline function (boundary_condition::BoundaryConditionsNavierStokesInflow)(
-   flux_inner, u_inner, gradients, outer_cache, normal::AbstractVector, x, t, dt, dg, operator_type::Divergence,
+   flux_inner, u_inner, gradients, outer_cache, normal::AbstractVector, x, t, dt, dg,
+   operator_type::Divergence,
    equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
    ::AbstractLWTimeDiscretization, scaling_factor = 1)
    @unpack nodes, weights = dg.basis
@@ -191,12 +198,15 @@ end
    return SVector(F_outer[1], F_outer[2], F_outer[3], F_outer[4])
 end
 
-@inline function (boundary_condition::BoundaryConditionsNavierStokesInflow)(flux_inner, u_inner, normal::AbstractVector,
+@inline function (boundary_condition::BoundaryConditionsNavierStokesInflow)(flux_inner, u_inner,
+    normal::AbstractVector,
    x, t, operator_type::Gradient,
-   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative}, scaling_factor = 1)
+   equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
+   scaling_factor = 1)
 
    u_outer = boundary_condition.boundary_value_function(x, t, equations)
-   # TODO - Should u_outer[1] be set to u_inner[1]? We are assuming density is constant at inflow...
+   # TODO - Should u_outer[1] be set to u_inner[1]? We are assuming density is constant at
+   # inflow...
    return u_outer
 end
 

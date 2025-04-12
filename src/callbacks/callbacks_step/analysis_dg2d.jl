@@ -1,5 +1,6 @@
 using Trixi
-using Trixi: integrate_via_indices, norm, apply_jacobian_parabolic!, @threaded, indices2direction,
+using Trixi: integrate_via_indices, norm, apply_jacobian_parabolic!, @threaded,
+             indices2direction,
              index_to_start_step_2d, get_normal_direction, dot, get_node_coords
 using DelimitedFiles
 import Trixi: analyze, pretty_form_ascii, pretty_form_utf
@@ -22,7 +23,8 @@ struct AnalysisSurfaceIntegral{Indices, Variable}
     variable::Variable
 end
 
-struct AnalysisSurfaceFrictionCoefficient{Indices, FreeStreamVariables} <: SurfaceQuantitiyViscous
+struct AnalysisSurfaceFrictionCoefficient{Indices, FreeStreamVariables} <:
+       SurfaceQuantitiyViscous
     indices::Indices
     free_stream_variables::FreeStreamVariables
 end
@@ -34,11 +36,11 @@ end
 
 # WARNING - This must be done before AnalysisSurfaceIntegralViscous as
 # AnalysisSurfaceIntegralViscous will overwrite the gradient!
-struct AnalysisSurfaceIntegralViscousCorrectedGrad{Indices, Variable} <: SurfaceQuantitiyViscous
+struct AnalysisSurfaceIntegralViscousCorrectedGrad{Indices, Variable} <:
+       SurfaceQuantitiyViscous
     indices::Indices
     variable::Variable
 end
-
 
 function lift_force(u, normal_direction, equations::CompressibleEulerEquations2D)
     p = pressure(u, equations)
@@ -125,13 +127,15 @@ function (lift_force_viscous::LiftForceViscous)(u, gradients, normal_direction, 
     tau_22 = 4.0 / 3.0 * dv2dy - 2.0 / 3.0 * dv1dx
 
     n = normal_direction / norm(normal_direction)
-    force = tau_11*n[1]*Ψl[1] + tau_12*n[2]*Ψl[1] + tau_21*n[1]*Ψl[2] + tau_22*n[2]*Ψl[2]
+    force = tau_11 * n[1] * Ψl[1] + tau_12 * n[2] * Ψl[1] + tau_21 * n[1] * Ψl[2] +
+            tau_22 * n[2] * Ψl[2]
     force *= mu
     factor = 0.5 * rhoinf * uinf^2 * linf
     return force / factor
 end
 
-function surface_skin_friction(u, gradients, normal_direction, equations, free_stream_variables)
+function surface_skin_friction(u, gradients, normal_direction, equations,
+                               free_stream_variables)
     @unpack rhoinf, uinf, linf = free_stream_variables
     @unpack mu = equations
 
@@ -151,13 +155,12 @@ function surface_skin_friction(u, gradients, normal_direction, equations, free_s
 
     n = normal_direction / norm(normal_direction)
     n_perp = (-n[2], n[1])
-    Cf = (  tau_11*n[1]*n_perp[1] + tau_12*n[2]*n_perp[1]
-          + tau_21*n[1]*n_perp[2] + tau_22*n[2]*n_perp[2])
+    Cf = (tau_11 * n[1] * n_perp[1] + tau_12 * n[2] * n_perp[1]
+          + tau_21 * n[1] * n_perp[2] + tau_22 * n[2] * n_perp[2])
     Cf *= mu
     factor = 0.5 * rhoinf * uinf^2 * linf
     return Cf / factor
 end
-
 
 function (drag_force_viscous::DragForceViscous)(u, gradients, normal_direction, equations)
     @unpack Ψl, rhoinf, uinf, linf = drag_force_viscous.force_state
@@ -169,7 +172,7 @@ function (drag_force_viscous::DragForceViscous)(u, gradients, normal_direction, 
     # Components of viscous stress tensor
 
     # (4/3 * (v1)_x - 2/3 * (v2)_y)
-    tau_11 = 4.0 / 3.0 * dv1dx - 2.0 / 3.0 *  dv2dy
+    tau_11 = 4.0 / 3.0 * dv1dx - 2.0 / 3.0 * dv2dy
     # ((v1)_y + (v2)_x)
     # stress tensor is symmetric
     tau_12 = dv1dy + dv2dx # = tau_21
@@ -178,7 +181,8 @@ function (drag_force_viscous::DragForceViscous)(u, gradients, normal_direction, 
     tau_22 = 4.0 / 3.0 * dv2dy - 2.0 / 3.0 * dv1dx
 
     n = normal_direction / norm(normal_direction)
-    force = tau_11*n[1]*Ψl[1] + tau_12*n[2]*Ψl[1] + tau_21*n[1]*Ψl[2] + tau_22*n[2]*Ψl[2]
+    force = tau_11 * n[1] * Ψl[1] + tau_12 * n[2] * Ψl[1] + tau_21 * n[1] * Ψl[2] +
+            tau_22 * n[2] * Ψl[2]
     force *= mu # The tau had a factor of mu in Ray 2017, but it is not present in the
     # above expressions taken from Trixi.jl and thus it is included here
     factor = 0.5 * rhoinf * uinf^2 * linf
@@ -187,7 +191,7 @@ end
 
 function drag_force(u, normal_direction, equations)
     p = pressure(u, equations)
-    return p * normal_direction[1]  / norm(normal_direction)
+    return p * normal_direction[1] / norm(normal_direction)
 end
 
 function (drag_force::DragForcePressure)(u, normal_direction, equations)
@@ -207,8 +211,8 @@ function analyze(quantity::SurfaceQuantitiyViscous,
 end
 
 function analyze(surface_variable::AnalysisSurfaceIntegral, du, u, t,
-    mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
-    equations, dg::DGSEM, cache)
+                 mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
+                 equations, dg::DGSEM, cache)
     @unpack boundaries, boundary_cache = cache
     @unpack surface_flux_values, node_coordinates, contravariant_vectors = cache.elements
     @unpack weights = dg.basis
@@ -219,40 +223,43 @@ function analyze(surface_variable::AnalysisSurfaceIntegral, du, u, t,
     surface_integral = zero(eltype(u))
     index_range = eachnode(dg)
     for local_index in eachindex(indices_)
-       # Use the local index to get the global boundary index from the pre-sorted list
-       boundary = indices_[local_index]
+        # Use the local index to get the global boundary index from the pre-sorted list
+        boundary = indices_[local_index]
 
-       # Get information on the adjacent element, compute the surface fluxes,
-       # and store them
-       element = boundaries.neighbor_ids[boundary]
-       node_indices = boundaries.node_indices[boundary]
-       direction = indices2direction(node_indices)
+        # Get information on the adjacent element, compute the surface fluxes,
+        # and store them
+        element = boundaries.neighbor_ids[boundary]
+        node_indices = boundaries.node_indices[boundary]
+        direction = indices2direction(node_indices)
 
-       i_node_start, i_node_step = index_to_start_step_2d(node_indices[1], index_range)
-       j_node_start, j_node_step = index_to_start_step_2d(node_indices[2], index_range)
+        i_node_start, i_node_step = index_to_start_step_2d(node_indices[1], index_range)
+        j_node_start, j_node_step = index_to_start_step_2d(node_indices[2], index_range)
 
-       i_node = i_node_start
-       j_node = j_node_start
-       for node_index in eachnode(dg)
-          u_node = Trixi.get_node_vars(boundary_cache.u, equations, dg, node_index, boundary)
-          normal_direction = get_normal_direction(direction, contravariant_vectors, i_node, j_node,
-                                                  element)
+        i_node = i_node_start
+        j_node = j_node_start
+        for node_index in eachnode(dg)
+            u_node = Trixi.get_node_vars(boundary_cache.u, equations, dg, node_index,
+                                         boundary)
+            normal_direction = get_normal_direction(direction, contravariant_vectors,
+                                                    i_node, j_node,
+                                                    element)
 
-          # L2 norm of normal direction is the surface element
-          # 0.5 factor is NOT needed, the norm(normal_direction) is all the factor needed
-          dS = weights[node_index] * norm(normal_direction)
-          surface_integral += variable(u_node, normal_direction, equations) * dS
+            # L2 norm of normal direction is the surface element
+            # 0.5 factor is NOT needed, the norm(normal_direction) is all the factor needed
+            dS = weights[node_index] * norm(normal_direction)
+            surface_integral += variable(u_node, normal_direction, equations) * dS
 
-          i_node += i_node_step
-          j_node += j_node_step
-       end
+            i_node += i_node_step
+            j_node += j_node_step
+        end
     end
     return surface_integral
 end
 
 function analyze(surface_variable::AnalysisSurfaceFrictionCoefficient,
-    du, u, t, mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}}, equations,
-    equations_parabolic, dg::DGSEM, cache, cache_parabolic)
+                 du, u, t, mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
+                 equations,
+                 equations_parabolic, dg::DGSEM, cache, cache_parabolic)
     @unpack boundaries, boundary_cache = cache
     @unpack surface_flux_values, node_coordinates, contravariant_vectors = cache.elements
     @unpack weights = dg.basis
@@ -268,49 +275,51 @@ function analyze(surface_variable::AnalysisSurfaceFrictionCoefficient,
     n_nodes = nnodes(dg)
     n_elements = length(indices_)
     avg_array = zeros(n_elements, dim + 1)
-    soln_array = zeros(n_elements*n_nodes, dim + 1)
+    soln_array = zeros(n_elements * n_nodes, dim + 1)
 
     local it = 1
     local element_it = 1
 
     index_range = eachnode(dg)
     for local_index in eachindex(indices_)
-       # Use the local index to get the global boundary index from the pre-sorted list
-       boundary = indices_[local_index]
+        # Use the local index to get the global boundary index from the pre-sorted list
+        boundary = indices_[local_index]
 
-       # Get information on the adjacent element, compute the surface fluxes,
-       # and store them
-       element = boundaries.neighbor_ids[boundary]
-       node_indices = boundaries.node_indices[boundary]
-       direction = indices2direction(node_indices)
+        # Get information on the adjacent element, compute the surface fluxes,
+        # and store them
+        element = boundaries.neighbor_ids[boundary]
+        node_indices = boundaries.node_indices[boundary]
+        direction = indices2direction(node_indices)
 
-       i_node_start, i_node_step = index_to_start_step_2d(node_indices[1], index_range)
-       j_node_start, j_node_step = index_to_start_step_2d(node_indices[2], index_range)
+        i_node_start, i_node_step = index_to_start_step_2d(node_indices[1], index_range)
+        j_node_start, j_node_step = index_to_start_step_2d(node_indices[2], index_range)
 
-       i_node = i_node_start
-       j_node = j_node_start
-       for node_index in eachnode(dg)
-          x = get_node_coords(node_coordinates, equations, dg, i_node, j_node, element)
-          u_node = Trixi.get_node_vars(boundary_cache.u, equations, dg, node_index, boundary)
-          normal_direction = get_normal_direction(direction, contravariant_vectors, i_node, j_node,
-                                                  element)
-          ux = Trixi.get_node_vars(gradients_x, equations, dg, i_node, j_node, element)
-          uy = Trixi.get_node_vars(gradients_y, equations, dg, i_node, j_node, element)
+        i_node = i_node_start
+        j_node = j_node_start
+        for node_index in eachnode(dg)
+            x = get_node_coords(node_coordinates, equations, dg, i_node, j_node, element)
+            u_node = Trixi.get_node_vars(boundary_cache.u, equations, dg, node_index,
+                                         boundary)
+            normal_direction = get_normal_direction(direction, contravariant_vectors,
+                                                    i_node, j_node,
+                                                    element)
+            ux = Trixi.get_node_vars(gradients_x, equations, dg, i_node, j_node, element)
+            uy = Trixi.get_node_vars(gradients_y, equations, dg, i_node, j_node, element)
 
-          Cf = surface_skin_friction(u_node, (ux, uy), normal_direction,
-                                     equations_parabolic, free_stream_variables)
+            Cf = surface_skin_friction(u_node, (ux, uy), normal_direction,
+                                       equations_parabolic, free_stream_variables)
 
-          soln_array[it, 1:2  ] .= x
-          soln_array[it, 3] = Cf
-          avg_array[element_it, 1:2  ] .+= x * weights[node_index] / 2.0
-          avg_array[element_it, 3] += Cf * weights[node_index] / 2.0
+            soln_array[it, 1:2] .= x
+            soln_array[it, 3] = Cf
+            avg_array[element_it, 1:2] .+= x * weights[node_index] / 2.0
+            avg_array[element_it, 3] += Cf * weights[node_index] / 2.0
 
-          i_node += i_node_step
-          j_node += j_node_step
+            i_node += i_node_step
+            j_node += j_node_step
 
-          it += 1
-       end
-       element_it += 1
+            it += 1
+        end
+        element_it += 1
     end
     mkpath("out")
     writedlm(joinpath("out", "Cf_t$t.txt"), soln_array)
@@ -319,8 +328,9 @@ function analyze(surface_variable::AnalysisSurfaceFrictionCoefficient,
 end
 
 function analyze(surface_variable::AnalysisSurfaceIntegralViscousCorrectedGrad,
-    du, u, t, mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}}, equations,
-    equations_parabolic, dg::DGSEM, cache, cache_parabolic)
+                 du, u, t, mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
+                 equations,
+                 equations_parabolic, dg::DGSEM, cache, cache_parabolic)
     @unpack boundaries, boundary_cache = cache
     @unpack surface_flux_values, node_coordinates, contravariant_vectors = cache.elements
     @unpack weights = dg.basis
@@ -334,42 +344,46 @@ function analyze(surface_variable::AnalysisSurfaceIntegralViscousCorrectedGrad,
     surface_integral = zero(eltype(u))
     index_range = eachnode(dg)
     for local_index in eachindex(indices_)
-       # Use the local index to get the global boundary index from the pre-sorted list
-       boundary = indices_[local_index]
+        # Use the local index to get the global boundary index from the pre-sorted list
+        boundary = indices_[local_index]
 
-       # Get information on the adjacent element, compute the surface fluxes,
-       # and store them
-       element = boundaries.neighbor_ids[boundary]
-       node_indices = boundaries.node_indices[boundary]
-       direction = indices2direction(node_indices)
+        # Get information on the adjacent element, compute the surface fluxes,
+        # and store them
+        element = boundaries.neighbor_ids[boundary]
+        node_indices = boundaries.node_indices[boundary]
+        direction = indices2direction(node_indices)
 
-       i_node_start, i_node_step = index_to_start_step_2d(node_indices[1], index_range)
-       j_node_start, j_node_step = index_to_start_step_2d(node_indices[2], index_range)
+        i_node_start, i_node_step = index_to_start_step_2d(node_indices[1], index_range)
+        j_node_start, j_node_step = index_to_start_step_2d(node_indices[2], index_range)
 
-       i_node = i_node_start
-       j_node = j_node_start
-       for node_index in eachnode(dg)
-          u_node = Trixi.get_node_vars(boundary_cache.u, equations, dg, node_index, boundary)
-          normal_direction = get_normal_direction(direction, contravariant_vectors, i_node, j_node,
-                                                  element)
-          ux = Trixi.get_node_vars(gradients_x, equations, dg, i_node, j_node, element)
-          uy = Trixi.get_node_vars(gradients_y, equations, dg, i_node, j_node, element)
+        i_node = i_node_start
+        j_node = j_node_start
+        for node_index in eachnode(dg)
+            u_node = Trixi.get_node_vars(boundary_cache.u, equations, dg, node_index,
+                                         boundary)
+            normal_direction = get_normal_direction(direction, contravariant_vectors,
+                                                    i_node, j_node,
+                                                    element)
+            ux = Trixi.get_node_vars(gradients_x, equations, dg, i_node, j_node, element)
+            uy = Trixi.get_node_vars(gradients_y, equations, dg, i_node, j_node, element)
 
-          # L2 norm of normal direction is the surface
-          # 0.5 factor is NOT needed, the norm(normal_direction) is all the factor needed
-          dS = weights[node_index] * norm(normal_direction)
-          surface_integral += variable(u_node, (ux, uy), normal_direction, equations_parabolic) * dS
+            # L2 norm of normal direction is the surface
+            # 0.5 factor is NOT needed, the norm(normal_direction) is all the factor needed
+            dS = weights[node_index] * norm(normal_direction)
+            surface_integral += variable(u_node, (ux, uy), normal_direction,
+                                         equations_parabolic) * dS
 
-          i_node += i_node_step
-          j_node += j_node_step
-       end
+            i_node += i_node_step
+            j_node += j_node_step
+        end
     end
     return surface_integral
 end
 
 function analyze(surface_variable::AnalysisSurfaceIntegralViscous, du, u, t,
-    mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}}, equations,
-    equations_parabolic, dg::DGSEM, cache, cache_parabolic)
+                 mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
+                 equations,
+                 equations_parabolic, dg::DGSEM, cache, cache_parabolic)
     @unpack boundaries, boundary_cache = cache
     @unpack surface_flux_values, node_coordinates, contravariant_vectors = cache.elements
     @unpack weights = dg.basis
@@ -440,42 +454,45 @@ function analyze(surface_variable::AnalysisSurfaceIntegralViscous, du, u, t,
     surface_integral = zero(eltype(u))
     index_range = eachnode(dg)
     for local_index in eachindex(indices_)
-       # Use the local index to get the global boundary index from the pre-sorted list
-       boundary = indices_[local_index]
+        # Use the local index to get the global boundary index from the pre-sorted list
+        boundary = indices_[local_index]
 
-       # Get information on the adjacent element, compute the surface fluxes,
-       # and store them
-       element = boundaries.neighbor_ids[boundary]
-       node_indices = boundaries.node_indices[boundary]
-       direction = indices2direction(node_indices)
+        # Get information on the adjacent element, compute the surface fluxes,
+        # and store them
+        element = boundaries.neighbor_ids[boundary]
+        node_indices = boundaries.node_indices[boundary]
+        direction = indices2direction(node_indices)
 
-       i_node_start, i_node_step = index_to_start_step_2d(node_indices[1], index_range)
-       j_node_start, j_node_step = index_to_start_step_2d(node_indices[2], index_range)
+        i_node_start, i_node_step = index_to_start_step_2d(node_indices[1], index_range)
+        j_node_start, j_node_step = index_to_start_step_2d(node_indices[2], index_range)
 
-       i_node = i_node_start
-       j_node = j_node_start
-       for node_index in eachnode(dg)
-          u_node = Trixi.get_node_vars(boundary_cache.u, equations, dg, node_index, boundary)
-          normal_direction = get_normal_direction(direction, contravariant_vectors, i_node, j_node,
-                                                  element)
-          ux = Trixi.get_node_vars(gradients_x, equations, dg, i_node, j_node, element)
-          uy = Trixi.get_node_vars(gradients_y, equations, dg, i_node, j_node, element)
+        i_node = i_node_start
+        j_node = j_node_start
+        for node_index in eachnode(dg)
+            u_node = Trixi.get_node_vars(boundary_cache.u, equations, dg, node_index,
+                                         boundary)
+            normal_direction = get_normal_direction(direction, contravariant_vectors,
+                                                    i_node, j_node,
+                                                    element)
+            ux = Trixi.get_node_vars(gradients_x, equations, dg, i_node, j_node, element)
+            uy = Trixi.get_node_vars(gradients_y, equations, dg, i_node, j_node, element)
 
-          # L2 norm of normal direction is the surface
-          # 0.5 factor is NOT needed, the norm(normal_direction) is all the factor needed
-          dS = weights[node_index] * norm(normal_direction)
-          surface_integral += variable(u_node, (ux, uy), normal_direction, equations_parabolic) * dS
+            # L2 norm of normal direction is the surface
+            # 0.5 factor is NOT needed, the norm(normal_direction) is all the factor needed
+            dS = weights[node_index] * norm(normal_direction)
+            surface_integral += variable(u_node, (ux, uy), normal_direction,
+                                         equations_parabolic) * dS
 
-          i_node += i_node_step
-          j_node += j_node_step
-       end
+            i_node += i_node_step
+            j_node += j_node_step
+        end
     end
     return surface_integral
 end
 
 function analyze(surface_variable::SaveSurfacePrimitives, du, u, t,
-    mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
-    equations, dg::DGSEM, cache)
+                 mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
+                 equations, dg::DGSEM, cache)
     @unpack boundaries, boundary_cache = cache
     @unpack surface_flux_values, node_coordinates, contravariant_vectors = cache.elements
     @unpack weights = dg.basis
@@ -487,39 +504,40 @@ function analyze(surface_variable::SaveSurfacePrimitives, du, u, t,
     n_nodes = nnodes(dg)
     n_elements = length(indices_)
     avg_array = zeros(n_elements, dim + nvar)
-    soln_array = zeros(n_elements*n_nodes, dim + nvar)
+    soln_array = zeros(n_elements * n_nodes, dim + nvar)
 
     local it = 1
     local element_it = 1
     index_range = eachnode(dg)
     for local_index in eachindex(indices_)
-       # Use the local index to get the global boundary index from the pre-sorted list
-       boundary = indices_[local_index]
+        # Use the local index to get the global boundary index from the pre-sorted list
+        boundary = indices_[local_index]
 
-       # Get information on the adjacent element, compute the surface fluxes,
-       # and store them
-       element = boundaries.neighbor_ids[boundary]
-       node_indices = boundaries.node_indices[boundary]
+        # Get information on the adjacent element, compute the surface fluxes,
+        # and store them
+        element = boundaries.neighbor_ids[boundary]
+        node_indices = boundaries.node_indices[boundary]
 
-       i_node_start, i_node_step = index_to_start_step_2d(node_indices[1], index_range)
-       j_node_start, j_node_step = index_to_start_step_2d(node_indices[2], index_range)
+        i_node_start, i_node_step = index_to_start_step_2d(node_indices[1], index_range)
+        j_node_start, j_node_step = index_to_start_step_2d(node_indices[2], index_range)
 
-       i_node = i_node_start
-       j_node = j_node_start
-       for node_index in eachnode(dg)
-          u_node = Trixi.get_node_vars(boundary_cache.u, equations, dg, node_index, boundary)
-          x = get_node_coords(node_coordinates, equations, dg, i_node, j_node, element)
-          prim = cons2prim(u_node, equations)
+        i_node = i_node_start
+        j_node = j_node_start
+        for node_index in eachnode(dg)
+            u_node = Trixi.get_node_vars(boundary_cache.u, equations, dg, node_index,
+                                         boundary)
+            x = get_node_coords(node_coordinates, equations, dg, i_node, j_node, element)
+            prim = cons2prim(u_node, equations)
 
-          soln_array[it, 1:2  ] .= x
-          soln_array[it, 3:end] .= prim
-          avg_array[element_it, 1:2  ] .+= x * weights[node_index] / 2.0
-          avg_array[element_it, 3:end] .+= prim * weights[node_index] / 2.0
-          i_node += i_node_step
-          j_node += j_node_step
-          it += 1
-       end
-       element_it += 1
+            soln_array[it, 1:2] .= x
+            soln_array[it, 3:end] .= prim
+            avg_array[element_it, 1:2] .+= x * weights[node_index] / 2.0
+            avg_array[element_it, 3:end] .+= prim * weights[node_index] / 2.0
+            i_node += i_node_step
+            j_node += j_node_step
+            it += 1
+        end
+        element_it += 1
     end
     mkpath("out")
     writedlm(joinpath("out", "soln_t$t.txt"), soln_array)
@@ -533,26 +551,55 @@ pretty_form_utf(::SaveSurfacePrimitives{<:Any}) = "Dummy value"
 pretty_form_ascii(::AnalysisSurfaceFrictionCoefficient{<:Any}) = "Dummy value"
 pretty_form_utf(::AnalysisSurfaceFrictionCoefficient{<:Any}) = "Dummy value"
 
-
 pretty_form_ascii(::AnalysisSurfaceIntegral{<:Any, typeof(lift_force)}) = "Lift"
 pretty_form_utf(::AnalysisSurfaceIntegral{<:Any, typeof(lift_force)}) = "Lift"
 pretty_form_ascii(::AnalysisSurfaceIntegral{<:Any, typeof(drag_force)}) = "Drag"
 pretty_form_utf(::AnalysisSurfaceIntegral{<:Any, typeof(drag_force)}) = "Drag"
 
-pretty_form_ascii(::AnalysisSurfaceIntegral{<:Any, <:LiftForcePressure{<:Any}}) = "Pressure_lift"
-pretty_form_utf(::AnalysisSurfaceIntegral{<:Any, <:LiftForcePressure{<:Any}}) = "Pressure_lift"
-pretty_form_ascii(::AnalysisSurfaceIntegral{<:Any, <:DragForcePressure{<:Any}}) = "Pressure_drag"
-pretty_form_utf(::AnalysisSurfaceIntegral{<:Any, <:DragForcePressure{<:Any}}) = "Pressure_drag"
+function pretty_form_ascii(::AnalysisSurfaceIntegral{<:Any, <:LiftForcePressure{<:Any}})
+    "Pressure_lift"
+end
+function pretty_form_utf(::AnalysisSurfaceIntegral{<:Any, <:LiftForcePressure{<:Any}})
+    "Pressure_lift"
+end
+function pretty_form_ascii(::AnalysisSurfaceIntegral{<:Any, <:DragForcePressure{<:Any}})
+    "Pressure_drag"
+end
+function pretty_form_utf(::AnalysisSurfaceIntegral{<:Any, <:DragForcePressure{<:Any}})
+    "Pressure_drag"
+end
 
-pretty_form_ascii(::AnalysisSurfaceIntegralViscous{<:Any, <:LiftForceViscous{<:Any}}) = "Viscous_lift"
-pretty_form_utf(::AnalysisSurfaceIntegralViscous{<:Any, <:LiftForceViscous{<:Any}}) = "Viscous_lift"
-pretty_form_ascii(::AnalysisSurfaceIntegralViscous{<:Any, <:DragForceViscous{<:Any}}) = "Viscous_drag"
-pretty_form_utf(::AnalysisSurfaceIntegralViscous{<:Any, <:DragForceViscous{<:Any}}) = "Viscous_drag"
+function pretty_form_ascii(::AnalysisSurfaceIntegralViscous{<:Any,
+                                                            <:LiftForceViscous{<:Any}})
+    "Viscous_lift"
+end
+function pretty_form_utf(::AnalysisSurfaceIntegralViscous{<:Any, <:LiftForceViscous{<:Any}})
+    "Viscous_lift"
+end
+function pretty_form_ascii(::AnalysisSurfaceIntegralViscous{<:Any,
+                                                            <:DragForceViscous{<:Any}})
+    "Viscous_drag"
+end
+function pretty_form_utf(::AnalysisSurfaceIntegralViscous{<:Any, <:DragForceViscous{<:Any}})
+    "Viscous_drag"
+end
 
-pretty_form_ascii(::AnalysisSurfaceIntegralViscousCorrectedGrad{<:Any, <:LiftForceViscous{<:Any}}) = "Viscous_lift_corr"
-pretty_form_utf(::AnalysisSurfaceIntegralViscousCorrectedGrad{<:Any, <:LiftForceViscous{<:Any}}) = "Viscous_lift_corr"
-pretty_form_ascii(::AnalysisSurfaceIntegralViscousCorrectedGrad{<:Any, <:DragForceViscous{<:Any}}) = "Viscous_drag_corr"
-pretty_form_utf(::AnalysisSurfaceIntegralViscousCorrectedGrad{<:Any, <:DragForceViscous{<:Any}}) = "Viscous_drag_corr"
+function pretty_form_ascii(::AnalysisSurfaceIntegralViscousCorrectedGrad{<:Any,
+                                                                         <:LiftForceViscous{<:Any}})
+    "Viscous_lift_corr"
+end
+function pretty_form_utf(::AnalysisSurfaceIntegralViscousCorrectedGrad{<:Any,
+                                                                       <:LiftForceViscous{<:Any}})
+    "Viscous_lift_corr"
+end
+function pretty_form_ascii(::AnalysisSurfaceIntegralViscousCorrectedGrad{<:Any,
+                                                                         <:DragForceViscous{<:Any}})
+    "Viscous_drag_corr"
+end
+function pretty_form_utf(::AnalysisSurfaceIntegralViscousCorrectedGrad{<:Any,
+                                                                       <:DragForceViscous{<:Any}})
+    "Viscous_drag_corr"
+end
 
 pretty_form_ascii(::CFLComputation) = "CFLMin"
 pretty_form_utf(::CFLComputation) = "CFLMin"
@@ -560,8 +607,8 @@ pretty_form_ascii(::CFLComputationMax) = "CFLMax"
 pretty_form_utf(::CFLComputationMax) = "CFLMax"
 
 function analyze(::CFLComputation, du, u, t,
-    mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
-    equations::CompressibleEulerEquations2D, dg::DGSEM, cache)
+                 mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
+                 equations::CompressibleEulerEquations2D, dg::DGSEM, cache)
     dt = cache.dt[1]
     max_scaled_speed = nextfloat(zero(t))
     min_cfl = 1.0e20
@@ -600,8 +647,8 @@ function analyze(::CFLComputation, du, u, t,
 end
 
 function analyze(::CFLComputationMax, du, u, t,
-    mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
-    equations::CompressibleEulerEquations2D, dg::DGSEM, cache)
+                 mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
+                 equations::CompressibleEulerEquations2D, dg::DGSEM, cache)
     dt = cache.dt[1]
     max_scaled_speed = nextfloat(zero(t))
     min_cfl = 1.0e20
@@ -640,49 +687,49 @@ function analyze(::CFLComputationMax, du, u, t,
 end
 
 function analyze(::RhoRes, du, u, t,
-    mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
-    equations::CompressibleEulerEquations2D, dg::DGSEM, cache)
+                 mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
+                 equations::CompressibleEulerEquations2D, dg::DGSEM, cache)
     @unpack contravariant_vectors = cache.elements
     # in the below do syntax, the anonymous function is
     # (u_, i, j, element, equations, dg, cache, derivative_matrix) -> u_[1,i,j,element]^2
     # The integrate_via_indices function is calling it with u_=du
     integrate_via_indices(du, mesh, equations, dg, cache, cache,
-                dg.basis.derivative_matrix) do u_, i, j, element, equations,
-                                                dg, cache, derivative_matrix
-        res = u_[1,i,j,element]^2
+                          dg.basis.derivative_matrix) do u_, i, j, element, equations,
+                                                         dg, cache, derivative_matrix
+        res = u_[1, i, j, element]^2
     end |> sqrt
 end
 
 function analyze(::RhoV1Res, du, u, t,
-    mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
-    equations::CompressibleEulerEquations2D, dg::DGSEM, cache)
+                 mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
+                 equations::CompressibleEulerEquations2D, dg::DGSEM, cache)
     @unpack contravariant_vectors = cache.elements
     integrate_via_indices(du, mesh, equations, dg, cache, cache,
-                dg.basis.derivative_matrix) do u_, i, j, element, equations,
-                                                dg, cache, derivative_matrix
-        res = u_[2,i,j,element]^2
+                          dg.basis.derivative_matrix) do u_, i, j, element, equations,
+                                                         dg, cache, derivative_matrix
+        res = u_[2, i, j, element]^2
     end |> sqrt
 end
 
 function analyze(::RhoV2Res, du, u, t,
-    mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
-    equations::CompressibleEulerEquations2D, dg::DGSEM, cache)
+                 mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
+                 equations::CompressibleEulerEquations2D, dg::DGSEM, cache)
     @unpack contravariant_vectors = cache.elements
     integrate_via_indices(du, mesh, equations, dg, cache, cache,
-                dg.basis.derivative_matrix) do u_, i, j, element, equations,
-                                                dg, cache, derivative_matrix
-        res = u_[3,i,j,element]^2
+                          dg.basis.derivative_matrix) do u_, i, j, element, equations,
+                                                         dg, cache, derivative_matrix
+        res = u_[3, i, j, element]^2
     end |> sqrt
 end
 
 function analyze(::ERes, du, u, t,
-    mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
-    equations::CompressibleEulerEquations2D, dg::DGSEM, cache)
+                 mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
+                 equations::CompressibleEulerEquations2D, dg::DGSEM, cache)
     @unpack contravariant_vectors = cache.elements
     integrate_via_indices(du, mesh, equations, dg, cache, cache,
-                dg.basis.derivative_matrix) do u_, i, j, element, equations,
-                                                dg, cache, derivative_matrix
-        res = u_[4,i,j,element]^2
+                          dg.basis.derivative_matrix) do u_, i, j, element, equations,
+                                                         dg, cache, derivative_matrix
+        res = u_[4, i, j, element]^2
     end |> sqrt
 end
 

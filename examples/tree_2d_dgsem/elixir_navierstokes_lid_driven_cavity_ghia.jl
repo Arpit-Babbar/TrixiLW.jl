@@ -13,30 +13,29 @@ mu() = 0.001
 # rho_0 = u_0 = L = 1 so that Re = rho_0*u_0*L_0/mu = 1000
 
 equations = CompressibleEulerEquations2D(1.4)
-equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu=mu(),
-                                                          Prandtl=prandtl_number(),
-                                                          gradient_variables=TrixiLW.GradientVariablesConservative())
+equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu = mu(),
+                                                          Prandtl = prandtl_number(),
+                                                          gradient_variables = TrixiLW.GradientVariablesConservative())
 
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
-solver = DGSEM(polydeg=4, surface_flux=flux_lax_friedrichs,
-               volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
+solver = DGSEM(polydeg = 4, surface_flux = flux_lax_friedrichs,
+               volume_integral = TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
 
 coordinates_min = (0.0, 0.0) # minimum coordinates (min(x), min(y))
 coordinates_max = (1.0, 1.0) # maximum coordinates (max(x), max(y))
 
 # Create a uniformly refined mesh
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level=4,
-                periodicity=false,
-                n_cells_max=30_000) # set maximum capacity of tree data structure
-
+                initial_refinement_level = 4,
+                periodicity = false,
+                n_cells_max = 30_000) # set maximum capacity of tree data structure
 
 function initial_condition_cavity(x, t, equations::CompressibleEulerEquations2D)
-  Ma = 0.1
-  rho = 1.0
-  u, v = 0.0, 0.0
-  p = 1.0 / (Ma^2 * equations.gamma)
-  return prim2cons(SVector(rho, u, v, p), equations)
+    Ma = 0.1
+    rho = 1.0
+    u, v = 0.0, 0.0
+    p = 1.0 / (Ma^2 * equations.gamma)
+    return prim2cons(SVector(rho, u, v, p), equations)
 end
 
 initial_condition = initial_condition_cavity
@@ -55,22 +54,25 @@ boundary_conditions = (;
                        x_neg = TrixiLW.boundary_condition_slip_wall_vertical,
                        x_pos = TrixiLW.boundary_condition_slip_wall_vertical,
                        y_neg = TrixiLW.boundary_condition_slip_wall_horizontal,
-                       y_pos = TrixiLW.boundary_condition_slip_wall_horizontal
-                      )
+                       y_pos = TrixiLW.boundary_condition_slip_wall_horizontal)
 
 boundary_conditions_parabolic = (; x_neg = boundary_condition_cavity,
-                                   y_neg = boundary_condition_cavity,
-                                   y_pos = boundary_condition_lid,
-                                   x_pos = boundary_condition_cavity)
+                                 y_neg = boundary_condition_cavity,
+                                 y_pos = boundary_condition_lid,
+                                 x_pos = boundary_condition_cavity)
 
 # A semidiscretization collects data structures and functions for the spatial discretization
 cfl_number = 0.98
 
 semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
-                                                  get_time_discretization(solver),
-                                             (equations, equations_parabolic),initial_condition, solver;
-                                             boundary_conditions=(boundary_conditions, boundary_conditions_parabolic),
-                                             initial_caches = ((;cfl_number, dt = ones(1)),(;cfl_number)))
+                                                     get_time_discretization(solver),
+                                                     (equations, equations_parabolic),
+                                                     initial_condition, solver;
+                                                     boundary_conditions = (boundary_conditions,
+                                                                            boundary_conditions_parabolic),
+                                                     initial_caches = ((; cfl_number,
+                                                                        dt = ones(1)),
+                                                                       (; cfl_number)))
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -84,28 +86,25 @@ lw_update = TrixiLW.semidiscretize(semi,
 
 summary_callback = SummaryCallback()
 
-save_solution = SaveSolutionCallback(interval=1000,
-                                     save_initial_solution=true,
-                                     save_final_solution=true,
-                                     solution_variables=cons2prim)
+save_solution = SaveSolutionCallback(interval = 1000,
+                                     save_initial_solution = true,
+                                     save_final_solution = true,
+                                     solution_variables = cons2prim)
 
-alive_callback = AliveCallback(alive_interval=100)
+alive_callback = AliveCallback(alive_interval = 100)
 analysis_interval = 5000
-analysis_callback = AnalysisCallback(semi, interval=analysis_interval)
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
-callbacks = (
-  save_solution,
-  analysis_callback,
-  alive_callback,
-);
+callbacks = (save_solution,
+             analysis_callback,
+             alive_callback);
 
 ###############################################################################
 # run the simulation
 
 time_int_tol = 1e-8
-tolerances = (;abstol = time_int_tol, reltol = time_int_tol)
+tolerances = (; abstol = time_int_tol, reltol = time_int_tol)
 dt_initial = 1e-6
 sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
-                        # time_step_computation = TrixiLW.CFLBased(cfl_number),
-                        time_step_computation = TrixiLW.Adaptive(),
-                        );
+                         # time_step_computation = TrixiLW.CFLBased(cfl_number),
+                         time_step_computation = TrixiLW.Adaptive());
