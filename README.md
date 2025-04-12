@@ -1,6 +1,6 @@
 # TrixiLW.jl
 
-An implementation of Lax-Wendroff Flux Reconstruction scheme for curvilinear meshes with adaptive mesh refinement and error based time stepping using [`Trixi.jl`](https://github.com/trixi-framework/Trixi.jl) as a library. To run the code, enter the following the `julia` REPL.
+`TrixiLW.jl` in implementation of Lax-Wendroff Flux Reconstruction scheme for curvilinear meshes with adaptive mesh refinement and error based time stepping using [`Trixi.jl`](https://github.com/trixi-framework/Trixi.jl) as a library. To run the code, enter the following in the `julia` REPL.
 
 ## Users
 
@@ -17,7 +17,7 @@ You can also run any of the [available examples](https://github.com/Arpit-Babbar
 
 ## Developers
 
-You should do this if you find something in `TrixiLW.jl` to be incompatible with your use case. In this case, I will also be happy to make changes in `TrixiLW.jl` to adapt it to your needs. This is likely to greatly help `TrixiLW.jl`. Thus, feel free to raise an issue, make a pull request or to [email me](mailto:arpit@babbar.dev). For development, clone (ideally, after forking) the repository and then run the following in the `julia` REPL when you are in the `TrixiLW.jl` directory to install the dependencies
+You should do this if you find something in `TrixiLW.jl` to be incompatible with your use case. In this case, I will also be happy to make changes in `TrixiLW.jl` to adapt it to your needs. This is likely to greatly help `TrixiLW.jl`. Thus, feel free to raise an issue, make a pull request or [email me](mailto:arpit@babbar.dev). For development, clone (ideally, after forking) the repository and then run the following in the `julia` REPL when you are in the `TrixiLW.jl` directory to install the dependencies
 
 ```julia
 julia> using Pkg; Pkg.activate("."); Pkg.instantiate()
