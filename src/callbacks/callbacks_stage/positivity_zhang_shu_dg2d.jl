@@ -40,7 +40,9 @@ function my_limiter_zhang_shu!(u, threshold::Real, variable,
       end
    end
 
-   limit_mortars!(u, threshold, variable, mesh, equations, dg, cache)
+   if isa(mesh, P4estMesh)
+      limit_mortars!(u, threshold, variable, mesh, equations, dg, cache)
+   end
    return nothing
 end
 

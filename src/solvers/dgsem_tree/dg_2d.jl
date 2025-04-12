@@ -2062,6 +2062,7 @@ using Enzyme
             f_ll, f_rr = get_surface_node_vars(f, equations, dg, i, interface)
             fn_inner_ll, fn_inner_rr = get_surface_node_vars(fn_low, equations, dg, i, interface)
             Fn_ = surface_flux(f_ll, f_rr, u_ll, u_rr, U_ll, U_rr, orientations[interface], equations)
+            # Fn_ = surface_flux(f_ll, f_rr, u_ll, u_rr, U_ll, U_rr, orientations[interface], equations)
             fn = surface_flux(u_ll, u_rr, orientations[interface], equations)
 
             Jl = Jr = cache.interface_cache.inverse_jacobian[i, interface]
