@@ -60,10 +60,7 @@ function get_kwarg(args, keyword, default_value)
     return val
 end
 
-macro test_trixilw_include_run(mesh_name, elixir_name, args...)
-    tol = get_kwarg(args, :tol, 1e-14)
-    overwrite_errors = get_kwarg(args, :overwrite_errors, to_overwrite_errors())
-
+macro test_trixilw_include(mesh_name, elixir_name, args...)
     full_test_name = "$(mesh_name)_$(elixir_name)"
     full_elixir_name = joinpath(examples_dir_trixilw(), mesh_name, "elixir_$(elixir_name).jl")
     try
@@ -80,11 +77,31 @@ macro test_trixilw_include_run(mesh_name, elixir_name, args...)
     end
 end
 
-# TODO - Test if everything below can be replaced with this macro
-macro test_trixilw_include(mesh_name, elixir_name, args...)
-    full_test_name, sol, analysis_callback = @test_trixilw_include_run(mesh_name, elixir_name, args...)
+# TODO - Test if everything below can be replaced with this function and macro
+macro test_trixilw_elixir_run(mesh_name, elixir_name, args...)
+    full_test_name = "$(mesh_name)_$(elixir_name)"
+    full_elixir_name = joinpath(examples_dir_trixilw(), mesh_name, "elixir_$(elixir_name).jl")
+    try
+        trixi_include(@__MODULE__, full_elixir_name,
+        tspan = (0.0, 0.01), initial_refinement_level = 2)
+    catch
+    finally
+        trixi_include(@__MODULE__, full_elixir_name,
+        tspan = (0.0, 0.01), initial_refinement_level = 2)
+        trixi_include(@__MODULE__, full_elixir_name,
+        tspan = (0.0, 0.01), initial_refinement_level = 2)
+
+        return full_test_name, sol, analysis_callback
+    end
+end
+
+macro test_trixilw_elixir(mesh_name, elixir_name, args...)
+    full_test_name, sol, analysis_callback = test_trixilw_elixir_run(mesh_name, elixir_name, args...)
+    tol = get_kwarg(args, :tol, 1e-14)
+    overwrite_errors = get_kwarg(args, :overwrite_errors, to_overwrite_errors())
     @testset "$full_test_name" begin
-        compare_errors_txt(sol, analysis_callback, full_test_name)
+        compare_errors_txt(sol, analysis_callback, full_test_name, tol = tol,
+            overwrite_errors = overwrite_errors)
     end
 end
 
