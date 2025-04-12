@@ -112,6 +112,12 @@ full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
 end
 
 full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
+                                                               "euler_density_wave_enzyme")
+@testset "$full_test_name" begin
+    compare_errors_txt(sol, analysis_callback, full_test_name)
+end
+
+full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
                                                                "euler_double_mach_reflection_square")
 @testset "$full_test_name" begin
     compare_errors_txt(sol, analysis_callback, full_test_name)
