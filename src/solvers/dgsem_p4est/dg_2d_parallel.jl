@@ -1,4 +1,5 @@
-using Trixi: indices2direction, index_to_start_step_2d, eachmpiinterface, eachnode, get_normal_direction,
+using Trixi: indices2direction, index_to_start_step_2d, eachmpiinterface, eachnode,
+             get_normal_direction,
              eachvariable, ParallelP4estMesh, get_surface_node_vars
 
 import Trixi: prolong2mpiinterfaces!, calc_mpi_interface_flux!
@@ -42,8 +43,9 @@ function prolong2mpiinterfaces!(cache, u,
             # Get the normal direction on the local element. The above `local_indices`
             # will take care of giving us the outward unit normal. The main point is that
             # this is the normal_direction used in `calc_mpi_interface_flux!` function.
-            normal_direction = get_normal_direction(local_direction, contravariant_vectors,
-            i_element, j_element, local_element)
+            normal_direction = get_normal_direction(local_direction,
+                                                    contravariant_vectors,
+                                                    i_element, j_element, local_element)
             f = get_flux_vars(F, equations, dg, i_element, j_element, local_element)
 
             # The flux should be in the same normal direction when the surface flux function is
@@ -156,9 +158,11 @@ end
                                        interface_index)
 
     if local_side == 1
-        flux_ = surface_flux(F_ll, F_rr, u_ll, u_rr, U_ll, U_rr, normal_direction, equations)
+        flux_ = surface_flux(F_ll, F_rr, u_ll, u_rr, U_ll, U_rr, normal_direction,
+                             equations)
     else # local_side == 2
-        flux_ = -surface_flux(F_ll, F_rr, u_ll, u_rr, U_ll, U_rr, -normal_direction, equations)
+        flux_ = -surface_flux(F_ll, F_rr, u_ll, u_rr, U_ll, U_rr, -normal_direction,
+                              equations)
     end
 
     for v in eachvariable(equations)

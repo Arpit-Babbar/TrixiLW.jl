@@ -21,7 +21,8 @@ function create_radial_cache()
     return cache
 end
 
-function (radial_indicator::RadialIndicator)(u::AbstractArray, mesh, equations, dg::DGSEM, cache;
+function (radial_indicator::RadialIndicator)(u::AbstractArray, mesh, equations, dg::DGSEM,
+                                             cache;
                                              kwargs...)
     @unpack alpha = radial_indicator.cache
     @unpack radius, center = radial_indicator

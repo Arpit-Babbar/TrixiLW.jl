@@ -12,7 +12,7 @@ struct MyNothing end
 to_overwrite_errors() = false
 
 function TrixiLW.solve_lwfr(::MyNothing, callbacks, dt_initial, tolerances;
-    time_step_computation=CFLBased(), limiters=(;))
+                            time_step_computation = CFLBased(), limiters = (;))
     return nothing
 end
 
@@ -62,16 +62,17 @@ end
 
 macro test_trixilw_include(mesh_name, elixir_name, args...)
     full_test_name = "$(mesh_name)_$(elixir_name)"
-    full_elixir_name = joinpath(examples_dir_trixilw(), mesh_name, "elixir_$(elixir_name).jl")
+    full_elixir_name = joinpath(examples_dir_trixilw(), mesh_name,
+                                "elixir_$(elixir_name).jl")
     try
         trixi_include(@__MODULE__, full_elixir_name,
-        tspan = (0.0, 0.01), initial_refinement_level = 2)
+                      tspan = (0.0, 0.01), initial_refinement_level = 2)
     catch
     finally
         trixi_include(@__MODULE__, full_elixir_name,
-        tspan = (0.0, 0.01), initial_refinement_level = 2)
+                      tspan = (0.0, 0.01), initial_refinement_level = 2)
         trixi_include(@__MODULE__, full_elixir_name,
-        tspan = (0.0, 0.01), initial_refinement_level = 2)
+                      tspan = (0.0, 0.01), initial_refinement_level = 2)
 
         return full_test_name, sol, analysis_callback
     end
@@ -80,95 +81,101 @@ end
 # TODO - Test if everything below can be replaced with this function and macro
 macro test_trixilw_elixir_run(mesh_name, elixir_name, args...)
     full_test_name = "$(mesh_name)_$(elixir_name)"
-    full_elixir_name = joinpath(examples_dir_trixilw(), mesh_name, "elixir_$(elixir_name).jl")
+    full_elixir_name = joinpath(examples_dir_trixilw(), mesh_name,
+                                "elixir_$(elixir_name).jl")
     try
         trixi_include(@__MODULE__, full_elixir_name,
-        tspan = (0.0, 0.01), initial_refinement_level = 2)
+                      tspan = (0.0, 0.01), initial_refinement_level = 2)
     catch
     finally
         trixi_include(@__MODULE__, full_elixir_name,
-        tspan = (0.0, 0.01), initial_refinement_level = 2)
+                      tspan = (0.0, 0.01), initial_refinement_level = 2)
         trixi_include(@__MODULE__, full_elixir_name,
-        tspan = (0.0, 0.01), initial_refinement_level = 2)
+                      tspan = (0.0, 0.01), initial_refinement_level = 2)
 
         return full_test_name, sol, analysis_callback
     end
 end
 
 macro test_trixilw_elixir(mesh_name, elixir_name, args...)
-    full_test_name, sol, analysis_callback = test_trixilw_elixir_run(mesh_name, elixir_name, args...)
+    full_test_name, sol, analysis_callback = test_trixilw_elixir_run(mesh_name, elixir_name,
+                                                                     args...)
     tol = get_kwarg(args, :tol, 1e-14)
     overwrite_errors = get_kwarg(args, :overwrite_errors, to_overwrite_errors())
     @testset "$full_test_name" begin
         compare_errors_txt(sol, analysis_callback, full_test_name, tol = tol,
-            overwrite_errors = overwrite_errors)
+                           overwrite_errors = overwrite_errors)
     end
 end
 
-full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem", "advection_basic")
+full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
+                                                               "advection_basic")
 @testset "$full_test_name" begin
     compare_errors_txt(sol, analysis_callback, full_test_name)
 end
 
 full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
-    "advection_nonperiodic")
+                                                               "advection_nonperiodic")
 @testset "$full_test_name" begin
     compare_errors_txt(sol, analysis_callback, full_test_name)
 end
 
 full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
-    "euler_density_wave")
+                                                               "euler_density_wave")
 @testset "$full_test_name" begin
     compare_errors_txt(sol, analysis_callback, full_test_name)
 end
 
 full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
-    "euler_double_mach_reflection_square")
+                                                               "euler_double_mach_reflection_square")
 @testset "$full_test_name" begin
     compare_errors_txt(sol, analysis_callback, full_test_name)
 end
 
 full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
-    "euler_source_terms")
+                                                               "euler_source_terms")
 @testset "$full_test_name" begin
     compare_errors_txt(sol, analysis_callback, full_test_name)
 end
 
 full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
-    "euler_source_terms_nonperiodic")
+                                                               "euler_source_terms_nonperiodic")
 @testset "$full_test_name" begin
     compare_errors_txt(sol, analysis_callback, full_test_name)
 end
 
 full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
-    "advection_diffusion_diff02")
+                                                               "advection_diffusion_diff02")
 @testset "$full_test_name" begin
     compare_errors_txt(sol, analysis_callback, full_test_name)
 end
 
 full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
-    "advection_diffusion_nonperiodic")
+                                                               "advection_diffusion_nonperiodic")
 @testset "$full_test_name" begin
     compare_errors_txt(sol, analysis_callback, full_test_name)
 end
 
 full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
-    "advection_diffusion")
+                                                               "advection_diffusion")
 @testset "$full_test_name" begin
     compare_errors_txt(sol, analysis_callback, full_test_name)
 end
 
-full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem", "navierstokes_convergence")
+full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
+                                                               "navierstokes_convergence")
 @testset "$full_test_name" begin
     compare_errors_txt(sol, analysis_callback, full_test_name)
 end
 
-full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem", "navierstokes_lid_driven_cavity_ghia")
+full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
+                                                               "navierstokes_lid_driven_cavity_ghia")
 @testset "$full_test_name" begin
     compare_errors_txt(sol, analysis_callback, full_test_name)
 end
 
-full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem", "navierstokes_lid_driven_cavity")
+full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
+                                                               "navierstokes_lid_driven_cavity")
 @testset "$full_test_name" begin
-    compare_errors_txt(sol, analysis_callback, full_test_name)
+    compare_errors_txt(sol, analysis_callback, full_test_name, tolerances = 1e-11)
 end

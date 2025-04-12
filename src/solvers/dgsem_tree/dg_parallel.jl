@@ -8,7 +8,8 @@ using Trixi: MPI
 # Initialize MPI data structures. This works for both the
 # `TreeMesh` and the `P4estMesh` and is dimension-agnostic.
 function init_mpi_data_structures(mpi_neighbor_interfaces, mpi_neighbor_mortars, n_dims,
-                                  nvars, n_nodes, uEltype, time_discretization::AbstractLWTimeDiscretization)
+                                  nvars, n_nodes, uEltype,
+                                  time_discretization::AbstractLWTimeDiscretization)
     lw_data_size_factor = 3 # LW requires thrice the amount of data transfer than RK
     lw_data_size = nvars * lw_data_size_factor * n_nodes^(n_dims - 1)
     n_small_elements = 2^(n_dims - 1)
@@ -16,15 +17,15 @@ function init_mpi_data_structures(mpi_neighbor_interfaces, mpi_neighbor_mortars,
     mpi_recv_buffers = Vector{Vector{uEltype}}(undef, length(mpi_neighbor_interfaces))
     for index in 1:length(mpi_neighbor_interfaces)
         mpi_send_buffers[index] = Vector{uEltype}(undef,
-                                                    length(mpi_neighbor_interfaces[index]) *
-                                                    lw_data_size +
-                                                    length(mpi_neighbor_mortars[index]) *
-                                                    n_small_elements * 2 * lw_data_size)
+                                                  length(mpi_neighbor_interfaces[index]) *
+                                                  lw_data_size +
+                                                  length(mpi_neighbor_mortars[index]) *
+                                                  n_small_elements * 2 * lw_data_size)
         mpi_recv_buffers[index] = Vector{uEltype}(undef,
-                                                    length(mpi_neighbor_interfaces[index]) *
-                                                    lw_data_size +
-                                                    length(mpi_neighbor_mortars[index]) *
-                                                    n_small_elements * 2 * lw_data_size)
+                                                  length(mpi_neighbor_interfaces[index]) *
+                                                  lw_data_size +
+                                                  length(mpi_neighbor_mortars[index]) *
+                                                  n_small_elements * 2 * lw_data_size)
     end
 
     mpi_send_requests = Vector{MPI.Request}(undef, length(mpi_neighbor_interfaces))

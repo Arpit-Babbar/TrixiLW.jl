@@ -2,16 +2,15 @@ import Trixi: ninterfaces
 using StaticArrays
 
 function ninterfaces(mesh::StructuredMesh, dg, cache, ::AbstractLWTimeDiscretization)
-   return 2 # Not to be used
+    return 2 # Not to be used
 end
 
 function ninterfaces(::Union{LW}, cache)
-   return 2 # Not to be used
+    return 2 # Not to be used
 end
 
-
 function nboundaries(mesh::StructuredMesh, dg, cache, ::AbstractLWTimeDiscretization)
-   return 2 # Not to be used
+    return 2 # Not to be used
 end
 
 # function create_element_cache(::Union{StructuredMesh,UnstructuredMesh2D,P4estMesh},
@@ -26,21 +25,21 @@ end
 #    return U, F, Ub, Fb, fn_low
 # end
 
-
 function create_interface_cache(mesh::Union{StructuredMesh{2}}, equations, dg,
-   uEltype, RealT,
-   cache, time_discretization)
-   return nothing
+                                uEltype, RealT,
+                                cache, time_discretization)
+    return nothing
 end
 
 function create_boundary_cache(mesh::Union{StructuredMesh{2}}, equations, dg,
-   uEltype, RealT, cache, outer_cache, time_discretization)
-   MOuter = MArray{Tuple{nvariables(equations)},Float64}
-   outer_cache = alloc_for_threads(MOuter, 2)
-   return (; outer_cache)
+                               uEltype, RealT, cache, outer_cache, time_discretization)
+    MOuter = MArray{Tuple{nvariables(equations)}, Float64}
+    outer_cache = alloc_for_threads(MOuter, 2)
+    return (; outer_cache)
 end
 
-function create_mortar_cache(mesh::Union{StructuredMesh,UnstructuredMesh2D}, equations, dg,
-   uEltype, RealT, cache, time_discretization::AbstractLWTimeDiscretization)
-   return nothing
+function create_mortar_cache(mesh::Union{StructuredMesh, UnstructuredMesh2D}, equations, dg,
+                             uEltype, RealT, cache,
+                             time_discretization::AbstractLWTimeDiscretization)
+    return nothing
 end

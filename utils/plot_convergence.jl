@@ -55,7 +55,8 @@ function set_ticks!(ax, log_sub, ticks_formatter; dim = 2, base_major = 2.0)
     ax.tick_params(axis = "both", which = "minor")
 
     # Configure y-axis tick formatting
-    y_minor = plt.matplotlib.ticker.LogLocator(base=10.0, subs=range(2, 10) * 0.1, numticks=100)
+    y_minor = plt.matplotlib.ticker.LogLocator(base = 10.0, subs = range(2, 10) * 0.1,
+                                               numticks = 100)
     ax.yaxis.set_minor_locator(y_minor)
 
     # Use LogFormatter for y-axis to show labels for very small/large values
@@ -63,16 +64,16 @@ function set_ticks!(ax, log_sub, ticks_formatter; dim = 2, base_major = 2.0)
 end
 
 function add_theo_factors!(ax, ncells, error, degree, i,
-    theo_factor_even, theo_factor_odd, to_label = true)
+                           theo_factor_even, theo_factor_odd, to_label = true)
     if degree isa Int64
         d = degree
     else
         d = parse(Int64, degree)
     end
-    min_y = minimum(error[1:(end-1)])
+    min_y = minimum(error[1:(end - 1)])
     @show error, min_y
-    @show log.(error[1:end-1] ./ error[2:end]) / log(2)
-    xaxis = ncells[(end-1):end]
+    @show log.(error[1:(end - 1)] ./ error[2:end]) / log(2)
+    xaxis = ncells[(end - 1):end]
     slope = d + 1
     @show slope
     if iseven(slope)
@@ -89,25 +90,25 @@ function add_theo_factors!(ax, ncells, error, degree, i,
     else
         label_string = "\$ O(M^{-$(d + 1)})\$"
     end
-    ax.loglog(xaxis, y, label=label_string, linestyle="--",
-        marker=markers[i], c="grey",
-        fillstyle="none")
+    ax.loglog(xaxis, y, label = label_string, linestyle = "--",
+              marker = markers[i], c = "grey",
+              fillstyle = "none")
     # else
     # ax.loglog(xaxis,y, linestyle = "--", c = "grey")
     # end
 end
 
 function plot_python_ndofs_vs_y(files::Vector{String}, labels::Vector{String},
-    degrees::Vector{Int};
-    saveto,
-    theo_factor_even=0.8, theo_factor_odd=0.8,
-    title=nothing, log_sub="2.5",
-    error_norm="l2",
-    ticks_formatter=format_with_powers,
-    figsize=(6.4, 4.8),
-    base = 2.0)
+                                degrees::Vector{Int};
+                                saveto,
+                                theo_factor_even = 0.8, theo_factor_odd = 0.8,
+                                title = nothing, log_sub = "2.5",
+                                error_norm = "l2",
+                                ticks_formatter = format_with_powers,
+                                figsize = (6.4, 4.8),
+                                base = 2.0)
     # @assert error_type in ["l2","L2"] "Only L2 error for now"
-    fig_error, ax_error = plt.subplots(figsize=figsize)
+    fig_error, ax_error = plt.subplots(figsize = figsize)
     colors = ["orange", "royalblue", "green", "m", "c", "y", "k"]
     markers = ["D", "o", "*", "^"]
     @assert length(files) == length(labels)
@@ -118,14 +119,14 @@ function plot_python_ndofs_vs_y(files::Vector{String}, labels::Vector{String},
         data = readdlm(files[i])
         marker = markers[i]
         # TODO - This sqrt shows really bad foresight!
-        ax_error.loglog(sqrt.(data[:, 1]), data[:, 2], marker=marker, c=colors[1],
-            mec="k", fillstyle="none", label="\$ \\rho \$ ")
-        ax_error.loglog(sqrt.(data[:, 1]), data[:, 3], marker=marker, c=colors[2],
-            mec="k", fillstyle="none", label="\$ \\rho v_1 \$ ")
-        ax_error.loglog(sqrt.(data[:, 1]), data[:, 4], marker=marker, c=colors[3],
-            mec="k", fillstyle="none", label="\$ \\rho v_2 \$ ")
-        ax_error.loglog(sqrt.(data[:, 1]), data[:, 5], marker=marker, c=colors[4],
-            mec="k", fillstyle="none", label="\$ E \$ ")
+        ax_error.loglog(sqrt.(data[:, 1]), data[:, 2], marker = marker, c = colors[1],
+                        mec = "k", fillstyle = "none", label = "\$ \\rho \$ ")
+        ax_error.loglog(sqrt.(data[:, 1]), data[:, 3], marker = marker, c = colors[2],
+                        mec = "k", fillstyle = "none", label = "\$ \\rho v_1 \$ ")
+        ax_error.loglog(sqrt.(data[:, 1]), data[:, 4], marker = marker, c = colors[3],
+                        mec = "k", fillstyle = "none", label = "\$ \\rho v_2 \$ ")
+        ax_error.loglog(sqrt.(data[:, 1]), data[:, 5], marker = marker, c = colors[4],
+                        mec = "k", fillstyle = "none", label = "\$ E \$ ")
     end
 
     for i in eachindex(degrees) # Assume degrees are not repeated
@@ -133,20 +134,20 @@ function plot_python_ndofs_vs_y(files::Vector{String}, labels::Vector{String},
         degree = degrees[i]
         @show degree
         add_theo_factors!(ax_error, sqrt.(data[:, 1]), data[:, 2], degree, i,
-            theo_factor_even, theo_factor_odd)
+                          theo_factor_even, theo_factor_odd)
         add_theo_factors!(ax_error, sqrt.(data[:, 1]), data[:, 3], degree, i,
-            theo_factor_even, theo_factor_odd, false)
+                          theo_factor_even, theo_factor_odd, false)
         add_theo_factors!(ax_error, sqrt.(data[:, 1]), data[:, 4], degree, i,
-            theo_factor_even, theo_factor_odd, false)
+                          theo_factor_even, theo_factor_odd, false)
         add_theo_factors!(ax_error, sqrt.(data[:, 1]), data[:, 5], degree, i,
-            theo_factor_even, theo_factor_odd, false)
+                          theo_factor_even, theo_factor_odd, false)
     end
     ax_error.set_xlabel("Number of elements")
     ax_error.set_ylabel(error_label(error_norm))
 
-    set_ticks!(ax_error, log_sub, ticks_formatter; dim=2, base_major = base)
+    set_ticks!(ax_error, log_sub, ticks_formatter; dim = 2, base_major = base)
 
-    ax_error.grid(true, linestyle="--")
+    ax_error.grid(true, linestyle = "--")
 
     if title !== nothing
         ax_error.set_title(title)
@@ -172,15 +173,16 @@ files = ["utils/isentropic_3.txt"]
 labels = [""]
 degrees = [3]
 
-plot_python_ndofs_vs_y(files, labels, degrees, saveto = "convergence_isentropic", log_sub = "2.0",
+plot_python_ndofs_vs_y(files, labels, degrees, saveto = "convergence_isentropic",
+                       log_sub = "2.0",
                        figsize = (6.0, 6.5), title = "Degree \$ N = 3 \$")
-
 
 files = ["results/couette_conv_3.txt"]
 labels = [""]
 degrees = [3]
 
-plot_python_ndofs_vs_y(files, labels, degrees, saveto = "convergence_couette", log_sub = "2.0",
+plot_python_ndofs_vs_y(files, labels, degrees, saveto = "convergence_couette",
+                       log_sub = "2.0",
                        figsize = (6.0, 6.5), title = "Degree \$ N = 3 \$")
 
 files = ["results/couette_conv_3.txt", "results/couette_conv_p4est_3.txt"]
@@ -189,7 +191,6 @@ degrees = [3, 3]
 
 plot_python_ndofs_vs_y(files, labels, degrees, saveto = "convergence_NS", log_sub = "2.0",
                        figsize = (6.0, 6.5), title = "Degree \$ N = 3 \$")
-
 
 files = ["results/couette_conv_p4est_3.txt"]
 labels = ["\$ N = 3\$"]
