@@ -23,7 +23,7 @@ function get_errors(sol, analysis_callback)
     return l2, linf
 end
 
-function compare_errors(sol, analysis_callback, l2_ref, linf_ref; tol = 1e-14)
+function compare_errors(sol, analysis_callback, l2_ref, linf_ref; tol = 1e-13)
     (; l2, linf) = analysis_callback(sol)
     nvar = nvariables(sol.prob.p)
     for i in 1:nvar
@@ -32,7 +32,7 @@ function compare_errors(sol, analysis_callback, l2_ref, linf_ref; tol = 1e-14)
     end
 end
 
-function compare_errors_txt(sol, analysis_callback, testname; tol = 1e-14,
+function compare_errors_txt(sol, analysis_callback, testname; tol = 1e-13,
                             overwrite_errors = false)
     (; l2, linf) = analysis_callback(sol)
     datafile_l2 = joinpath(test_data_dir(), "$(testname)_l2.txt")

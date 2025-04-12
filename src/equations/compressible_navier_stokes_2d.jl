@@ -21,14 +21,16 @@ struct BoundaryConditionsNavierStokesInflow{F}
    boundary_value_function::F
 end
 
-gradient_variable_transformation(::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative}) = cons2cons
+gradient_variable_transformation(
+    ::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative}) = cons2cons
 
 pressure(u, equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative}
 ) = pressure(u, equations.equations_hyperbolic)
 
 @inline cons2cons(u, equations::CompressibleNavierStokesDiffusion2D) = u
 
-@inline function convert_transformed_to_primitive(u_transformed, equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative})
+@inline function convert_transformed_to_primitive(u_transformed,
+    equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative})
    return cons2prim(u_transformed, equations)
 end
 
@@ -40,7 +42,8 @@ end
    # back.
    # We can fix this if we directly compute v1, v2, T from the entropy variables
    # w = (ρ, ρ*v1, ρ*v2, ρ*T/(gamma-1) + )
-   u = cons2prim(w, equations) # calls a "modified" entropy2cons defined for CompressibleNavierStokesDiffusion2D
+   u = cons2prim(w, equations) # calls a "modified" entropy2cons defined for
+                               # CompressibleNavierStokesDiffusion2D
    ρ, v1, v2, T = u
 
    W = gradient_cons_vars #= W = (ρ_x,
@@ -86,14 +89,17 @@ end
    equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
    ::AbstractLWTimeDiscretization, scaling_factor = 1)
    # rho, v1, v2, _ = u_inner
-   normal_heat_flux = boundary_condition.boundary_condition_heat_flux.boundary_value_normal_flux_function(x, t, equations)
+   (; boundary_condition_heat_flux) = boundary_condition
+   normal_heat_flux = boundary_condition_heat_flux.boundary_value_normal_flux_function(
+                      x, t, equations)
    v1, v2 = boundary_condition.boundary_condition_velocity.boundary_value_function(x, t, equations)
    _, tau_1n, tau_2n, _ = flux_inner # extract fluxes for 2nd and 3rd equations
    normal_energy_flux = v1 * tau_1n + v2 * tau_2n + normal_heat_flux
    return SVector(flux_inner[1], flux_inner[2], flux_inner[3], normal_energy_flux)
 end
 
-@inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:NoSlip,<:Isothermal})(flux_inner, u_inner, normal::AbstractVector,
+@inline function (boundary_condition::BoundaryConditionNavierStokesWall{<:NoSlip,<:Isothermal})(
+    flux_inner, u_inner, normal::AbstractVector,
    x, t, operator_type::Gradient,
    equations::CompressibleNavierStokesDiffusion2D{GradientVariablesConservative},
    scaling_factor = 1)
@@ -252,20 +258,4 @@ function max_dt(u, t, mesh::Union{TreeMesh{2}, P4estMesh{2}},
    dt = 1.0 / ((max_lam_a + max_lam_v) * (dim * (2.0 * N + 1.0)))
 
    return dt
-
-
-   # CGSEM style
-   # mu = equations_parabolic.mu # dynamic viscosity
-   # dim = 2
-   # N = polydeg(dg)
-   # for element in eachelement(dg, cache)
-   #   for j in eachnode(dg), i in eachnode(dg)
-   #     rho = u[1, i, j, element]
-   #     nu = mu / rho # kinematic viscosity
-   #     inv_jacobian = cache.elements.inverse_jacobian[element]
-   #     max_diffusion = max(max_diffusion, inv_jacobian^2 * nu)
-   #   end
-   # end
-
-   # return 1/(N^4 * max_diffusion)
 end
