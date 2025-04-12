@@ -24,23 +24,31 @@ using Enzyme
 @muladd begin
 #! format: noindent
 
-@inline @inbounds df(x, dx, orientation, equations) = autodiff(
-                                                               Enzyme.set_abi(Forward, Enzyme.InlineABI),
-                                                               flux, DuplicatedNoNeed(x, dx),
+@inline @inbounds df(x, dx, orientation, equations) = autodiff(Enzyme.set_abi(Forward,
+                                                                              Enzyme.InlineABI),
+                                                               flux,
+                                                               DuplicatedNoNeed(x, dx),
                                                                Const(orientation),
                                                                Const(equations))[1]
 
-@inline @inbounds ddf(x, dx, ddx, orientation, equations) = autodiff(
-   Enzyme.set_abi(Forward, Enzyme.InlineABI),
-   df, DuplicatedNoNeed(x, dx), DuplicatedNoNeed(dx, ddx), Const(orientation), Const(equations))[1]
+@inline @inbounds ddf(x, dx, ddx, orientation, equations) = autodiff(Enzyme.set_abi(Forward,
+                                                                                    Enzyme.InlineABI),
+                                                                     df,
+                                                                     DuplicatedNoNeed(x,
+                                                                                      dx),
+                                                                     DuplicatedNoNeed(dx,
+                                                                                      ddx),
+                                                                     Const(orientation),
+                                                                     Const(equations))[1]
 
-
-@inline @inbounds function compute_first_derivative_enzyme_2d(u, du, orientation, equations)
+@inline @inbounds function compute_first_derivative_enzyme_2d(u, du, orientation,
+                                                              equations)
     return df(u, du, orientation, equations)
 end
 
-@inline @inbounds function compute_second_derivative_enzyme_2d(u, du, ddu, orientation, equations)
-   return ddf(u, du, ddu, orientation, equations)
+@inline @inbounds function compute_second_derivative_enzyme_2d(u, du, ddu, orientation,
+                                                               equations)
+    return ddf(u, du, ddu, orientation, equations)
 end
 
 # @inline @inbounds function compute_first_derivative_taylor_diff(u, du, orientation, equations)
@@ -1021,8 +1029,10 @@ end
         utt_node = get_node_vars(utt, equations, dg, i, j)
         multiply_add_to_node_vars!(U, 1.0 / 6.0, utt_node, equations, dg, i, j)
 
-        ftt = compute_second_derivative_enzyme_2d(u_node, ut_node, utt_node, 1, equations)
-        gtt = compute_second_derivative_enzyme_2d(u_node, ut_node, utt_node, 2, equations)
+        ftt = compute_second_derivative_enzyme_2d(u_node, ut_node, utt_node, 1,
+                                                  equations)
+        gtt = compute_second_derivative_enzyme_2d(u_node, ut_node, utt_node, 2,
+                                                  equations)
 
         multiply_add_to_node_vars!(F, 1.0 / 6.0, ftt, equations, dg, i, j)
         multiply_add_to_node_vars!(G, 1.0 / 6.0, gtt, equations, dg, i, j)
