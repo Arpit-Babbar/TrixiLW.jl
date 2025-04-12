@@ -1,5 +1,5 @@
 using Downloads: download
-using Trixi
+using TrixiLW.Trixi
 using TrixiLW
 
 ###############################################################################

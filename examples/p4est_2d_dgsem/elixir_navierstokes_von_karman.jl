@@ -1,7 +1,7 @@
 using Downloads: download
 using TrixiLW
 using TrixiLW: AnalysisSurfaceIntegral, AnalysisSurfaceIntegralViscous, slip_wall_approximate_trixi
-using Trixi
+using TrixiLW.Trixi
 using LinearAlgebra
 using Plots
 

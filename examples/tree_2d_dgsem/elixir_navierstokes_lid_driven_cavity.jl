@@ -1,5 +1,4 @@
-using OrdinaryDiffEq
-using Trixi
+using TrixiLW.Trixi
 using TrixiLW
 
 ###############################################################################

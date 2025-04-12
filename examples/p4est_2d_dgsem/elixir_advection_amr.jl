@@ -2,7 +2,7 @@
 # to verify the StructuredMesh implementation against TreeMesh
 
 using TrixiLW
-using Trixi
+using TrixiLW.Trixi
 
 ###############################################################################
 # semidiscretization of the linear advection equation

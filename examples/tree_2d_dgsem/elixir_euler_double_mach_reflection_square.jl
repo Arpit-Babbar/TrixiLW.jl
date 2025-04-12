@@ -1,7 +1,6 @@
 using Downloads: download
 using TrixiLW
-using Trixi
-using Plots
+using TrixiLW.Trixi
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations
@@ -201,7 +200,7 @@ mesh = TreeMesh(coordinates_min, coordinates_max,
                 n_cells_max=30_000,
                 periodicity = (false, false)) # set maximum capacity of tree data structure
 
-cfl_number = 1.0
+cfl_number = 0.8
 semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver),
   equations, initial_condition, solver, boundary_conditions=boundary_conditions)
 
@@ -225,13 +224,14 @@ save_solution = SaveSolutionCallback(interval=100,
                                      save_final_solution=true,
                                      solution_variables=cons2prim)
 
-visualization_callback = VisualizationCallback(interval=100,
-   save_initial_solution=true,
-   save_final_solution=true,
-   solution_variables=cons2prim)
+# visualization_callback = VisualizationCallback(interval=100,
+#    save_initial_solution=true,
+#    save_final_solution=true,
+#    solution_variables=cons2prim)
 
 callbacks = (analysis_callback, alive_callback, save_solution,
-              visualization_callback)
+              # visualization_callback
+              )
 
 # positivity limiter necessary for this example with strong shocks
 stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds=(5.0e-6, 5.0e-6),
@@ -250,5 +250,3 @@ sol = TrixiLW.solve_lwfr(lw_update, callbacks, dt_initial, tolerances,
   limiters=(; stage_limiter!)
 );
 summary_callback() # print the timer summary
-
-# L2 error:       6.55686570e-01   5.67598614e+00   3.27902890e+00   5.56696504e+01

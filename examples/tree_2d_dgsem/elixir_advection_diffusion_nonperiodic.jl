@@ -1,4 +1,4 @@
-using Trixi
+using TrixiLW.Trixi
 using TrixiLW
 
 ###############################################################################
@@ -40,14 +40,12 @@ function initial_condition_eriksson_johnson(x, t, equations)
   return SVector{1}(u)
 end
 
-initial_condition = initial_condition_eriksson_johnson
-
-boundary_conditions = (; x_neg = BoundaryConditionDirichlet(initial_condition),
-                         y_neg = BoundaryConditionDirichlet(initial_condition),
-                         y_pos = BoundaryConditionDirichlet(initial_condition),
+boundary_conditions = (; x_neg = BoundaryConditionDirichlet(initial_condition_eriksson_johnson),
+                         y_neg = BoundaryConditionDirichlet(initial_condition_eriksson_johnson),
+                         y_pos = BoundaryConditionDirichlet(initial_condition_eriksson_johnson),
                          x_pos = boundary_condition_do_nothing)
 
-boundary_conditions_parabolic = BoundaryConditionDirichlet(initial_condition)
+boundary_conditions_parabolic = BoundaryConditionDirichlet(initial_condition_eriksson_johnson)
 
 cfl_number = 0.98
 
@@ -55,7 +53,7 @@ cfl_number = 0.98
 semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
                                                   TrixiLW.get_time_discretization(solver),
                                                   (equations, equations_parabolic),
-                                                  initial_condition, solver;
+                                                  initial_condition_eriksson_johnson, solver;
                                                   boundary_conditions=(boundary_conditions,
                                                                         boundary_conditions_parabolic),
                                                   initial_caches = ((;cfl_number, dt = zeros(1)),(;cfl_number)))

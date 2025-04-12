@@ -1,4 +1,4 @@
-using Trixi
+using TrixiLW.Trixi
 using TrixiLW
 
 ###############################################################################
@@ -9,7 +9,7 @@ equations = LinearScalarAdvectionEquation2D(advection_velocity)
 diffusivity() = 5e-2
 equations_parabolic = LaplaceDiffusion2D(diffusivity(), equations)
 
-time_discretization = TrixiLW.MDRK()
+time_discretization = TrixiLW.LW()
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
 solver = DGSEM(polydeg=4, surface_flux=flux_lax_friedrichs,
                volume_integral = TrixiLW.VolumeIntegralFR(time_discretization))
@@ -38,7 +38,7 @@ function initial_condition_diffusive_convergence_test(x, t, equation::LinearScal
   return SVector(scalar)
 end
 
-initial_condition = initial_condition_diffusive_convergence_test
+initial_condition_diffusive_convergence_test
 
 # define periodic boundary conditions everywhere
 boundary_conditions = boundary_condition_periodic
@@ -50,7 +50,7 @@ cfl_number = 0.1
 semi = TrixiLW.SemidiscretizationHyperbolicParabolic(mesh,
                                                 get_time_discretization(solver),
                                                 (equations, equations_parabolic),
-                                                initial_condition, solver,
+                                                initial_condition_diffusive_convergence_test, solver,
                                                 boundary_conditions=(boundary_conditions,
                                                                      boundary_conditions_parabolic),
                                                 initial_caches = ((;cfl_number, dt = zeros(1)),(;cfl_number)))

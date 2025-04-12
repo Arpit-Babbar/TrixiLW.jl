@@ -18,14 +18,14 @@ using Trixi: TreeMesh, P4estMesh, BoundaryConditionPeriodic,
 using MuladdMacro
 using LoopVectorization: @turbo
 
-using TaylorDiff
+# using TaylorDiff
 using Enzyme
 
 @muladd begin
 #! format: noindent
 
    @inline @inbounds df(x, dx, orientation, equations) = autodiff(
-      Enzyme.set_abi(Forward, Enzyme.InlineABI),
+      # Enzyme.set_abi(Forward, Enzyme.InlineABI),
       flux, Duplicated(x, dx),
       Const(orientation), Const(equations))[1]
 
@@ -34,32 +34,32 @@ using Enzyme
    end
 
 
-   @inline @inbounds function compute_first_derivative_taylor_diff(u, du, orientation, equations)
-      return derivative(@inline(u -> flux(u, orientation, equations)), u, du, Val(1))
-   end
+   # @inline @inbounds function compute_first_derivative_taylor_diff(u, du, orientation, equations)
+   #    return derivative(@inline(u -> flux(u, orientation, equations)), u, du, Val(1))
+   # end
 
-   @inline @inbounds function compute_second_derivative_taylor_diff(u, du, ddu, orientation, equations)
-      u_bundle = map((x, dx, ddx) -> TaylorScalar(x, (dx, 0.5*ddx)), u, du, ddu)
-      f_bundle = flux(u_bundle, orientation, equations)
-      TaylorDiff.extract_derivative(f_bundle, Val(2))
-   end
+   # @inline @inbounds function compute_second_derivative_taylor_diff(u, du, ddu, orientation, equations)
+   #    u_bundle = map((x, dx, ddx) -> TaylorScalar(x, (dx, 0.5*ddx)), u, du, ddu)
+   #    f_bundle = flux(u_bundle, orientation, equations)
+   #    TaylorDiff.extract_derivative(f_bundle, Val(2))
+   # end
 
-   @inline @inbounds function compute_third_derivative_taylor_diff(u, du, ddu, dddu, orientation,
-                                                                equations)
-      u_bundle = map((x, dx, ddx, dddx) -> TaylorScalar(x, (dx, 0.5*ddx, dddx / 6.0)), u, du,
-                      ddu, dddu)
-      f_bundle = flux(u_bundle, orientation, equations)
-      TaylorDiff.extract_derivative(f_bundle, Val(3))
-   end
+   # @inline @inbounds function compute_third_derivative_taylor_diff(u, du, ddu, dddu, orientation,
+   #                                                              equations)
+   #    u_bundle = map((x, dx, ddx, dddx) -> TaylorScalar(x, (dx, 0.5*ddx, dddx / 6.0)), u, du,
+   #                    ddu, dddu)
+   #    f_bundle = flux(u_bundle, orientation, equations)
+   #    TaylorDiff.extract_derivative(f_bundle, Val(3))
+   # end
 
-   @inline @inbounds function compute_fourth_derivative_taylor_diff(u, du, ddu, dddu, ddddu,
-      equations, orientation)
-      u_bundle = map((x, dx, ddx, dddx, ddddx) -> TaylorScalar(x, (dx, 0.5*ddx, dddx / 6.0,
-                                                                   ddddx / 24.0)),
-                     u, du, ddu, dddu, ddddu)
-      f_bundle = flux(u_bundle, equations, orientation)
-      TaylorDiff.extract_derivative(f_bundle, Val(4))
-   end
+   # @inline @inbounds function compute_fourth_derivative_taylor_diff(u, du, ddu, dddu, ddddu,
+   #    equations, orientation)
+   #    u_bundle = map((x, dx, ddx, dddx, ddddx) -> TaylorScalar(x, (dx, 0.5*ddx, dddx / 6.0,
+   #                                                                 ddddx / 24.0)),
+   #                   u, du, ddu, dddu, ddddu)
+   #    f_bundle = flux(u_bundle, equations, orientation)
+   #    TaylorDiff.extract_derivative(f_bundle, Val(4))
+   # end
 
    # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
    # Since these FMAs can increase the performance of many numerical algorithms,
@@ -412,7 +412,9 @@ using Enzyme
       t, dt, tolerances,
       element, mesh::TreeMesh{2},
       nonconservative_terms::False, source_terms, equations,
-      dg::DGSEM{<:Any, <:Any, <:Any, VolumeIntegralFR{LW}}, cache, alpha=true)
+      dg::DGSEM{<:Any, <:Any, <:Any,
+      <:Union{VolumeIntegralFR{LW}, VolumeIntegralFRShockCapturing{TrixiLW.LW, <:Any}}},
+      cache, alpha=true)
       # true * [some floating point value] == [exactly the same floating point value]
       # This can (hopefully) be optimized away due to constant propagation.
       @unpack derivative_dhat, derivative_matrix = dg.basis
@@ -537,7 +539,10 @@ using Enzyme
       t, dt, tolerances,
       element, mesh::TreeMesh{2},
       nonconservative_terms::False, source_terms, equations,
-      dg::DGSEM{<:Any, <:Any, <:Any, VolumeIntegralFR{LWADEnzyme}}, cache, alpha=true)
+      dg::DGSEM{<:Any, <:Any, <:Any,
+      <:Union{VolumeIntegralFR{LWADEnzyme}, VolumeIntegralFRShockCapturing{
+         TrixiLW.LWADEnzyme, <:Any}}},
+      cache, alpha=true)
       # true * [some floating point value] == [exactly the same floating point value]
       # This can (hopefully) be optimized away due to constant propagation.
       @unpack derivative_dhat, derivative_matrix = dg.basis
@@ -656,7 +661,8 @@ using Enzyme
       t, dt, tolerances,
       element, mesh::TreeMesh{2},
       nonconservative_terms::False, source_terms, equations,
-      dg::DGSEM{<:Any, <:Any, <:Any, VolumeIntegralFR{LW}}, cache, alpha=true)
+      dg::DGSEM{<:Any, <:Any, <:Any,
+      <:Union{VolumeIntegralFR{LW}, VolumeIntegralFRShockCapturing{TrixiLW.LW, <:Any}}}, cache, alpha=true)
       # true * [some floating point value] == [exactly the same floating point value]
       # This can (hopefully) be optimized away due to constant propagation.
       @unpack derivative_dhat, derivative_matrix = dg.basis
@@ -835,7 +841,8 @@ using Enzyme
       t, dt, tolerances,
       element, mesh::TreeMesh{2},
       nonconservative_terms::False, source_terms, equations,
-      dg::DGSEM{<:Any, <:Any, <:Any, VolumeIntegralFR{LW}}, cache, alpha=true)
+      dg::DGSEM{<:Any, <:Any, <:Any,
+      <:Union{VolumeIntegralFR{LW}, VolumeIntegralFRShockCapturing{TrixiLW.LW, <:Any}}}, cache, alpha=true)
       # true * [some floating point value] == [exactly the same floating point value]
       # This can (hopefully) be optimized away due to constant propagation.
       @unpack derivative_dhat, derivative_matrix = dg.basis
@@ -1080,7 +1087,9 @@ using Enzyme
       element, mesh::TreeMesh{2},
       nonconservative_terms::False,
       source_terms, equations,
-      dg::DGSEM{<:Any, <:Any, <:Any, VolumeIntegralFR{LW}}, cache, alpha=true)
+      dg::DGSEM{<:Any, <:Any, <:Any,
+      <:Union{VolumeIntegralFR{LW}, VolumeIntegralFRShockCapturing{TrixiLW.LW, <:Any}}}, cache,
+      alpha=true)
       # true * [some floating point value] == [exactly the same floating point value]
       # This can (hopefully) be optimized away due to constant propagation.
       @unpack derivative_dhat, derivative_matrix = dg.basis

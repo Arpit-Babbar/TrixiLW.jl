@@ -14,7 +14,7 @@
 # Keywords: supersonic flow, shock capturing, AMR, unstructured curved mesh, positivity preservation, compressible Euler, 2D
 
 using Downloads: download
-using Trixi
+using TrixiLW.Trixi
 using TrixiLW
 using LinearAlgebra
 using TrixiLW: lift_force, drag_force

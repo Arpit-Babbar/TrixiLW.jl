@@ -1,5 +1,4 @@
-using Trixi, TrixiLW
-using Plots
+using TrixiLW.Trixi, TrixiLW
 
 ###############################################################################
 # semidiscretization of the ideal compressible Navier-Stokes equations

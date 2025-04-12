@@ -1,7 +1,7 @@
 
 using Downloads: download
 using TrixiLW
-using Trixi
+using TrixiLW.Trixi
 using LinearAlgebra
 
 ###############################################################################

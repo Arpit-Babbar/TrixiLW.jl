@@ -1,5 +1,5 @@
 using OrdinaryDiffEq
-using Trixi
+using TrixiLW.Trixi
 
 ###############################################################################
 # semidiscretization of the linear advection equation

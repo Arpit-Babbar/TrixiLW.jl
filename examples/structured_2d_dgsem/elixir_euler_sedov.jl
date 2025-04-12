@@ -1,5 +1,5 @@
 using TrixiLW
-using Trixi
+using TrixiLW.Trixi
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations

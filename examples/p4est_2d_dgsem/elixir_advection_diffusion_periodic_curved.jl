@@ -1,4 +1,4 @@
-using Trixi, TrixiLW
+using TrixiLW.Trixi, TrixiLW
 using Plots
 
 ###############################################################################

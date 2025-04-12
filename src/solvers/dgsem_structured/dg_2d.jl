@@ -968,7 +968,7 @@ end
 function lw_volume_kernel_1!(du, u, t, dt, tolerances,
    element, mesh::Union{StructuredMesh{2},UnstructuredMesh2D,P4estMesh{2}},
    nonconservative_terms::False, source_terms, equations,
-   dg::DGSEM, cache, alpha=true)
+   dg::DGSEM{<:Any, <:Any, <:Any, VolumeIntegralFR{LW}}, cache, alpha=true)
    # true * [some floating point value] == [exactly the same floating point value]
    # This can (hopefully) be optimized away due to constant propagation.
    @unpack derivative_dhat, derivative_matrix = dg.basis
@@ -1149,7 +1149,7 @@ end
 function lw_volume_kernel_2!(du, u, t, dt, tolerances,
    element, mesh::Union{StructuredMesh{2},UnstructuredMesh2D,P4estMesh{2}},
    nonconservative_terms::False, source_terms, equations,
-   dg::DGSEM, cache, alpha=true)
+   dg::DGSEM{<:Any, <:Any, <:Any, VolumeIntegralFR{LW}}, cache, alpha=true)
    # true * [some floating point value] == [exactly the same floating point value]
    # This can (hopefully) be optimized away due to constant propagation.
    @unpack derivative_dhat, derivative_matrix = dg.basis
@@ -1379,7 +1379,7 @@ end
 function lw_volume_kernel_3!(du, u, t, dt, tolerances,
    element, mesh::Union{StructuredMesh{2},UnstructuredMesh2D,P4estMesh{2}},
    nonconservative_terms::False, source_terms, equations,
-   dg::DGSEM, cache, alpha=true)
+   dg::DGSEM{<:Any, <:Any, <:Any, VolumeIntegralFR{LW}}, cache, alpha=true)
    # true * [some floating point value] == [exactly the same floating point value]
    # This can (hopefully) be optimized away due to constant propagation.
    @unpack derivative_dhat, derivative_matrix = dg.basis
@@ -1686,7 +1686,9 @@ end
 
 function lw_volume_kernel_4!(du, u, t, dt, tolerances,
    element, mesh::Union{StructuredMesh{2},UnstructuredMesh2D,P4estMesh{2}},
-   nonconservative_terms::False, source_terms, equations, dg::DGSEM, cache, alpha=true)
+   nonconservative_terms::False, source_terms, equations, dg::DGSEM{<:Any, <:Any, <:Any,
+   Union{VolumeIntegralFR{LW}, VolumeIntegralFRShockCapturing{TrixiLW.LW, <:Any}}}, cache,
+   alpha=true)
 
    # true * [some floating point value] == [exactly the same floating point value]
    # This can (hopefully) be optimized away due to constant propagation.

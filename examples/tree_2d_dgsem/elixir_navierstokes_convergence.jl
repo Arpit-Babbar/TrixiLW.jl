@@ -1,5 +1,5 @@
 using TrixiLW
-using Trixi
+using TrixiLW.Trixi
 
 ###############################################################################
 # semidiscretization of the ideal compressible Navier-Stokes equations
@@ -13,7 +13,7 @@ equations_parabolic = TrixiLW.CompressibleNavierStokesDiffusion2D(equations, mu=
 
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
 solver = TrixiLW.DGSEM(polydeg=3, surface_flux=flux_lax_friedrichs,
-  volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.MDRK()))
+  volume_integral=TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
 
 coordinates_min = (-1.0, -1.0) # minimum coordinates (min(x), min(y))
 coordinates_max = (1.0, 1.0) # maximum coordinates (max(x), max(y))
