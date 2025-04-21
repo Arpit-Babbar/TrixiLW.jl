@@ -1,5 +1,5 @@
 using TrixiLW.Trixi, TrixiLW
-using Plots
+# using Plots
 
 ###############################################################################
 # semidiscretization of the linear advection-diffusion equation
@@ -85,7 +85,8 @@ visualization_callback = VisualizationCallback(interval = 100,
 callbacks = (summary_callback,
              analysis_callback,
              alive_callback,
-             visualization_callback);
+            #  visualization_callback
+             );
 
 ###############################################################################
 # run the simulation

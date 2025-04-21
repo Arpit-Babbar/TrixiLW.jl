@@ -2,7 +2,7 @@ using Downloads: download
 using TrixiLW
 using TrixiLW.Trixi
 using LinearAlgebra
-using Plots
+# using Plots
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations

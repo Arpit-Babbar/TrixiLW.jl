@@ -4,7 +4,7 @@ using TrixiLW: AnalysisSurfaceIntegral, AnalysisSurfaceIntegralViscous,
                slip_wall_approximate_trixi
 using TrixiLW.Trixi
 using LinearAlgebra
-using Plots
+# using Plots
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations

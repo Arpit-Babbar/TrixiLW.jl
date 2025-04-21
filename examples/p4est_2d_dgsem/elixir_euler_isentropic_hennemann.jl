@@ -1,5 +1,5 @@
 using TrixiLW.Trixi, TrixiLW
-using Plots
+# using Plots
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations

@@ -3,7 +3,7 @@ using TrixiLW
 using TrixiLW: AnalysisSurfaceIntegral, AnalysisSurfaceIntegralViscous
 using TrixiLW.Trixi
 using LinearAlgebra
-using Plots
+# using Plots
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations
