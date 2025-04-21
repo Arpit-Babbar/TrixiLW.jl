@@ -100,6 +100,12 @@ full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
 end
 
 full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
+                                                               "advection_amr")
+@testset "$full_test_name" begin
+    compare_errors_txt(sol, analysis_callback, full_test_name)
+end
+
+full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
                                                                "advection_nonperiodic")
 @testset "$full_test_name" begin
     compare_errors_txt(sol, analysis_callback, full_test_name)
