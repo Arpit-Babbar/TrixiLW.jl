@@ -1060,7 +1060,10 @@ using Trixi: @threaded
                                  mesh::Union{StructuredMesh{2}, UnstructuredMesh2D,
                                              P4estMesh{2}},
                                  nonconservative_terms::False, source_terms, equations,
-                                 dg::DGSEM{<:Any, <:Any, <:Any, VolumeIntegralFR{LW}},
+                                 dg::DGSEM{<:Any, <:Any, <:Any,
+                                           <:Union{VolumeIntegralFR{LW},
+                                                   VolumeIntegralFRShockCapturing{TrixiLW.LW,
+                                                                                  <:Any}}},
                                  cache, alpha = true)
         # true * [some floating point value] == [exactly the same floating point value]
         # This can (hopefully) be optimized away due to constant propagation.
@@ -1257,7 +1260,10 @@ using Trixi: @threaded
                                  mesh::Union{StructuredMesh{2}, UnstructuredMesh2D,
                                              P4estMesh{2}},
                                  nonconservative_terms::False, source_terms, equations,
-                                 dg::DGSEM{<:Any, <:Any, <:Any, VolumeIntegralFR{LW}},
+                                 dg::DGSEM{<:Any, <:Any, <:Any,
+                                           <:Union{VolumeIntegralFR{LW},
+                                                   VolumeIntegralFRShockCapturing{TrixiLW.LW,
+                                                                                  <:Any}}},
                                  cache, alpha = true)
         # true * [some floating point value] == [exactly the same floating point value]
         # This can (hopefully) be optimized away due to constant propagation.
@@ -1513,7 +1519,10 @@ using Trixi: @threaded
                                  mesh::Union{StructuredMesh{2}, UnstructuredMesh2D,
                                              P4estMesh{2}},
                                  nonconservative_terms::False, source_terms, equations,
-                                 dg::DGSEM{<:Any, <:Any, <:Any, VolumeIntegralFR{LW}},
+                                 dg::DGSEM{<:Any, <:Any, <:Any,
+                                           <:Union{VolumeIntegralFR{LW},
+                                                   VolumeIntegralFRShockCapturing{TrixiLW.LW,
+                                                                                  <:Any}}},
                                  cache, alpha = true)
         # true * [some floating point value] == [exactly the same floating point value]
         # This can (hopefully) be optimized away due to constant propagation.
@@ -1850,9 +1859,9 @@ using Trixi: @threaded
                                              P4estMesh{2}},
                                  nonconservative_terms::False, source_terms, equations,
                                  dg::DGSEM{<:Any, <:Any, <:Any,
-                                           Union{VolumeIntegralFR{LW},
-                                                 VolumeIntegralFRShockCapturing{TrixiLW.LW,
-                                                                                <:Any}}},
+                                           <:Union{VolumeIntegralFR{LW},
+                                                   VolumeIntegralFRShockCapturing{TrixiLW.LW,
+                                                                                  <:Any}}},
                                  cache,
                                  alpha = true)
 

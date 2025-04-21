@@ -13,7 +13,8 @@ using Trixi: TreeMesh, P4estMesh, BoundaryConditionPeriodic,
              AbstractContainer,
              DG, DGSEM, ndims, polydeg, nnodes, eachelement, nelements, nmortars,
              eachmortar, eachnode, eachboundary, multiply_add_to_node_vars!,
-             multiply_dimensionwise!, mortar_fluxes_to_elements!, False,
+             multiply_dimensionwise!, False,
+#  mortar_fluxes_to_elements!,
              @threaded, get_surface_node_vars
 using MuladdMacro
 using LoopVectorization: @turbo
@@ -2110,7 +2111,7 @@ function calc_mortar_flux!(surface_flux_values,
     @unpack surface_flux = surface_integral
     @unpack u_lower, u_upper, orientations = cache.mortars
     @unpack U_lower, U_upper, F_lower, F_upper = cache.lw_mortars
-    @unpack fstar_upper_threaded, fstar_lower_threaded = cache
+    @unpack fstar_upper_threaded, fstar_lower_threaded = cache.lw_mortars.tmp
 
     @threaded for mortar in eachmortar(dg, cache)
         # Choose thread-specific pre-allocated container
@@ -2124,10 +2125,85 @@ function calc_mortar_flux!(surface_flux_values,
         calc_fstar!(fstar_lower, equations, surface_flux, time_discretization,
                     dg, u_lower, F_lower, U_lower, mortar, orientation)
 
-        mortar_fluxes_to_elements!(surface_flux_values,
-                                   mesh, equations, mortar_l2, dg, cache,
-                                   mortar, fstar_upper, fstar_lower)
+        # TODO - Use Trixi.jl version!
+        my_mortar_fluxes_to_elements!(surface_flux_values,
+                                      mesh, equations, mortar_l2, dg, cache,
+                                      mortar, fstar_upper, fstar_lower)
     end
+
+    return nothing
+end
+
+# TODO - Use Trixi.jl version!
+@inline function my_mortar_fluxes_to_elements!(surface_flux_values,
+                                               mesh::TreeMesh{2}, equations,
+                                               mortar_l2::LobattoLegendreMortarL2,
+                                               dg::DGSEM, cache,
+                                               mortar, fstar_upper, fstar_lower)
+    large_element = cache.mortars.neighbor_ids[3, mortar]
+    upper_element = cache.mortars.neighbor_ids[2, mortar]
+    lower_element = cache.mortars.neighbor_ids[1, mortar]
+
+    # Copy flux small to small
+    if cache.mortars.large_sides[mortar] == 1 # -> small elements on right side
+        if cache.mortars.orientations[mortar] == 1
+            # L2 mortars in x-direction
+            direction = 1
+        else
+            # L2 mortars in y-direction
+            direction = 3
+        end
+    else # large_sides[mortar] == 2 -> small elements on left side
+        if cache.mortars.orientations[mortar] == 1
+            # L2 mortars in x-direction
+            direction = 2
+        else
+            # L2 mortars in y-direction
+            direction = 4
+        end
+    end
+    surface_flux_values[:, :, direction, upper_element] .= fstar_upper
+    surface_flux_values[:, :, direction, lower_element] .= fstar_lower
+
+    # Project small fluxes to large element
+    if cache.mortars.large_sides[mortar] == 1 # -> large element on left side
+        if cache.mortars.orientations[mortar] == 1
+            # L2 mortars in x-direction
+            direction = 2
+        else
+            # L2 mortars in y-direction
+            direction = 4
+        end
+    else # large_sides[mortar] == 2 -> large element on right side
+        if cache.mortars.orientations[mortar] == 1
+            # L2 mortars in x-direction
+            direction = 1
+        else
+            # L2 mortars in y-direction
+            direction = 3
+        end
+    end
+
+    # TODO: Taal performance
+    # for v in eachvariable(equations)
+    #   # The code below is semantically equivalent to
+    #   # surface_flux_values[v, :, direction, large_element] .=
+    #   #   (mortar_l2.reverse_upper * fstar_upper[v, :] + mortar_l2.reverse_lower * fstar_lower[v, :])
+    #   # but faster and does not allocate.
+    #   # Note that `true * some_float == some_float` in Julia, i.e. `true` acts as
+    #   # a universal `one`. Hence, the second `mul!` means "add the matrix-vector
+    #   # product to the current value of the destination".
+    #   @views mul!(surface_flux_values[v, :, direction, large_element],
+    #               mortar_l2.reverse_upper, fstar_upper[v, :])
+    #   @views mul!(surface_flux_values[v, :, direction, large_element],
+    #               mortar_l2.reverse_lower,  fstar_lower[v, :], true, true)
+    # end
+    # The code above could be replaced by the following code. However, the relative efficiency
+    # depends on the types of fstar_upper/fstar_lower and dg.l2mortar_reverse_upper.
+    # Using StaticArrays for both makes the code above faster for common test cases.
+    multiply_dimensionwise!(view(surface_flux_values, :, :, direction, large_element),
+                            mortar_l2.reverse_upper, fstar_upper,
+                            mortar_l2.reverse_lower, fstar_lower)
 
     return nothing
 end

@@ -191,6 +191,14 @@ function create_mortar_cache(mesh::TreeMesh, equations, dg, uEltype, RealT,
                              cache, time_discretization::AbstractLWTimeDiscretization)
     @unpack mortars = cache
 
+    # TODO - This is in order to use the old approach of Trixi. It should be
+    # removed and replaced with the new approach of Trixi.
+    mortar_l2 = dg.mortar
+    MA2d = MArray{Tuple{nvariables(equations), nnodes(mortar_l2)}, uEltype, 2,
+                  nvariables(equations) * nnodes(mortar_l2)}
+    fstar_upper_threaded = MA2d[MA2d(undef) for _ in 1:Threads.nthreads()]
+    fstar_lower_threaded = MA2d[MA2d(undef) for _ in 1:Threads.nthreads()]
+
     # Create arrays of sizes (2, n_variables, n_nodes, n_mortars)
     @unpack _u_upper, u_upper = mortars
 
@@ -209,7 +217,7 @@ function create_mortar_cache(mesh::TreeMesh, equations, dg, uEltype, RealT,
                               fn_low_lower,
                               _U_upper, _U_lower, _F_upper, _F_lower, _fn_low_upper,
                               _fn_low_lower,
-                              (;))
+                              (; fstar_upper_threaded, fstar_lower_threaded))
 end
 
 function ninterfaces(mesh::Union{TreeMesh, UnstructuredMesh2D, P4estMesh}, dg, cache,

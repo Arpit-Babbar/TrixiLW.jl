@@ -176,3 +176,10 @@ full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
 @testset "$full_test_name" begin
     compare_errors_txt(sol, analysis_callback, full_test_name, tol = 1e-11)
 end
+
+# P4estMesh tests
+full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
+                                                               "advection_amr")
+@testset "$full_test_name" begin
+    compare_errors_txt(sol, analysis_callback, full_test_name)
+end

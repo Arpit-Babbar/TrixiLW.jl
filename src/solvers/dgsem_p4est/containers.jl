@@ -43,6 +43,14 @@ function create_mortar_cache(mesh::P4estMesh, equations, dg, uEltype, RealT, cac
     n_mortars = nmortars(dg, cache)
     n_nodes = nnodes(dg)
 
+    mortar_l2 = dg.mortar
+    MA2d = MArray{Tuple{nvariables(equations), nnodes(mortar_l2)},
+                  uEltype, 2,
+                  nvariables(equations) * nnodes(mortar_l2)}
+    fstar_upper_threaded = MA2d[MA2d(undef) for _ in 1:Threads.nthreads()]
+    fstar_lower_threaded = MA2d[MA2d(undef) for _ in 1:Threads.nthreads()]
+    u_threaded = MA2d[MA2d(undef) for _ in 1:Threads.nthreads()]
+
     # Create arrays of sizes (leftright, n_variables, updown, n_nodes, n_mortars)
     @unpack _u, u = mortars
 
@@ -62,7 +70,9 @@ function create_mortar_cache(mesh::P4estMesh, equations, dg, uEltype, RealT, cac
 
     L2MortarContainer_lw_P4est(U, F, fn_low, inverse_jacobian,
                                _U, _F, _fn_low, _inverse_jacobian,
-                               (; U_threaded, F_threaded, fn_low_threaded))
+                               (; U_threaded, F_threaded, fn_low_threaded,
+                                fstar_upper_threaded,
+                                fstar_lower_threaded, u_threaded))
 end
 
 function create_mortar_cache(mesh::P4estMesh, equations::AbstractEquationsParabolic, dg,
