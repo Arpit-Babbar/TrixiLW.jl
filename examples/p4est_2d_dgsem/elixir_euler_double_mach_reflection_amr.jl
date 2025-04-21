@@ -64,7 +64,8 @@ end
                                                          x, t, dt,
                                                          surface_flux_function,
                                                          equations::CompressibleEulerEquations2D,
-                                                         dg, time_discretization)
+                                                         dg, time_discretization,
+                                                         scaling_factor = 1.0)
     if x[1] < 1 / 6
         # From the BoundaryConditionDirichlet
         # get the external value of the solution

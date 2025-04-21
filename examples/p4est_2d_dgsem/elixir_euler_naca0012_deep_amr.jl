@@ -69,7 +69,7 @@ boundary_conditions = Dict(:Left => boundary_condition_supersonic_inflow,
 
 surface_flux = flux_lax_friedrichs
 
-polydeg = 4
+polydeg = 6
 basis = LobattoLegendreBasis(polydeg)
 shock_indicator = IndicatorHennemannGassner(equations, basis,
                                             alpha_max = 1.0,

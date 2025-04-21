@@ -18,7 +18,7 @@ boundary_conditions = Dict(:x_neg => boundary_condition,
 
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
 solver = DGSEM(polydeg = 3, surface_flux = flux_lax_friedrichs,
-               volume_integral = TrixiLW.VolumeIntegralFR(TrixiLW.MDRK()))
+               volume_integral = TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
 
 # The initial condition is 2-periodic
 coordinates_min = (-1.5, 1.3) # minimum coordinates (min(x), min(y))
@@ -69,7 +69,7 @@ save_solution = SaveSolutionCallback(interval = 100,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
 
-callbacks = (; summary_callback,
+callbacks = (summary_callback,
              analysis_callback, alive_callback,
              save_restart, save_solution)
 

@@ -34,7 +34,7 @@ end
 initial_condition = initial_value_vortex_henneman
 
 solver = DGSEM(polydeg = 3, surface_flux = flux_lax_friedrichs,
-               volume_integral = TrixiLW.VolumeIntegralFR(TrixiLW.MDRK()))
+               volume_integral = TrixiLW.VolumeIntegralFR(TrixiLW.LW()))
 
 refinement_level = 2
 cells_per_dimension = (2^refinement_level * 16, 2^refinement_level * 16)
@@ -47,7 +47,8 @@ function mapping_henneman_isentropic(ξ_, η_)
     return (x, y)
 end
 
-mesh = P4estMesh(cells_per_dimension, mapping = mapping_henneman_isentropic, polydeg = 3)
+mesh = P4estMesh(cells_per_dimension, mapping = mapping_henneman_isentropic, polydeg = 3,
+                 initial_refinement_level = 0)
 
 cfl_number = 0.25
 semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver),

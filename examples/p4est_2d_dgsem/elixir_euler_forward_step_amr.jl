@@ -80,7 +80,7 @@ isfile(default_mesh_file) ||
              default_mesh_file)
 mesh_file = default_mesh_file
 
-mesh = P4estMesh{2}(mesh_file)
+mesh = P4estMesh{2}(mesh_file, initial_refinement_level = 0)
 
 semi = TrixiLW.SemidiscretizationHyperbolic(mesh, get_time_discretization(solver),
                                             equations, initial_condition, solver,

@@ -65,8 +65,9 @@ macro test_trixilw_include(mesh_name, elixir_name, args...)
     full_elixir_name = joinpath(examples_dir_trixilw(), mesh_name,
                                 "elixir_$(elixir_name).jl")
 
+    final_time = get_kwarg(args, :final_time, 0.01)
     trixi_include(@__MODULE__, full_elixir_name,
-                  tspan = (0.0, 0.01), initial_refinement_level = 2)
+                  tspan = (0.0, final_time), initial_refinement_level = 2)
 
     return full_test_name, sol, analysis_callback
 end
@@ -178,8 +179,102 @@ full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
 end
 
 # P4estMesh tests
+
+full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
+                                                               "advection_basic")
+@testset "$full_test_name" begin
+    compare_errors_txt(sol, analysis_callback, full_test_name)
+end
+
 full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
                                                                "advection_amr")
+@testset "$full_test_name" begin
+    compare_errors_txt(sol, analysis_callback, full_test_name)
+end
+
+full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
+                                                               "advection_diffusion_diff02_periodic")
+@testset "$full_test_name" begin
+    compare_errors_txt(sol, analysis_callback, full_test_name)
+end
+
+full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
+                                                               "advection_diffusion_nonperiodic_curved",
+                                                               final_time=1e-4)
+@testset "$full_test_name" begin
+    compare_errors_txt(sol, analysis_callback, full_test_name)
+end
+
+full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
+                                                               "advection_diffusion_periodic_curved")
+@testset "$full_test_name" begin
+    compare_errors_txt(sol, analysis_callback, full_test_name)
+end
+
+full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
+                                                               "advection_extended")
+@testset "$full_test_name" begin
+    compare_errors_txt(sol, analysis_callback, full_test_name)
+end
+
+full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
+                                                               "euler_astrophysical_jet_amr",
+                                                               final_time=1e-6)
+@testset "$full_test_name" begin
+    compare_errors_txt(sol, analysis_callback, full_test_name)
+end
+
+full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
+                                                               "euler_double_mach_reflection_amr",
+                                                               final_time=1e-4)
+@testset "$full_test_name" begin
+    compare_errors_txt(sol, analysis_callback, full_test_name)
+end
+
+full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
+                                                               "euler_double_mach_reflection_square")
+@testset "$full_test_name" begin
+    compare_errors_txt(sol, analysis_callback, full_test_name)
+end
+
+full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
+                                                               "euler_forward_step_amr",
+                                                               final_time=1e-4)
+@testset "$full_test_name" begin
+    compare_errors_txt(sol, analysis_callback, full_test_name)
+end
+
+full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
+                                                               "euler_isentropic_hennemann",
+                                                               final_time=1e-7)
+@testset "$full_test_name" begin
+    compare_errors_txt(sol, analysis_callback, full_test_name)
+end
+
+full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
+                                                               "euler_naca0012_deep_amr",
+                                                               final_time=1e-6)
+@testset "$full_test_name" begin
+    compare_errors_txt(sol, analysis_callback, full_test_name)
+end
+
+full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
+                                                               "euler_supersonic_cylinder_amr",
+                                                               final_time=1e-4)
+@testset "$full_test_name" begin
+    compare_errors_txt(sol, analysis_callback, full_test_name)
+end
+
+full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
+                                                               "navierstokes_convergence",
+                                                               final_time=1e-4)
+@testset "$full_test_name" begin
+    compare_errors_txt(sol, analysis_callback, full_test_name)
+end
+
+full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
+                                                               "navierstokes_naca0012_swanson",
+                                                               final_time=1e-4)
 @testset "$full_test_name" begin
     compare_errors_txt(sol, analysis_callback, full_test_name)
 end

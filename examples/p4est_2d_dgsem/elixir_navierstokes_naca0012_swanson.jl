@@ -162,7 +162,7 @@ boundary_conditions_parabolic = Dict(:Left => boundary_condition_square,
 
 surface_flux = flux_lax_friedrichs
 
-polydeg = 4
+polydeg = 6
 basis = LobattoLegendreBasis(polydeg)
 # Create DG solver with polynomial degree = 3 and (local) Lax-Friedrichs/Rusanov flux as surface flux
 solver = DGSEM(polydeg = polydeg, surface_flux = flux_lax_friedrichs,
@@ -204,14 +204,14 @@ aoa = 10 * pi / 180.0
 
 # TODO - Fix this. IT MUST be passed as a proper function for AMR
 indices = semi_ -> semi.boundary_conditions.boundary_indices[2]
-drag_force = AnalysisSurfaceIntegral(indices,
-                                     TrixiLW.DragForcePressure(sw_aoa(), sw_rho_inf(),
-                                                               sw_U_inf(equations),
-                                                               sw_linf()))
-lift_force = AnalysisSurfaceIntegral(indices,
-                                     TrixiLW.LiftForcePressure(sw_aoa(), sw_rho_inf(),
-                                                               sw_U_inf(equations),
-                                                               sw_linf()))
+drag_force_ = AnalysisSurfaceIntegral(indices,
+                                      TrixiLW.DragForcePressure(sw_aoa(), sw_rho_inf(),
+                                                                sw_U_inf(equations),
+                                                                sw_linf()))
+lift_force_ = AnalysisSurfaceIntegral(indices,
+                                      TrixiLW.LiftForcePressure(sw_aoa(), sw_rho_inf(),
+                                                                sw_U_inf(equations),
+                                                                sw_linf()))
 drag_force_viscous = AnalysisSurfaceIntegralViscous(indices,
                                                     TrixiLW.DragForceViscous(sw_aoa(),
                                                                              sw_rho_inf(),
@@ -229,7 +229,7 @@ analysis_callback = AnalysisCallback(semi, interval = 100,
                                      analysis_errors = Symbol[],
                                      output_directory = "analysis_results",
                                      save_analysis = true,
-                                     analysis_integrals = (drag_force, lift_force,
+                                     analysis_integrals = (drag_force_, lift_force_,
                                                            drag_force_viscous,
                                                            lift_force_viscous,
                                                            TrixiLW.RhoRes(),
@@ -249,8 +249,7 @@ visualization_callback = VisualizationCallback(interval = 200,
                                                save_initial_solution = true,
                                                save_final_solution = true)
 
-callbacks = (;
-             analysis_callback,
+callbacks = (analysis_callback,
              alive_callback,
              # visualization_callback,
              save_solution)
