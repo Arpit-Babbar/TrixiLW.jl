@@ -595,6 +595,13 @@ using Trixi: @threaded
         return flux1, flux2, contravariant_flux1, contravariant_flux2
     end
 
+    function transform2contravariant(f, g, Ja)
+        (Ja11, Ja12), (Ja21, Ja22) = Ja
+        f1 = Ja11 * f + Ja12 * g
+        f2 = Ja21 * f + Ja22 * g
+        return f1, f2
+    end
+
     @inline function compute_temporal_errors!(cache, cell_arrays, tolerances, dt, equations,
                                               dg,
                                               element)
@@ -1255,6 +1262,193 @@ using Trixi: @threaded
         return nothing
     end
 
+    function lw_volume_kernel_1!(du, u, t, dt, tolerances,
+                                 element,
+                                 mesh::Union{StructuredMesh{2}, UnstructuredMesh2D,
+                                             P4estMesh{2}},
+                                 nonconservative_terms::False, source_terms, equations,
+                                 dg::DGSEM{<:Any, <:Any, <:Any,
+                                           <:Union{VolumeIntegralFR{LWADEnzyme},
+                                                   VolumeIntegralFRShockCapturing{LWADEnzyme,
+                                                                                  <:Any}}},
+                                 cache, alpha = true)
+        # true * [some floating point value] == [exactly the same floating point value]
+        # This can (hopefully) be optimized away due to constant propagation.
+        @unpack derivative_dhat, derivative_matrix = dg.basis
+        @unpack contravariant_vectors, inverse_jacobian, node_coordinates = cache.elements
+        @unpack lw_res_cache, element_cache = cache
+        @unpack cell_arrays = lw_res_cache
+        @unpack elements = cache # To access cache.U and cache.F
+        refresh!(arr) = fill!(arr, zero(eltype(u)))
+        id = Threads.threadid()
+        Ftilde, Gtilde, ut, U, ftildet, gtildet, S, u_np1, u_np1_low = cell_arrays[id]
+        refresh!.((ut, ftildet, gtildet))
+        for j in eachnode(dg), i in eachnode(dg)
+            u_node = get_node_vars(u, equations, dg, i, j, element)
+
+            Ja = get_contravariant_matrix(contravariant_vectors, i, j, element)
+
+            flux1, flux2, cv_flux1, cv_flux2 = contravariant_flux(u_node, Ja, equations)
+
+            set_node_vars!(element_cache.F, flux1, equations, dg, 1, i, j, element)
+            set_node_vars!(element_cache.F, flux2, equations, dg, 2, i, j, element)
+
+            set_node_vars!(Ftilde, cv_flux1, equations, dg, i, j)
+            for ii in eachnode(dg)
+                # ut              += -lam * D * f for each variable
+                # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
+                multiply_add_to_node_vars!(ut, -dt * derivative_matrix[ii, i], cv_flux1,
+                                           equations, dg, ii, j)
+            end
+
+            set_node_vars!(Gtilde, cv_flux2, equations, dg, i, j)
+            for jj in eachnode(dg)
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                multiply_add_to_node_vars!(ut, -dt * derivative_matrix[jj, j], cv_flux2,
+                                           equations, dg, i, jj)
+            end
+
+            Trixi.set_node_vars!(u_np1, u_node, equations, dg, i, j)
+            Trixi.set_node_vars!(u_np1_low, u_node, equations, dg, i, j)
+
+            Trixi.set_node_vars!(U, u_node, equations, dg, i, j)
+        end
+        # Scale ut
+        for j in eachnode(dg), i in eachnode(dg)
+            inv_jacobian = inverse_jacobian[i, j, element]
+            for v in eachvariable(equations)
+                ut[v, i, j] *= inv_jacobian
+            end
+        end
+
+        # Add source term contribution to ut and some to S
+        for j in eachnode(dg), i in eachnode(dg)
+            # Add source term contribution to ut
+            x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            s_node = calc_source(u_node, x, t, source_terms, equations, dg, cache)
+            Trixi.set_node_vars!(S, s_node, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(ut, dt, s_node, equations, dg, i, j) # has no jacobian factor
+        end
+
+        for j in eachnode(dg), i in eachnode(dg)
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            ut_node = Trixi.get_node_vars(ut, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(U, 0.5, ut_node, equations, dg, i, j)
+            Ja = get_contravariant_matrix(contravariant_vectors, i, j, element)
+
+            ft = compute_first_derivative_enzyme_2d(u_node, ut_node, 1, equations)
+            gt = compute_first_derivative_enzyme_2d(u_node, ut_node, 2, equations)
+
+            # Updating u_np1_low here
+            F_ = Trixi.get_node_vars(Ftilde, equations, dg, i, j)
+            G_ = Trixi.get_node_vars(Gtilde, equations, dg, i, j)
+
+            for ii in eachnode(dg)
+                inv_jacobian = inverse_jacobian[ii, j, element]
+                # res              += -lam * D * F for each variable
+                # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
+                Trixi.multiply_add_to_node_vars!(u_np1_low,
+                                                 -dt * inv_jacobian *
+                                                 derivative_matrix[ii, i],
+                                                 F_, equations, dg, ii, j)
+            end
+
+            for jj in eachnode(dg)
+                inv_jacobian = inverse_jacobian[i, jj, element]
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                Trixi.multiply_add_to_node_vars!(u_np1_low,
+                                                 -dt * inv_jacobian *
+                                                 derivative_matrix[jj, j],
+                                                 G_, equations, dg, i, jj)
+            end
+
+            # TODO - Check the source term contribution
+            S_node = Trixi.get_node_vars(S, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(u_np1_low, 1.0, S_node, equations, dg, i, j)
+
+            # UPDATING u_np1_low ENDS!!!
+
+            multiply_add_to_node_vars!(element_cache.F, 0.5, ft, equations, dg, 1, i, j,
+                                       element)
+            multiply_add_to_node_vars!(element_cache.F, 0.5, gt, equations, dg, 2, i, j,
+                                       element)
+            ftildet_node, gtildet_node = transform2contravariant(ft, gt, Ja)
+            Trixi.multiply_add_to_node_vars!(Ftilde,
+                                             0.5, ftildet_node,
+                                             equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(Gtilde,
+                                             0.5, gtildet_node,
+                                             equations, dg, i, j)
+            Ftilde_node = Trixi.get_node_vars(Ftilde, equations, dg, i, j)
+            Gtilde_node = Trixi.get_node_vars(Gtilde, equations, dg, i, j)
+
+            for ii in eachnode(dg)
+                # res              += -lam * D * F for each variable
+                # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
+                Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i],
+                                                 Ftilde_node, equations, dg, ii, j, element)
+
+                Trixi.multiply_add_to_node_vars!(u_np1,
+                                                 -dt * inv_jacobian *
+                                                 derivative_matrix[ii, i],
+                                                 Ftilde_node, equations, dg, ii, j)
+            end
+
+            for jj in eachnode(dg)
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j],
+                                                 Gtilde_node, equations, dg, i, jj, element)
+
+                Trixi.multiply_add_to_node_vars!(u_np1,
+                                                 -dt * inv_jacobian *
+                                                 derivative_matrix[jj, j],
+                                                 Gtilde_node, equations, dg, i, jj)
+            end
+
+            x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+            # TODO - Add source term support
+            # st = calc_source_t_N12(up_node, um_node, x, t, dt, source_terms, equations,
+            #                        dg, cache)
+            # Trixi.multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
+
+            # TODO - update to v1.8 and call with @inline
+            # Give u1_ or U depending on dissipation model
+            U_node = Trixi.get_node_vars(U, equations, dg, i, j)
+
+            # Ub = UT * V
+            # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
+            Trixi.set_node_vars!(element_cache.U, U_node, equations, dg, i, j, element)
+
+            S_node = Trixi.get_node_vars(S, equations, dg, i, j)
+            inv_jacobian = inverse_jacobian[i, j, element]
+            Trixi.multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg,
+                                             i, j, element)
+            Trixi.multiply_add_to_node_vars!(u_np1, 1.0, S_node, equations, dg, i, j)
+        end
+
+        @unpack temporal_errors = cache
+        @unpack abstol, reltol = tolerances
+        temporal_errors[element] = zero(dt)
+        for j in eachnode(dg), i in eachnode(dg)
+            u_np1_node = Trixi.get_node_vars(u_np1, equations, dg, i, j)
+            u_np1_low_node = Trixi.get_node_vars(u_np1_low, equations, dg, i, j)
+            # u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            for v in eachvariable(equations)
+                temporal_errors[element] += ((u_np1_node[v] - u_np1_low_node[v])
+                                             /
+                                             (abstol +
+                                              reltol * max(abs(u_np1_node[v]),
+                                                  abs(u_np1_low_node[v]))))^2
+            end
+        end
+
+        return nothing
+    end
+
     function lw_volume_kernel_2!(du, u, t, dt, tolerances,
                                  element,
                                  mesh::Union{StructuredMesh{2}, UnstructuredMesh2D,
@@ -1479,6 +1673,249 @@ using Trixi: @threaded
             stt = calc_source_tt_N23(u_node, up_node, um_node, x, t, dt, source_terms,
                                      equations, dg, cache)
             Trixi.multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, equations, dg, i, j)
+
+            # TODO - update to v1.8 and call with @inline
+            # Give u1_ or U depending on dissipation model
+            U_node = Trixi.get_node_vars(U, equations, dg, i, j)
+
+            # Ub = UT * V
+            # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
+            Trixi.set_node_vars!(element_cache.U, U_node, equations, dg, i, j, element)
+
+            S_node = Trixi.get_node_vars(S, equations, dg, i, j)
+            inv_jacobian = inverse_jacobian[i, j, element]
+            Trixi.multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg,
+                                             i, j, element)
+            Trixi.multiply_add_to_node_vars!(u_np1, 1.0, S_node, equations, dg, i, j)
+        end
+
+        @unpack temporal_errors = cache
+        @unpack abstol, reltol = tolerances
+        temporal_errors[element] = zero(dt)
+        for j in eachnode(dg), i in eachnode(dg)
+            u_np1_node = Trixi.get_node_vars(u_np1, equations, dg, i, j)
+            u_np1_low_node = Trixi.get_node_vars(u_np1_low, equations, dg, i, j)
+            # u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            for v in eachvariable(equations)
+                temporal_errors[element] += ((u_np1_node[v] - u_np1_low_node[v])
+                                             /
+                                             (abstol +
+                                              reltol * max(abs(u_np1_node[v]),
+                                                  abs(u_np1_low_node[v]))))^2
+            end
+        end
+
+        return nothing
+    end
+
+    function lw_volume_kernel_2!(du, u, t, dt, tolerances,
+                                 element,
+                                 mesh::Union{StructuredMesh{2}, UnstructuredMesh2D,
+                                             P4estMesh{2}},
+                                 nonconservative_terms::False, source_terms, equations,
+                                 dg::DGSEM{<:Any, <:Any, <:Any,
+                                           <:Union{VolumeIntegralFR{LWADEnzyme},
+                                                   VolumeIntegralFRShockCapturing{LWADEnzyme,
+                                                                                  <:Any}}},
+                                 cache, alpha = true)
+        # true * [some floating point value] == [exactly the same floating point value]
+        # This can (hopefully) be optimized away due to constant propagation.
+        @unpack derivative_dhat, derivative_matrix = dg.basis
+        @unpack contravariant_vectors, inverse_jacobian, node_coordinates = cache.elements
+        @unpack lw_res_cache, element_cache = cache
+        @unpack cell_arrays = lw_res_cache
+        @unpack elements = cache # To access cache.U and cache.F
+        refresh!(arr) = fill!(arr, zero(eltype(u)))
+        id = Threads.threadid()
+        f, g, ftilde, gtilde, Ftilde, Gtilde, ut, utt, U, S, u_np1, u_np1_low = cell_arrays[id]
+        refresh!.((ut, utt))
+        for j in eachnode(dg), i in eachnode(dg)
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+
+            Ja = get_contravariant_matrix(contravariant_vectors, i, j, element)
+
+            flux1, flux2, cv_flux1, cv_flux2 = contravariant_flux(u_node, Ja, equations)
+
+            Trixi.set_node_vars!(element_cache.F, flux1, equations, dg, 1, i, j, element)
+            Trixi.set_node_vars!(element_cache.F, flux2, equations, dg, 2, i, j, element)
+            Trixi.set_node_vars!(f, flux1, equations, dg, i, j)
+            Trixi.set_node_vars!(g, flux2, equations, dg, i, j)
+
+            Trixi.set_node_vars!(Ftilde, cv_flux1, equations, dg, i, j)
+            Trixi.set_node_vars!(ftilde, cv_flux1, equations, dg, i, j)
+
+            for ii in eachnode(dg)
+                # ut              += -lam * D * f for each variable
+                # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
+                Trixi.multiply_add_to_node_vars!(ut, -dt * derivative_matrix[ii, i],
+                                                 cv_flux1, equations, dg, ii, j)
+            end
+            Trixi.set_node_vars!(Gtilde, cv_flux2, equations, dg, i, j)
+            Trixi.set_node_vars!(gtilde, cv_flux2, equations, dg, i, j)
+            for jj in eachnode(dg)
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                Trixi.multiply_add_to_node_vars!(ut, -dt * derivative_matrix[jj, j],
+                                                 cv_flux2, equations, dg, i, jj)
+            end
+
+            Trixi.set_node_vars!(u_np1, u_node, equations, dg, i, j)
+            Trixi.set_node_vars!(u_np1_low, u_node, equations, dg, i, j)
+
+            Trixi.set_node_vars!(U, u_node, equations, dg, i, j)
+        end
+        # Scale ut
+        for j in eachnode(dg), i in eachnode(dg)
+            inv_jacobian = inverse_jacobian[i, j, element]
+            for v in eachvariable(equations)
+                ut[v, i, j] *= inv_jacobian
+            end
+        end
+
+        # Add source term contribution to ut and some to S
+        for j in eachnode(dg), i in eachnode(dg)
+            # Add source term contribution to ut
+            x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            s_node = calc_source(u_node, x, t, source_terms, equations, dg, cache)
+            Trixi.set_node_vars!(S, s_node, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(ut, dt, s_node, equations, dg, i, j) # has no jacobian factor
+        end
+
+        for j in eachnode(dg), i in eachnode(dg)
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            ut_node = Trixi.get_node_vars(ut, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(U,
+                                             0.5, ut_node,
+                                             equations, dg, i, j)
+            Ja = get_contravariant_matrix(contravariant_vectors, i, j, element)
+
+            f_t = compute_first_derivative_enzyme_2d(u_node, ut_node, 1, equations)
+            g_t = compute_first_derivative_enzyme_2d(u_node, ut_node, 2, equations)
+            ftilde_t, gtilde_t = transform2contravariant(f_t, g_t, Ja)
+
+            Trixi.multiply_add_to_node_vars!(element_cache.F, 0.5, f_t, equations, dg, 1, i,
+                                             j, element)
+            Trixi.multiply_add_to_node_vars!(element_cache.F, 0.5, g_t, equations, dg, 2, i,
+                                             j, element)
+            Trixi.multiply_add_to_node_vars!(Ftilde, 0.5, ftilde_t, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(Gtilde, 0.5, gtilde_t, equations, dg, i, j)
+            for ii in eachnode(dg)
+                # res              += -lam * D * F for each variable
+                # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
+                Trixi.multiply_add_to_node_vars!(utt, -dt * derivative_matrix[ii, i],
+                                                 ftilde_t, equations, dg, ii, j)
+            end
+
+            for jj in eachnode(dg)
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                Trixi.multiply_add_to_node_vars!(utt, -dt * derivative_matrix[jj, j],
+                                                 gtilde_t, equations, dg, i, jj)
+            end
+        end
+
+        # Apply Jacobian to utt
+        for j in eachnode(dg), i in eachnode(dg)
+            inv_jacobian = inverse_jacobian[i, j, element]
+            for v in eachvariable(equations)
+                utt[v, i, j] *= inv_jacobian
+            end
+        end
+
+        # Add source term contribution to utt and some to S
+        for j in eachnode(dg), i in eachnode(dg)
+            # Add source term contribution to ut
+            x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+            # TODO - Add source term support
+            # st = calc_source_t_N12(up_node, um_node, x, t, dt, source_terms,
+            #                        equations, dg, cache)
+            # Trixi.multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
+            # Trixi.multiply_add_to_node_vars!(utt, dt, st, equations, dg, i, j) # has no jacobian factor
+        end
+
+        for j in eachnode(dg), i in eachnode(dg)
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            ut_node = Trixi.get_node_vars(ut, equations, dg, i, j)
+            utt_node = Trixi.get_node_vars(utt, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(U, 1.0 / 6.0, utt_node, equations, dg, i, j)
+
+            Ja = get_contravariant_matrix(contravariant_vectors, i, j, element)
+            f_tt = compute_second_derivative_enzyme_2d(u_node, ut_node, utt_node, 1,
+                                                       equations)
+            g_tt = compute_second_derivative_enzyme_2d(u_node, ut_node, utt_node, 2,
+                                                       equations)
+            ftilde_tt, gtilde_tt = transform2contravariant(f_tt, g_tt, Ja)
+
+            # Updating u_np1_low here
+            F_ = Trixi.get_node_vars(Ftilde, equations, dg, i, j)
+            G_ = Trixi.get_node_vars(Gtilde, equations, dg, i, j)
+
+            for ii in eachnode(dg)
+                inv_jacobian = inverse_jacobian[ii, j, element]
+                # res              += -lam * D * F for each variable
+                # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
+                Trixi.multiply_add_to_node_vars!(u_np1_low,
+                                                 -dt * inv_jacobian *
+                                                 derivative_matrix[ii, i],
+                                                 F_, equations, dg, ii, j)
+            end
+
+            for jj in eachnode(dg)
+                inv_jacobian = inverse_jacobian[i, jj, element]
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                Trixi.multiply_add_to_node_vars!(u_np1_low,
+                                                 -dt * inv_jacobian *
+                                                 derivative_matrix[jj, j],
+                                                 G_, equations, dg, i, jj)
+            end
+
+            # TODO - Check the source term contribution
+            S_node = Trixi.get_node_vars(S, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(u_np1_low, 1.0, S_node, equations, dg, i, j)
+            # UPDATING u_np1_low ENDS!!!
+
+            Trixi.multiply_add_to_node_vars!(Ftilde, 1.0 / 6.0, ftilde_tt, equations, dg, i,
+                                             j)
+            Trixi.multiply_add_to_node_vars!(element_cache.F, 1.0 / 6.0, f_tt, equations,
+                                             dg, 1, i, j, element)
+            Trixi.multiply_add_to_node_vars!(Gtilde, 1.0 / 6.0, gtilde_tt, equations, dg, i,
+                                             j)
+            Trixi.multiply_add_to_node_vars!(element_cache.F, 1.0 / 6.0, g_tt, equations,
+                                             dg, 2, i, j, element)
+
+            Ftilde_node = Trixi.get_node_vars(Ftilde, equations, dg, i, j)
+            Gtilde_node = Trixi.get_node_vars(Gtilde, equations, dg, i, j)
+            for ii in eachnode(dg)
+                # res              += -lam * D * F for each variable
+                # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
+                Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i],
+                                                 Ftilde_node, equations, dg, ii, j, element)
+
+                Trixi.multiply_add_to_node_vars!(u_np1,
+                                                 -dt * inv_jacobian *
+                                                 derivative_matrix[ii, i],
+                                                 Ftilde_node, equations, dg, ii, j)
+            end
+
+            for jj in eachnode(dg)
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j],
+                                                 Gtilde_node, equations, dg, i, jj, element)
+
+                Trixi.multiply_add_to_node_vars!(u_np1,
+                                                 -dt * inv_jacobian *
+                                                 derivative_matrix[jj, j],
+                                                 Gtilde_node, equations, dg, i, jj)
+            end
+
+            x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+            # TODO - Add source term support
+            # stt = calc_source_tt_N23(u_node, up_node, um_node, x, t, dt, source_terms,
+            #                          equations, dg, cache)
+            # Trixi.multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, equations, dg, i, j)
 
             # TODO - update to v1.8 and call with @inline
             # Give u1_ or U depending on dissipation model
@@ -1819,6 +2256,310 @@ using Trixi: @threaded
                                        x, t, dt, source_terms,
                                        equations, dg, cache)
             multiply_add_to_node_vars!(S, 1.0 / 24.0, sttt, equations, dg, i, j)
+
+            # TODO - update to v1.8 and call with @inline
+            # Give u1_ or U depending on dissipation model
+            U_node = get_node_vars(U, equations, dg, i, j)
+
+            # Ub = UT * V
+            # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
+            set_node_vars!(element_cache.U, U_node, equations, dg, i, j, element)
+
+            S_node = get_node_vars(S, equations, dg, i, j)
+            inv_jacobian = inverse_jacobian[i, j, element]
+            multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg,
+                                       i, j, element)
+            multiply_add_to_node_vars!(u_np1, 1.0, S_node, equations, dg, i, j)
+        end
+
+        @unpack temporal_errors = cache
+        @unpack abstol, reltol = tolerances
+        temporal_errors[element] = zero(dt)
+        for j in eachnode(dg), i in eachnode(dg)
+            u_np1_node = Trixi.get_node_vars(u_np1, equations, dg, i, j)
+            u_np1_low_node = Trixi.get_node_vars(u_np1_low, equations, dg, i, j)
+            for v in eachvariable(equations)
+                temporal_errors[element] += ((u_np1_node[v] - u_np1_low_node[v])
+                                             /
+                                             (abstol +
+                                              reltol * max(abs(u_np1_node[v]),
+                                                  abs(u_np1_low_node[v]))))^2
+            end
+        end
+
+        return nothing
+    end
+
+    function lw_volume_kernel_3!(du, u, t, dt, tolerances,
+                                 element,
+                                 mesh::Union{StructuredMesh{2}, UnstructuredMesh2D,
+                                             P4estMesh{2}},
+                                 nonconservative_terms::False, source_terms, equations,
+                                 dg::DGSEM{<:Any, <:Any, <:Any,
+                                           <:Union{VolumeIntegralFR{LWADEnzyme},
+                                                   VolumeIntegralFRShockCapturing{LWADEnzyme,
+                                                                                  <:Any}}},
+                                 cache, alpha = true)
+        # true * [some floating point value] == [exactly the same floating point value]
+        # This can (hopefully) be optimized away due to constant propagation.
+        @unpack derivative_dhat, derivative_matrix = dg.basis
+        @unpack contravariant_vectors, inverse_jacobian, node_coordinates = cache.elements
+        @unpack element_cache, lw_res_cache = cache
+        @unpack cell_arrays = lw_res_cache
+        @unpack elements = cache # To access cache.U and cache.F
+        refresh!(arr) = fill!(arr, zero(eltype(u)))
+        id = Threads.threadid()
+        f, g, ftilde, gtilde, Ftilde, Gtilde, ut, utt, uttt, U, S, u_np1, u_np1_low = cell_arrays[id]
+        refresh!.((ut, utt, uttt))
+        for j in eachnode(dg), i in eachnode(dg)
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+
+            Ja = get_contravariant_matrix(contravariant_vectors, i, j, element)
+
+            flux1, flux2, cv_flux1, cv_flux2 = contravariant_flux(u_node, Ja, equations)
+
+            Trixi.set_node_vars!(element_cache.F, flux1, equations, dg, 1, i, j, element)
+            Trixi.set_node_vars!(element_cache.F, flux2, equations, dg, 2, i, j, element)
+            Trixi.set_node_vars!(f, flux1, equations, dg, i, j)
+            Trixi.set_node_vars!(g, flux2, equations, dg, i, j)
+
+            Trixi.set_node_vars!(Ftilde, cv_flux1, equations, dg, i, j)
+            Trixi.set_node_vars!(ftilde, cv_flux1, equations, dg, i, j)
+            for ii in eachnode(dg)
+                # ut              += -lam * D * f for each variable
+                # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
+                Trixi.multiply_add_to_node_vars!(ut, -dt * derivative_matrix[ii, i],
+                                                 cv_flux1,
+                                                 equations, dg, ii, j)
+            end
+
+            Trixi.set_node_vars!(Gtilde, cv_flux2, equations, dg, i, j)
+            Trixi.set_node_vars!(gtilde, cv_flux2, equations, dg, i, j)
+            for jj in eachnode(dg)
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                Trixi.multiply_add_to_node_vars!(ut, -dt * derivative_matrix[jj, j],
+                                                 cv_flux2, equations, dg, i, jj)
+            end
+
+            Trixi.set_node_vars!(u_np1, u_node, equations, dg, i, j)
+            Trixi.set_node_vars!(u_np1_low, u_node, equations, dg, i, j)
+
+            Trixi.set_node_vars!(U, u_node, equations, dg, i, j)
+        end
+        # Scale ut
+        for j in eachnode(dg), i in eachnode(dg)
+            inv_jacobian = inverse_jacobian[i, j, element]
+            for v in eachvariable(equations)
+                ut[v, i, j] *= inv_jacobian
+            end
+        end
+
+        # Add source term contribution to ut and some to S
+        for j in eachnode(dg), i in eachnode(dg)
+            # Add source term contribution to ut
+            x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            s_node = calc_source(u_node, x, t, source_terms, equations, dg, cache)
+            Trixi.set_node_vars!(S, s_node, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(ut, dt, s_node, equations, dg, i, j) # has no jacobian factor
+        end
+
+        for j in eachnode(dg), i in eachnode(dg)
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            ut_node = Trixi.get_node_vars(ut, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(U, 0.5, ut_node, equations, dg, i, j)
+
+            Ja = get_contravariant_matrix(contravariant_vectors, i, j, element)
+
+            f_t = compute_first_derivative_enzyme_2d(u_node, ut_node, 1, equations)
+            g_t = compute_first_derivative_enzyme_2d(u_node, ut_node, 2, equations)
+            ftilde_t, gtilde_t = transform2contravariant(f_t, g_t, Ja)
+
+            Trixi.multiply_add_to_node_vars!(element_cache.F, 0.5, f_t, equations, dg, 1, i,
+                                             j, element)
+            Trixi.multiply_add_to_node_vars!(element_cache.F, 0.5, g_t, equations, dg, 2, i,
+                                             j, element)
+            Trixi.multiply_add_to_node_vars!(Ftilde, 0.5, ftilde_t, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(Gtilde, 0.5, gtilde_t, equations, dg, i, j)
+            for ii in eachnode(dg)
+                # res              += -lam * D * F for each variable
+                # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)
+                Trixi.multiply_add_to_node_vars!(utt, -dt * derivative_matrix[ii, i],
+                                                 ftilde_t, equations, dg, ii, j)
+            end
+
+            for jj in eachnode(dg)
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                Trixi.multiply_add_to_node_vars!(utt, -dt * derivative_matrix[jj, j],
+                                                 gtilde_t, equations, dg, i, jj)
+            end
+        end
+
+        # Apply Jacobian to utt
+        for j in eachnode(dg), i in eachnode(dg)
+            inv_jacobian = inverse_jacobian[i, j, element]
+            for v in eachvariable(equations)
+                utt[v, i, j] *= inv_jacobian
+            end
+        end
+
+        # Add source term contribution to utt and some to S
+        for j in eachnode(dg), i in eachnode(dg)
+            # Add source term contribution to ut
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            # TODO - Add source term support
+            # x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+            # st = calc_source_t_N34(u_node, up_node, upp_node, um_node, umm_node,
+            #                        x, t, dt, source_terms,
+            #                        equations, dg, cache)
+            # Trixi.multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
+            # Trixi.multiply_add_to_node_vars!(utt, dt, st, equations, dg, i, j) # has no jacobian factor
+        end
+
+        for j in eachnode(dg), i in eachnode(dg)
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            ut_node = Trixi.get_node_vars(ut, equations, dg, i, j)
+            utt_node = Trixi.get_node_vars(utt, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(U, 1.0 / 6.0, utt_node, equations, dg, i, j)
+
+            Ja = get_contravariant_matrix(contravariant_vectors, i, j, element)
+
+            f_tt = compute_second_derivative_enzyme_2d(u_node, ut_node, utt_node, 1,
+                                                       equations)
+            g_tt = compute_second_derivative_enzyme_2d(u_node, ut_node, utt_node, 2,
+                                                       equations)
+            ftilde_tt, gtilde_tt = transform2contravariant(f_tt, g_tt, Ja)
+
+            Trixi.multiply_add_to_node_vars!(Ftilde, 1.0 / 6.0, ftilde_tt, equations, dg, i,
+                                             j)
+            Trixi.multiply_add_to_node_vars!(element_cache.F, 1.0 / 6.0, f_tt, equations,
+                                             dg, 1, i, j, element)
+            Trixi.multiply_add_to_node_vars!(Gtilde, 1.0 / 6.0, gtilde_tt, equations, dg, i,
+                                             j)
+            Trixi.multiply_add_to_node_vars!(element_cache.F, 1.0 / 6.0, g_tt, equations,
+                                             dg, 2, i, j, element)
+
+            for ii in eachnode(dg)
+                # res              += -lam * D * F for each variable
+                # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)
+                Trixi.multiply_add_to_node_vars!(uttt, -dt * derivative_matrix[ii, i],
+                                                 ftilde_tt, equations, dg, ii, j)
+            end
+
+            for jj in eachnode(dg)
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                Trixi.multiply_add_to_node_vars!(uttt, -dt * derivative_matrix[jj, j],
+                                                 gtilde_tt, equations, dg, i, jj)
+            end
+        end
+
+        # Apply Jacobian to uttt
+        for j in eachnode(dg), i in eachnode(dg)
+            inv_jacobian = inverse_jacobian[i, j, element]
+            for v in eachvariable(equations)
+                uttt[v, i, j] *= inv_jacobian
+            end
+        end
+
+        # Add source term contribution to uttt and some to S
+        for j in eachnode(dg), i in eachnode(dg)
+            # Add source term contribution to ut
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+            # TODO - Add source term support
+            # stt = calc_source_tt_N23(u_node, up_node, um_node, x, t, dt, source_terms,
+            #                          equations, dg, cache)
+            # Trixi.multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, equations, dg, i, j)
+            # Trixi.multiply_add_to_node_vars!(uttt, dt, stt, equations, dg, i, j) # has no jacobian factor
+        end
+
+        for j in eachnode(dg), i in eachnode(dg)
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            ut_node = Trixi.get_node_vars(ut, equations, dg, i, j)
+            utt_node = Trixi.get_node_vars(utt, equations, dg, i, j)
+            uttt_node = Trixi.get_node_vars(uttt, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(U, 1.0 / 24.0, uttt_node, equations, dg, i, j)
+
+            Ja = get_contravariant_matrix(contravariant_vectors, i, j, element)
+
+            fttt = compute_third_derivative_enzyme_2d(u_node, ut_node, utt_node, uttt_node,
+                                                      1,
+                                                      equations)
+            gttt = compute_third_derivative_enzyme_2d(u_node, ut_node, utt_node, uttt_node,
+                                                      2,
+                                                      equations)
+            ftilde_ttt, gtilde_ttt = transform2contravariant(fttt, gttt, Ja)
+
+            # Updating u_np1_low here
+            F_ = Trixi.get_node_vars(Ftilde, equations, dg, i, j)
+            G_ = Trixi.get_node_vars(Gtilde, equations, dg, i, j)
+
+            for ii in eachnode(dg)
+                inv_jacobian = inverse_jacobian[ii, j, element]
+                # res              += -lam * D * F for each variable
+                # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
+                Trixi.multiply_add_to_node_vars!(u_np1_low,
+                                                 -dt * inv_jacobian *
+                                                 derivative_matrix[ii, i],
+                                                 F_, equations, dg, ii, j)
+            end
+
+            for jj in eachnode(dg)
+                inv_jacobian = inverse_jacobian[i, jj, element]
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                Trixi.multiply_add_to_node_vars!(u_np1_low,
+                                                 -dt * inv_jacobian *
+                                                 derivative_matrix[jj, j],
+                                                 G_, equations, dg, i, jj)
+            end
+
+            # TODO - Check the source term contribution
+            S_node = Trixi.get_node_vars(S, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(u_np1_low, 1.0, S_node, equations, dg, i, j)
+            # UPDATING u_np1_low ENDS!!!
+
+            Trixi.multiply_add_to_node_vars!(element_cache.F, 1.0 / 24.0, fttt, equations,
+                                             dg, 1, i, j, element)
+            Trixi.multiply_add_to_node_vars!(Ftilde, 1.0 / 24.0, ftilde_ttt, equations, dg,
+                                             i, j)
+            multiply_add_to_node_vars!(element_cache.F, 1.0 / 24.0, gttt, equations, dg, 2,
+                                       i, j, element)
+            multiply_add_to_node_vars!(Gtilde, 1.0 / 24.0, gtilde_ttt, equations, dg, i, j)
+
+            Ftilde_node = get_node_vars(Ftilde, equations, dg, i, j)
+            Gtilde_node = get_node_vars(Gtilde, equations, dg, i, j)
+            for ii in eachnode(dg)
+                # res              += -lam * D * F for each variable
+                # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
+                multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], Ftilde_node,
+                                           equations, dg, ii, j, element)
+
+                multiply_add_to_node_vars!(u_np1,
+                                           -dt * inv_jacobian * derivative_matrix[ii, i],
+                                           Ftilde_node, equations, dg, ii, j)
+            end
+            for jj in eachnode(dg)
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], Gtilde_node,
+                                           equations, dg, i, jj, element)
+
+                multiply_add_to_node_vars!(u_np1,
+                                           -dt * inv_jacobian * derivative_matrix[jj, j],
+                                           Gtilde_node, equations, dg, i, jj)
+            end
+
+            u_node = get_node_vars(u, equations, dg, i, j, element)
+            x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+            # TODO - Add source term support
+            # sttt = calc_source_ttt_N34(u_node, up_node, um_node, upp_node, umm_node,
+            #                            x, t, dt, source_terms,
+            #                            equations, dg, cache)
+            # multiply_add_to_node_vars!(S, 1.0 / 24.0, sttt, equations, dg, i, j)
 
             # TODO - update to v1.8 and call with @inline
             # Give u1_ or U depending on dissipation model
@@ -2265,6 +3006,412 @@ using Trixi: @threaded
             stttt = calc_source_tttt_N4(u_node, up_node, um_node, upp_node, umm_node,
                                         x, t, dt, source_terms, equations, dg, cache)
             Trixi.multiply_add_to_node_vars!(S, 1.0 / 120.0, stttt, equations, dg, i, j)
+
+            # TODO - update to v1.8 and call with @inline
+            # Give u1_ or U depending on dissipation model
+            U_node = Trixi.get_node_vars(U, equations, dg, i, j)
+
+            # Ub = UT * V
+            # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
+            Trixi.set_node_vars!(element_cache.U, U_node, equations, dg, i, j, element)
+
+            S_node = Trixi.get_node_vars(S, equations, dg, i, j)
+            inv_jacobian = inverse_jacobian[i, j, element]
+            Trixi.multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg,
+                                             i, j, element)
+            Trixi.multiply_add_to_node_vars!(u_np1, 1.0, S_node, equations, dg, i, j)
+        end
+
+        @unpack temporal_errors = cache
+        @unpack abstol, reltol = tolerances
+        temporal_errors[element] = zero(dt)
+        for j in eachnode(dg), i in eachnode(dg)
+            u_np1_node = Trixi.get_node_vars(u_np1, equations, dg, i, j)
+            u_np1_low_node = Trixi.get_node_vars(u_np1_low, equations, dg, i, j)
+            # u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            for v in eachvariable(equations)
+                temporal_errors[element] += ((u_np1_node[v] - u_np1_low_node[v])
+                                             /
+                                             (abstol +
+                                              reltol * max(abs(u_np1_node[v]),
+                                                  abs(u_np1_low_node[v]))))^2
+            end
+        end
+
+        return nothing
+
+        # cell_arrays = cache.lw_res_cache.cell_arrays[Threads.threadid()]
+        # refresh!(arr) = fill!(arr, zero(eltype(u)))
+        # @unpack ut, utt, uttt, utttt, U, up, um, upp, umm, S, u_np1, u_np1_low = cell_arrays
+        # refresh!.((ut, utt, uttt, utttt))
+        # u_element = @view u[:,:,:,element]
+        # @turbo u_np1 .=  u_np1_low .=  um .= up .= umm .= upp .= U .= u_element # TODO - Is this the problem?
+
+        # # Compute flux f and source term s and use them to compute ut
+        # compute_f_s_ut!(cell_arrays, t, dt, u, source_terms, equations, dg, cache, element)
+
+        # # Compute ft, st and use them to compute utt
+        # compute_ft_st_utt!(cell_arrays, t, dt, u, source_terms, equations, dg, cache, element)
+
+        # # Compute ftt, stt and use them to compute uttt
+        # compute_ftt_stt_uttt!(cell_arrays, t, dt, u, source_terms, equations, dg, cache, element)
+
+        # # Compute ftt, stt and use them to compute uttt
+        # compute_fttt_sttt_utttt!(cell_arrays, t, dt, u, source_terms, equations, dg, cache, element)
+
+        # # Compute ftt, stt and use them to compute uttt
+        # compute_ftttt_stttt_du!(du, cell_arrays, t, dt, u, source_terms, equations, dg, cache, element, alpha)
+
+        # # Compute temporal_errors
+        # compute_temporal_errors!(cache, cell_arrays, tolerances, dt, equations, dg, element)
+
+        # return nothing
+    end
+
+    function lw_volume_kernel_4!(du, u, t, dt, tolerances,
+                                 element,
+                                 mesh::Union{StructuredMesh{2}, UnstructuredMesh2D,
+                                             P4estMesh{2}},
+                                 nonconservative_terms::False, source_terms, equations,
+                                 dg::DGSEM{<:Any, <:Any, <:Any,
+                                           <:Union{VolumeIntegralFR{LWADEnzyme},
+                                                   VolumeIntegralFRShockCapturing{LWADEnzyme,
+                                                                                  <:Any}}},
+                                 cache,
+                                 alpha = true)
+
+        # true * [some floating point value] == [exactly the same floating point value]
+        # This can (hopefully) be optimized away due to constant propagation.
+        @unpack derivative_dhat, derivative_matrix = dg.basis
+        @unpack contravariant_vectors, inverse_jacobian, node_coordinates = cache.elements
+        @unpack lw_res_cache, element_cache = cache
+        @unpack cell_arrays = lw_res_cache
+        @unpack elements = cache # To access cache.U and cache.F
+        refresh!(arr) = fill!(arr, zero(eltype(u)))
+        id = Threads.threadid()
+        f, g, ftilde, gtilde, Ftilde, Gtilde, ut, utt, uttt, utttt, U,
+        up, um, upp, umm, S, u_np1, u_np1_low = cell_arrays[id]
+        refresh!.((ut, utt, uttt, utttt))
+        u_element = @view u[:, :, :, element]
+        @.. begin
+            u_np1 = u_element
+            u_np1_low = u_element
+            U = u_element
+        end
+        for j in eachnode(dg), i in eachnode(dg)
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+
+            Ja = get_contravariant_matrix(contravariant_vectors, i, j, element)
+
+            flux1, flux2, cv_flux1, cv_flux2 = contravariant_flux(u_node, Ja, equations)
+
+            Trixi.set_node_vars!(element_cache.F, flux1, equations, dg, 1, i, j, element)
+            Trixi.set_node_vars!(element_cache.F, flux2, equations, dg, 2, i, j, element)
+            Trixi.set_node_vars!(f, flux1, equations, dg, i, j)
+            Trixi.set_node_vars!(g, flux2, equations, dg, i, j)
+
+            Trixi.set_node_vars!(Ftilde, cv_flux1, equations, dg, i, j)
+            Trixi.set_node_vars!(ftilde, cv_flux1, equations, dg, i, j)
+            for ii in eachnode(dg)
+                # ut              += -lam * D * f for each variable
+                # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
+                Trixi.multiply_add_to_node_vars!(ut, -dt * derivative_matrix[ii, i],
+                                                 cv_flux1, equations, dg, ii, j)
+            end
+
+            Trixi.set_node_vars!(Gtilde, cv_flux2, equations, dg, i, j)
+            Trixi.set_node_vars!(gtilde, cv_flux2, equations, dg, i, j)
+            for jj in eachnode(dg)
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                Trixi.multiply_add_to_node_vars!(ut, -dt * derivative_matrix[jj, j],
+                                                 cv_flux2, equations, dg, i, jj)
+            end
+        end
+        # Scale ut
+        for j in eachnode(dg), i in eachnode(dg)
+            inv_jacobian = inverse_jacobian[i, j, element]
+            for v in eachvariable(equations)
+                ut[v, i, j] *= inv_jacobian
+            end
+        end
+
+        # Add source term contribution to ut and some to S
+        for j in eachnode(dg), i in eachnode(dg)
+            # Add source term contribution to ut
+            x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            s_node = calc_source(u_node, x, t, source_terms, equations, dg, cache)
+            Trixi.set_node_vars!(S, s_node, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(ut, dt, s_node, equations, dg, i, j) # has no jacobian factor
+        end
+
+        for j in eachnode(dg), i in eachnode(dg)
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            ut_node = Trixi.get_node_vars(ut, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(U, 0.5, ut_node, equations, dg, i, j)
+
+            Ja = get_contravariant_matrix(contravariant_vectors, i, j, element)
+
+            f_t = compute_first_derivative_enzyme_2d(u_node, ut_node, 1, equations)
+            g_t = compute_first_derivative_enzyme_2d(u_node, ut_node, 2, equations)
+            ftilde_t, gtilde_t = transform2contravariant(f_t, g_t, Ja)
+
+            Trixi.multiply_add_to_node_vars!(element_cache.F, 0.5, f_t, equations, dg, 1, i,
+                                             j, element)
+            Trixi.multiply_add_to_node_vars!(element_cache.F, 0.5, g_t, equations, dg, 2, i,
+                                             j, element)
+            Trixi.multiply_add_to_node_vars!(Ftilde, 0.5, ftilde_t, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(Gtilde, 0.5, gtilde_t, equations, dg, i, j)
+            for ii in eachnode(dg)
+                # res              += -lam * D * F for each variable
+                # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)
+                Trixi.multiply_add_to_node_vars!(utt, -dt * derivative_matrix[ii, i],
+                                                 ftilde_t, equations, dg, ii, j)
+            end
+            for jj in eachnode(dg)
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                Trixi.multiply_add_to_node_vars!(utt, -dt * derivative_matrix[jj, j],
+                                                 gtilde_t, equations, dg, i, jj)
+            end
+        end
+
+        # Apply Jacobian to utt
+        for j in eachnode(dg), i in eachnode(dg)
+            inv_jacobian = inverse_jacobian[i, j, element]
+            for v in eachvariable(equations)
+                utt[v, i, j] *= inv_jacobian
+            end
+        end
+
+        # Add source term contribution to utt and some to S
+        for j in eachnode(dg), i in eachnode(dg)
+            # Add source term contribution to ut
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+            # TODO - Add source term support
+            # st = calc_source_t_N34(u_node, up_node, upp_node, um_node, umm_node,
+            #                        x, t, dt, source_terms,
+            #                        equations, dg, cache)
+            # Trixi.multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
+            # Trixi.multiply_add_to_node_vars!(utt, dt, st, equations, dg, i, j) # has no jacobian factor
+        end
+
+        for j in eachnode(dg), i in eachnode(dg)
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            ut_node = Trixi.get_node_vars(ut, equations, dg, i, j)
+            utt_node = Trixi.get_node_vars(utt, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(U, 1.0 / 6.0, utt_node, equations, dg, i, j)
+
+            Ja = get_contravariant_matrix(contravariant_vectors, i, j, element)
+
+            f_tt = compute_second_derivative_enzyme_2d(u_node, ut_node, utt_node, 1,
+                                                       equations)
+            g_tt = compute_second_derivative_enzyme_2d(u_node, ut_node, utt_node, 2,
+                                                       equations)
+            ftilde_tt, gtilde_tt = transform2contravariant(f_tt, g_tt, Ja)
+
+            Trixi.multiply_add_to_node_vars!(Ftilde, 1.0 / 6.0, ftilde_tt, equations, dg, i,
+                                             j)
+            Trixi.multiply_add_to_node_vars!(element_cache.F, 1.0 / 6.0, f_tt, equations,
+                                             dg, 1, i, j, element)
+            Trixi.multiply_add_to_node_vars!(Gtilde, 1.0 / 6.0, gtilde_tt, equations, dg, i,
+                                             j)
+            Trixi.multiply_add_to_node_vars!(element_cache.F, 1.0 / 6.0, g_tt, equations,
+                                             dg, 2, i, j,
+                                             element)
+
+            for ii in eachnode(dg)
+                # res              += -lam * D * F for each variable
+                # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)
+                Trixi.multiply_add_to_node_vars!(uttt, -dt * derivative_matrix[ii, i],
+                                                 ftilde_tt,
+                                                 equations, dg, ii, j)
+            end
+
+            for jj in eachnode(dg)
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                Trixi.multiply_add_to_node_vars!(uttt, -dt * derivative_matrix[jj, j],
+                                                 gtilde_tt,
+                                                 equations, dg, i, jj)
+            end
+        end
+
+        # Apply Jacobian to uttt
+        for j in eachnode(dg), i in eachnode(dg)
+            inv_jacobian = inverse_jacobian[i, j, element]
+            for v in eachvariable(equations)
+                uttt[v, i, j] *= inv_jacobian
+            end
+        end
+
+        # Add source term contribution to uttt and some to S
+        for j in eachnode(dg), i in eachnode(dg)
+            # Add source term contribution to ut
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+
+            x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+            # TODO - Add source term support
+            # stt = calc_source_tt_N4(u_node, up_node, upp_node, um_node, umm_node, x, t, dt,
+            #                         source_terms,
+            #                         equations, dg, cache)
+            # Trixi.multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, equations, dg, i, j)
+            # Trixi.multiply_add_to_node_vars!(uttt, dt, stt, equations, dg, i, j) # has no jacobian factor
+        end
+
+        for j in eachnode(dg), i in eachnode(dg)
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            ut_node = Trixi.get_node_vars(ut, equations, dg, i, j)
+            utt_node = Trixi.get_node_vars(utt, equations, dg, i, j)
+            uttt_node = Trixi.get_node_vars(uttt, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(U, 1.0 / 24.0, uttt_node, equations, dg, i, j)
+
+            Ja = get_contravariant_matrix(contravariant_vectors, i, j, element)
+
+            fttt = compute_third_derivative_enzyme_2d(u_node, ut_node, utt_node, uttt_node,
+                                                      1, equations)
+            gttt = compute_third_derivative_enzyme_2d(u_node, ut_node, utt_node, uttt_node,
+                                                      2, equations)
+            ftilde_ttt, gtilde_ttt = transform2contravariant(fttt, gttt, Ja)
+            Trixi.multiply_add_to_node_vars!(element_cache.F, 1.0 / 24.0, fttt, equations,
+                                             dg, 1, i, j, element)
+            Trixi.multiply_add_to_node_vars!(Ftilde, 1.0 / 24.0, ftilde_ttt, equations, dg,
+                                             i, j)
+            Trixi.multiply_add_to_node_vars!(element_cache.F, 1.0 / 24.0, gttt, equations,
+                                             dg, 2, i, j, element)
+            Trixi.multiply_add_to_node_vars!(Gtilde, 1.0 / 24.0, gtilde_ttt, equations, dg,
+                                             i, j)
+
+            for ii in eachnode(dg)
+                # ut              += -lam * D * ft for each variable
+                # i.e.,  ut[ii,j] += -lam * Dm[ii,i] ft[i,j] (sum over i)
+                Trixi.multiply_add_to_node_vars!(utttt, -dt * derivative_matrix[ii, i],
+                                                 ftilde_ttt, equations, dg, ii, j)
+            end
+            for jj in eachnode(dg)
+                # C += -lam*gt*Dm' for each variable
+                # C[i,jj] += -lam*gt[i,j]*Dm[jj,j] (sum over j)
+                Trixi.multiply_add_to_node_vars!(utttt, -dt * derivative_matrix[jj, j],
+                                                 gtilde_ttt, equations, dg, i, jj)
+            end
+        end
+
+        # Apply jacobian on utttt
+        for j in eachnode(dg), i in eachnode(dg)
+            inv_jacobian = inverse_jacobian[i, j, element]
+            for v in eachvariable(equations)
+                utttt[v, i, j] *= inv_jacobian
+            end
+        end
+
+        # Add source term contribution to utttt and some to S
+        for j in eachnode(dg), i in eachnode(dg)
+            # Add source term contribution to ut
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+            # TODO - Add source term support
+            # sttt = calc_source_ttt_N34(u_node, up_node, upp_node, um_node, umm_node,
+            #                            x, t, dt, source_terms,
+            #                            equations, dg, cache)
+            # Trixi.multiply_add_to_node_vars!(S, 1.0 / 24.0, sttt, equations, dg, i, j)
+            # Trixi.multiply_add_to_node_vars!(utttt, dt, sttt, equations, dg, i, j) # has no jacobian factor
+        end
+
+        for j in eachnode(dg), i in eachnode(dg)
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            ut_node = Trixi.get_node_vars(ut, equations, dg, i, j)
+            utt_node = Trixi.get_node_vars(utt, equations, dg, i, j)
+            uttt_node = Trixi.get_node_vars(uttt, equations, dg, i, j)
+            utttt_node = Trixi.get_node_vars(utttt, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(U, 1.0 / 120.0, utttt_node, equations, dg, i,
+                                             j)
+
+            Ja = get_contravariant_matrix(contravariant_vectors, i, j, element)
+
+            ftttt = compute_fourth_derivative_enzyme_2d(u_node, ut_node, utt_node,
+                                                        uttt_node, utttt_node, 1, equations)
+            gtttt = compute_fourth_derivative_enzyme_2d(u_node, ut_node, utt_node,
+                                                        uttt_node, utttt_node, 2, equations)
+            ftilde_tttt, gtilde_tttt = transform2contravariant(ftttt, gtttt, Ja)
+
+            # Updating u_np1_low here
+            F_ = Trixi.get_node_vars(Ftilde, equations, dg, i, j)
+            G_ = Trixi.get_node_vars(Gtilde, equations, dg, i, j)
+
+            for ii in eachnode(dg)
+                inv_jacobian = inverse_jacobian[ii, j, element]
+                # res              += -lam * D * F for each variable
+                # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
+                Trixi.multiply_add_to_node_vars!(u_np1_low,
+                                                 -dt * inv_jacobian *
+                                                 derivative_matrix[ii, i],
+                                                 F_, equations, dg, ii, j)
+            end
+
+            for jj in eachnode(dg)
+                inv_jacobian = inverse_jacobian[i, jj, element]
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                Trixi.multiply_add_to_node_vars!(u_np1_low,
+                                                 -dt * inv_jacobian *
+                                                 derivative_matrix[jj, j],
+                                                 G_, equations, dg, i, jj)
+            end
+
+            # TODO - Check the source term contribution
+            S_node = Trixi.get_node_vars(S, equations, dg, i, j)
+            Trixi.multiply_add_to_node_vars!(u_np1_low, 1.0, S_node, equations, dg, i, j)
+
+            # UPDATING u_np1_low ENDS!!!
+
+            Trixi.multiply_add_to_node_vars!(element_cache.F, 1.0 / 120.0, ftttt, equations,
+                                             dg, 1, i, j, element)
+            Trixi.multiply_add_to_node_vars!(element_cache.F, 1.0 / 120.0, gtttt, equations,
+                                             dg, 2, i, j, element)
+            Trixi.multiply_add_to_node_vars!(Ftilde, 1.0 / 120.0, ftilde_tttt, equations,
+                                             dg, i, j)
+            Trixi.multiply_add_to_node_vars!(Gtilde, 1.0 / 120.0, gtilde_tttt, equations,
+                                             dg, i, j)
+
+            Ftilde_node = Trixi.get_node_vars(Ftilde, equations, dg, i, j)
+            Gtilde_node = Trixi.get_node_vars(Gtilde, equations, dg, i, j)
+            for ii in eachnode(dg)
+                inv_jacobian = inverse_jacobian[ii, j, element]
+                # res              += -lam * D * F for each variable
+                # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
+                Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i],
+                                                 Ftilde_node,
+                                                 equations, dg, ii, j, element)
+
+                Trixi.multiply_add_to_node_vars!(u_np1,
+                                                 -dt * inv_jacobian *
+                                                 derivative_matrix[ii, i],
+                                                 Ftilde_node, equations, dg, ii, j)
+            end
+
+            for jj in eachnode(dg)
+                inv_jacobian = inverse_jacobian[i, jj, element]
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j],
+                                                 Gtilde_node,
+                                                 equations, dg, i, jj, element)
+
+                Trixi.multiply_add_to_node_vars!(u_np1,
+                                                 -dt * inv_jacobian *
+                                                 derivative_matrix[jj, j],
+                                                 Gtilde_node, equations, dg, i, jj)
+            end
+
+            # TODO - Add source term contribution to u_np1, u_np1_low too
+
+            u_node = Trixi.get_node_vars(u, equations, dg, i, j, element)
+            # x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+            # stttt = calc_source_tttt_N4(u_node, up_node, um_node, upp_node, umm_node,
+            #                             x, t, dt, source_terms, equations, dg, cache)
+            # Trixi.multiply_add_to_node_vars!(S, 1.0 / 120.0, stttt, equations, dg, i, j)
 
             # TODO - update to v1.8 and call with @inline
             # Give u1_ or U depending on dissipation model
