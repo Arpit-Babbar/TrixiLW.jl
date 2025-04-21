@@ -2040,7 +2040,6 @@ end
         ut_node = get_node_vars(ut, equations, dg, i, j)
         multiply_add_to_node_vars!(U_cell, 0.5, ut_node, equations, dg, i, j)
 
-
         ft_node = compute_first_derivative_enzyme_2d(u_node, ut_node, 1, equations)
         gt_node = compute_first_derivative_enzyme_2d(u_node, ut_node, 2, equations)
 
@@ -2140,10 +2139,10 @@ end
         multiply_add_to_node_vars!(U_cell, 1.0 / 24.0, uttt_node, equations, dg, i, j)
 
         fttt = compute_third_derivative_enzyme_2d(u_node, ut_node, utt_node, uttt_node,
-                                            1, equations)
+                                                  1, equations)
         multiply_add_to_node_vars!(F_cell, 1.0 / 24.0, fttt, equations, dg, i, j)
         gttt = compute_third_derivative_enzyme_2d(u_node, ut_node, utt_node, uttt_node,
-                                            2, equations)
+                                                  2, equations)
         multiply_add_to_node_vars!(G_cell, 1.0 / 24.0, gttt, equations, dg, i, j)
 
         for ii in eachnode(dg)
@@ -2212,9 +2211,9 @@ end
         # UPDATING u_np1_low ENDS!!!
 
         ftttt = compute_fourth_derivative_enzyme_2d(u_node, ut_node, utt_node,
-                                            uttt_node, utttt_node, 1, equations)
+                                                    uttt_node, utttt_node, 1, equations)
         gtttt = compute_fourth_derivative_enzyme_2d(u_node, ut_node, utt_node,
-                                            uttt_node, utttt_node, 2, equations)
+                                                    uttt_node, utttt_node, 2, equations)
         multiply_add_to_node_vars!(F_cell, 1.0 / 120.0, ftttt, equations, dg, i, j)
         multiply_add_to_node_vars!(G_cell, 1.0 / 120.0, gtttt, equations, dg, i, j)
 
