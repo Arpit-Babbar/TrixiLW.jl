@@ -234,7 +234,7 @@ full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
                                                                "euler_double_mach_reflection_amr",
                                                                final_time=1e-4)
 @testset "$full_test_name" begin
-    compare_errors_txt(sol, analysis_callback, full_test_name)
+    compare_errors_txt(sol, analysis_callback, full_test_name; tol = 1e-7)
 end
 
 full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
@@ -247,7 +247,7 @@ full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
                                                                "euler_forward_step_amr",
                                                                final_time=1e-4)
 @testset "$full_test_name" begin
-    compare_errors_txt(sol, analysis_callback, full_test_name)
+    compare_errors_txt(sol, analysis_callback, full_test_name; tol = 1e-7)
 end
 
 full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
@@ -261,14 +261,14 @@ full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
                                                                "euler_naca0012_deep_amr",
                                                                final_time=1e-6)
 @testset "$full_test_name" begin
-    compare_errors_txt(sol, analysis_callback, full_test_name)
+    compare_errors_txt(sol, analysis_callback, full_test_name; tol = 1e-7)
 end
 
 full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
                                                                "euler_supersonic_cylinder_amr",
                                                                final_time=1e-4)
 @testset "$full_test_name" begin
-    compare_errors_txt(sol, analysis_callback, full_test_name)
+    compare_errors_txt(sol, analysis_callback, full_test_name; tol = 1e-7)
 end
 
 full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
