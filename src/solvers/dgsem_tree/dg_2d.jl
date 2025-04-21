@@ -52,6 +52,37 @@ end
     return ddf(u, du, ddu, orientation, equations)
 end
 
+function compute_third_derivative_enzyme_2d(u, du, ddu, dddu, orientation, equations)
+    df(x, dx) = autodiff(Enzyme.set_abi(Forward, Enzyme.InlineABI), flux, Duplicated,
+                         Duplicated(x, dx), Const(orientation), Const(equations))[1]
+    ddf(x, dx, ddx) = autodiff(Enzyme.set_abi(Forward, Enzyme.InlineABI), df,
+                               Duplicated, Duplicated(x, dx), Duplicated(dx, ddx))[1]
+    dddf(x, dx, ddx, dddx) = autodiff(Enzyme.set_abi(Forward, Enzyme.InlineABI), ddf,
+                                      Duplicated, Duplicated(x, dx),
+                                      Duplicated(dx, ddx), Duplicated(ddx, dddx))[1]
+
+    return dddf(u, du, ddu, dddu)
+end
+
+function compute_fourth_derivative_enzyme_2d(u, du, ddu, dddu, ddddu, orienation,
+                                             equations)
+    df(x, dx) = autodiff(Enzyme.set_abi(Forward, Enzyme.InlineABI), flux, Duplicated,
+                         Duplicated(x, dx), Const(orienation),
+                         Const(equations))[1]
+    ddf(x, dx, ddx) = autodiff(Enzyme.set_abi(Forward, Enzyme.InlineABI), df,
+                               Duplicated, Duplicated(x, dx), Duplicated(dx, ddx))[1]
+    dddf(x, dx, ddx, dddx) = autodiff(Enzyme.set_abi(Forward, Enzyme.InlineABI), ddf,
+                                      Duplicated, Duplicated(x, dx),
+                                      Duplicated(dx, ddx), Duplicated(ddx, dddx))[1]
+    ddddf(x, dx, ddx, dddx, ddddx) = autodiff(Enzyme.set_abi(Forward, Enzyme.InlineABI),
+                                              dddf, Duplicated, Duplicated(x, dx),
+                                              Duplicated(dx, ddx),
+                                              Duplicated(ddx, dddx),
+                                              Duplicated(dddx, ddddx))[1]
+
+    return ddddf(u, du, ddu, dddu, ddddu)
+end
+
 # @inline @inbounds function compute_first_derivative_taylor_diff(u, du, orientation, equations)
 #    return derivative(@inline(u -> flux(u, orientation, equations)), u, du, Val(1))
 # end
@@ -1337,6 +1368,228 @@ end
     return nothing
 end
 
+@inline function lw_volume_kernel_3!(du, u,
+                                     t, dt, tolerances,
+                                     element, mesh::TreeMesh{2},
+                                     nonconservative_terms::False, source_terms,
+                                     equations,
+                                     dg::DGSEM{<:Any, <:Any, <:Any,
+                                               <:Union{VolumeIntegralFR{LWADEnzyme},
+                                                       VolumeIntegralFRShockCapturing{LWADEnzyme,
+                                                                                      <:Any}}},
+                                     cache, alpha = true)
+    # true * [some floating point value] == [exactly the same floating point value]
+    # This can (hopefully) be optimized away due to constant propagation.
+    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack node_coordinates = cache.elements
+
+    @unpack lw_res_cache, element_cache = cache
+    @unpack cell_arrays = lw_res_cache
+
+    inv_jacobian = cache.elements.inverse_jacobian[element]
+
+    id = Threads.threadid()
+
+    refresh!(arr) = fill!(arr, zero(eltype(u)))
+
+    f, g, F, G, ut, utt, uttt, U, S = cell_arrays[id]
+    refresh!.((ut, utt, uttt))
+    for j in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+
+        flux1, flux2 = fluxes(u_node, equations)
+
+        set_node_vars!(f, flux1, equations, dg, i, j)
+        set_node_vars!(g, flux2, equations, dg, i, j)
+
+        set_node_vars!(F, flux1, equations, dg, i, j)
+        for ii in eachnode(dg)
+            # ut              += -lam * D * f for each variable
+            # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
+            multiply_add_to_node_vars!(ut, -dt * derivative_matrix[ii, i], flux1,
+                                       equations, dg, ii, j)
+        end
+
+        set_node_vars!(G, flux2, equations, dg, i, j)
+        for jj in eachnode(dg)
+            # C += -lam*g*Dm' for each variable
+            # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+            multiply_add_to_node_vars!(ut, -dt * derivative_matrix[jj, j], flux2,
+                                       equations, dg, i, jj)
+        end
+
+        set_node_vars!(U, u_node, equations, dg, i, j)
+    end
+    # Scale ut
+    for j in eachnode(dg), i in eachnode(dg)
+        for v in eachvariable(equations)
+            ut[v, i, j] *= inv_jacobian
+        end
+    end
+
+    # Add source term contribution to ut and some to S
+    for j in eachnode(dg), i in eachnode(dg)
+        # Add source term contribution to ut
+        x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+        s_node = calc_source(u_node, x, t, source_terms, equations, dg, cache)
+        set_node_vars!(S, s_node, equations, dg, i, j)
+        multiply_add_to_node_vars!(ut, dt, s_node, equations, dg, i, j) # has no jacobian factor
+    end
+
+    for j in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+        ut_node = get_node_vars(ut, equations, dg, i, j)
+        multiply_add_to_node_vars!(U, 0.5, ut_node, equations, dg, i, j)
+
+        ft = compute_first_derivative_enzyme_2d(u_node, ut_node, 1, equations)
+        gt = compute_first_derivative_enzyme_2d(u_node, ut_node, 2, equations)
+
+        multiply_add_to_node_vars!(F, 0.5, ft, equations, dg, i, j)
+        multiply_add_to_node_vars!(G, 0.5, gt, equations, dg, i, j)
+        for ii in eachnode(dg)
+            # res              += -lam * D * F for each variable
+            # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)
+            multiply_add_to_node_vars!(utt, -dt * derivative_matrix[ii, i], ft,
+                                       equations, dg, ii, j)
+        end
+
+        for jj in eachnode(dg)
+            # C += -lam*g*Dm' for each variable
+            # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+            multiply_add_to_node_vars!(utt, -dt * derivative_matrix[jj, j], gt,
+                                       equations, dg, i, jj)
+        end
+    end
+
+    # Apply Jacobian to utt
+    for j in eachnode(dg), i in eachnode(dg)
+        # inv_jacobian = inverse_jacobian[i,j,element]
+        for v in eachvariable(equations)
+            utt[v, i, j] *= inv_jacobian
+        end
+    end
+
+    # Add source term contribution to utt and some to S
+    for j in eachnode(dg), i in eachnode(dg)
+        # Add source term contribution to ut
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+        x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+        # TODO - Add source terms support
+        # st = calc_source_t_N34(u_node, up_node, upp_node, um_node, umm_node,
+        #                        x, t, dt, source_terms,
+        #                        equations, dg, cache)
+        # multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
+        # multiply_add_to_node_vars!(utt, dt, st, equations, dg, i, j) # has no jacobian factor
+    end
+
+    for j in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+        ut_node = get_node_vars(ut, equations, dg, i, j)
+        utt_node = get_node_vars(utt, equations, dg, i, j)
+        multiply_add_to_node_vars!(U, 1.0 / 6.0, utt_node, equations, dg, i, j)
+
+        ftt = compute_second_derivative_enzyme_2d(u_node, ut_node, utt_node, 1,
+                                                  equations)
+        gtt = compute_second_derivative_enzyme_2d(u_node, ut_node, utt_node, 2,
+                                                  equations)
+
+        multiply_add_to_node_vars!(F, 1.0 / 6.0, ftt, equations, dg, i, j)
+        multiply_add_to_node_vars!(G, 1.0 / 6.0, gtt, equations, dg, i, j)
+
+        for ii in eachnode(dg)
+            # res              += -lam * D * F for each variable
+            # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)
+            multiply_add_to_node_vars!(uttt, -dt * derivative_matrix[ii, i], ftt,
+                                       equations, dg, ii, j)
+        end
+
+        for jj in eachnode(dg)
+            # C += -lam*g*Dm' for each variable
+            # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+            multiply_add_to_node_vars!(uttt, -dt * derivative_matrix[jj, j], gtt,
+                                       equations, dg, i, jj)
+        end
+    end
+
+    # Apply Jacobian to uttt
+    for j in eachnode(dg), i in eachnode(dg)
+        # inv_jacobian = inverse_jacobian[i,j,element]
+        for v in eachvariable(equations)
+            uttt[v, i, j] *= inv_jacobian
+        end
+    end
+
+    # Add source term contribution to uttt and some to S
+    for j in eachnode(dg), i in eachnode(dg)
+        # Add source term contribution to ut
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+        x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+        # TODO - Add source terms support
+        # stt = calc_source_tt_N23(u_node, up_node, um_node, x, t, dt, source_terms,
+        #                          equations, dg, cache)
+        # multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, equations, dg, i, j)
+        # multiply_add_to_node_vars!(uttt, dt, stt, equations, dg, i, j) # has no jacobian factor
+    end
+
+    for j in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+        ut_node = get_node_vars(ut, equations, dg, i, j)
+        utt_node = get_node_vars(utt, equations, dg, i, j)
+        uttt_node = get_node_vars(uttt, equations, dg, i, j)
+        multiply_add_to_node_vars!(U, 1.0 / 24.0, uttt_node, equations, dg, i, j)
+
+        fttt = compute_third_derivative_enzyme_2d(u_node, ut_node, utt_node,
+                                                  uttt_node, 1, equations)
+        multiply_add_to_node_vars!(F, 1.0 / 24.0, fttt, equations, dg, i, j)
+        gttt = compute_third_derivative_enzyme_2d(u_node, ut_node, utt_node,
+                                                  uttt_node, 2, equations)
+        multiply_add_to_node_vars!(G, 1.0 / 24.0, gttt, equations, dg, i, j)
+
+        F_node = get_node_vars(F, equations, dg, i, j)
+        G_node = get_node_vars(G, equations, dg, i, j)
+        for ii in eachnode(dg)
+            # res              += -lam * D * F for each variable
+            # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
+            multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], F_node,
+                                       equations, dg, ii, j, element)
+        end
+
+        for jj in eachnode(dg)
+            # C += -lam*g*Dm' for each variable
+            # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+            multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], G_node,
+                                       equations, dg, i, jj, element)
+        end
+
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+        # x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+        # TODO - BIG BIG BUG. Incorrect ordering of arguments.
+        # Check all source terms if they have this bug
+        # sttt = calc_source_ttt_N34(u_node, up_node, upp_node, upp_node, umm_node,
+        #                            x, t, dt, source_terms,
+        #                            equations, dg, cache)
+        # multiply_add_to_node_vars!(S, 1.0 / 24.0, sttt, equations, dg, i, j)
+
+        # TODO - update to v1.8 and call with @inline
+        # Give u1_ or U depending on dissipation model
+        U_node = get_node_vars(U, equations, dg, i, j)
+
+        # Ub = UT * V
+        # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
+        set_node_vars!(element_cache.U, U_node, equations, dg, i, j, element)
+        set_node_vars!(element_cache.F, F_node, equations, dg, 1, i, j, element)
+        set_node_vars!(element_cache.F, G_node, equations, dg, 2, i, j, element)
+
+        S_node = get_node_vars(S, equations, dg, i, j)
+        # inv_jacobian = inverse_jacobian[i, j, element]
+        multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg,
+                                   i, j, element)
+    end
+
+    return nothing
+end
+
 @inline function lw_volume_kernel_4!(du, u,
                                      t, dt, tolerances,
                                      element, mesh::TreeMesh{2},
@@ -1673,6 +1926,323 @@ end
                                     x, t, dt, source_terms,
                                     equations, dg, cache)
         multiply_add_to_node_vars!(S, 1.0 / 120.0, stttt, equations, dg, i, j)
+
+        # TODO - update to v1.8 and call with @inline
+        # Give u1_ or U depending on dissipation model
+        U_node = get_node_vars(U_cell, equations, dg, i, j)
+
+        # Ub = UT * V
+        # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
+        set_node_vars!(element_cache.F, F_node, equations, dg, 1, i, j, element)
+        set_node_vars!(element_cache.F, G_node, equations, dg, 2, i, j, element)
+        set_node_vars!(element_cache.U, U_node, equations, dg, i, j, element)
+
+        S_node = get_node_vars(S, equations, dg, i, j)
+        # inv_jacobian = inverse_jacobian[i, j, element]
+        multiply_add_to_node_vars!(du, -1.0 / inv_jacobian, S_node, equations, dg,
+                                   i, j, element)
+    end
+
+    @unpack temporal_errors = cache
+    @unpack abstol, reltol = tolerances
+    temporal_errors[element] = zero(dt)
+    for j in eachnode(dg), i in eachnode(dg)
+        u_np1_node = get_node_vars(u_np1, equations, dg, i, j)
+        u_np1_low_node = get_node_vars(u_np1_low, equations, dg, i, j)
+        # u_node = get_node_vars(u, equations, dg, i, j, element)
+        for v in eachvariable(equations)
+            temporal_errors[element] += ((u_np1_node[v] - u_np1_low_node[v])
+                                         /
+                                         (abstol +
+                                          reltol * max(abs(u_np1_node[v]),
+                                              abs(u_np1_low_node[v]))))^2
+        end
+    end
+    return nothing
+end
+
+@inline function lw_volume_kernel_4!(du, u,
+                                     t, dt, tolerances,
+                                     element, mesh::TreeMesh{2},
+                                     nonconservative_terms::False,
+                                     source_terms, equations,
+                                     dg::DGSEM{<:Any, <:Any, <:Any,
+                                               <:Union{VolumeIntegralFR{LWADEnzyme},
+                                                       VolumeIntegralFRShockCapturing{LWADEnzyme,
+                                                                                      <:Any}}},
+                                     cache,
+                                     alpha = true)
+    # true * [some floating point value] == [exactly the same floating point value]
+    # This can (hopefully) be optimized away due to constant propagation.
+    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack node_coordinates = cache.elements
+
+    @unpack lw_res_cache, element_cache = cache
+    @unpack cell_arrays = lw_res_cache
+
+    inv_jacobian = cache.elements.inverse_jacobian[element]
+
+    id = Threads.threadid()
+
+    refresh!(arr) = fill!(arr, zero(eltype(u)))
+
+    f, g, F_cell, G_cell, ut, utt, uttt, utttt, U_cell, S, u_np1, u_np1_low = cell_arrays[id]
+    refresh!.((ut, utt, uttt, utttt))
+    for j in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+
+        flux1, flux2 = fluxes(u_node, equations)
+
+        set_node_vars!(f, flux1, equations, dg, i, j)
+        set_node_vars!(g, flux2, equations, dg, i, j)
+
+        set_node_vars!(F_cell, flux1, equations, dg, i, j)
+        for ii in eachnode(dg)
+            # ut              += -lam * D * f for each variable
+            # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
+            multiply_add_to_node_vars!(ut, -dt * derivative_matrix[ii, i], flux1,
+                                       equations, dg, ii, j)
+        end
+
+        set_node_vars!(G_cell, flux2, equations, dg, i, j)
+        for jj in eachnode(dg)
+            # C += -lam*g*Dm' for each variable
+            # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+            multiply_add_to_node_vars!(ut, -dt * derivative_matrix[jj, j], flux2,
+                                       equations, dg, i, jj)
+        end
+
+        set_node_vars!(u_np1, u_node, equations, dg, i, j)
+        set_node_vars!(u_np1_low, u_node, equations, dg, i, j)
+
+        set_node_vars!(U_cell, u_node, equations, dg, i, j)
+    end
+    # Scale ut
+    for j in eachnode(dg), i in eachnode(dg)
+        # inv_jacobian = inverse_jacobian[i,j,element]
+        for v in eachvariable(equations)
+            ut[v, i, j] *= inv_jacobian
+        end
+    end
+
+    # Add source term contribution to ut and some to S
+    for j in eachnode(dg), i in eachnode(dg)
+        # Add source term contribution to ut
+        x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+        s_node = calc_source(u_node, x, t, source_terms, equations, dg, cache)
+        set_node_vars!(S, s_node, equations, dg, i, j)
+        multiply_add_to_node_vars!(ut, dt, s_node, equations, dg, i, j) # has no jacobian factor
+    end
+
+    for j in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+        ut_node = get_node_vars(ut, equations, dg, i, j)
+        multiply_add_to_node_vars!(U_cell, 0.5, ut_node, equations, dg, i, j)
+
+
+        ft_node = compute_first_derivative_enzyme_2d(u_node, ut_node, 1, equations)
+        gt_node = compute_first_derivative_enzyme_2d(u_node, ut_node, 2, equations)
+
+        multiply_add_to_node_vars!(F_cell, 0.5, ft_node, equations, dg, i, j)
+        multiply_add_to_node_vars!(G_cell, 0.5, gt_node, equations, dg, i, j)
+        for ii in eachnode(dg)
+            # res              += -lam * D * F for each variable
+            # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)
+            multiply_add_to_node_vars!(utt, -dt * derivative_matrix[ii, i], ft_node,
+                                       equations, dg, ii, j)
+        end
+
+        for jj in eachnode(dg)
+            # C += -lam*g*Dm' for each variable
+            # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+            multiply_add_to_node_vars!(utt, -dt * derivative_matrix[jj, j], gt_node,
+                                       equations, dg, i, jj)
+        end
+    end
+
+    # Apply Jacobian to utt
+    for j in eachnode(dg), i in eachnode(dg)
+        # inv_jacobian = inverse_jacobian[i,j,element]
+        for v in eachvariable(equations)
+            utt[v, i, j] *= inv_jacobian
+        end
+    end
+
+    # Add source term contribution to utt and some to S
+    for j in eachnode(dg), i in eachnode(dg)
+        # Add source term contribution to ut
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+        # TODO - add source term support
+        # x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+        # st = calc_source_t_N34(u_node, up_node, upp_node, um_node, umm_node,
+        #                        x, t, dt, source_terms,
+        #                        equations, dg, cache)
+        # multiply_add_to_node_vars!(S, 0.5, st, equations, dg, i, j)
+        # multiply_add_to_node_vars!(utt, dt, st, equations, dg, i, j) # has no jacobian factor
+    end
+
+    for j in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+        ut_node = get_node_vars(ut, equations, dg, i, j)
+        utt_node = get_node_vars(utt, equations, dg, i, j)
+        multiply_add_to_node_vars!(U_cell, 1.0 / 6.0, utt_node, equations, dg, i, j)
+
+        ftt = compute_second_derivative_enzyme_2d(u_node, ut_node, utt_node, 1,
+                                                  equations)
+        gtt = compute_second_derivative_enzyme_2d(u_node, ut_node, utt_node, 2,
+                                                  equations)
+
+        multiply_add_to_node_vars!(F_cell, 1.0 / 6.0, ftt, equations, dg, i, j)
+        multiply_add_to_node_vars!(G_cell, 1.0 / 6.0, gtt, equations, dg, i, j)
+
+        for ii in eachnode(dg)
+            # res              += -lam * D * F for each variable
+            # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)
+            multiply_add_to_node_vars!(uttt, -dt * derivative_matrix[ii, i], ftt,
+                                       equations, dg, ii, j)
+        end
+
+        for jj in eachnode(dg)
+            # C += -lam*g*Dm' for each variable
+            # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+            multiply_add_to_node_vars!(uttt, -dt * derivative_matrix[jj, j], gtt,
+                                       equations, dg, i, jj)
+        end
+    end
+
+    # Apply Jacobian to uttt
+    for j in eachnode(dg), i in eachnode(dg)
+        # inv_jacobian = inverse_jacobian[i,j,element]
+        for v in eachvariable(equations)
+            uttt[v, i, j] *= inv_jacobian
+        end
+    end
+
+    # Add source term contribution to uttt and some to S
+    for j in eachnode(dg), i in eachnode(dg)
+        # Add source term contribution to ut
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+
+        # TODO - add source term support
+        # x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+        # stt = calc_source_tt_N23(u_node, up_node, um_node, x, t, dt, source_terms,
+        #                          equations, dg, cache)
+        # multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, equations, dg, i, j)
+        # multiply_add_to_node_vars!(uttt, dt, stt, equations, dg, i, j) # has no jacobian factor
+    end
+
+    for j in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+        ut_node = get_node_vars(ut, equations, dg, i, j)
+        utt_node = get_node_vars(utt, equations, dg, i, j)
+        uttt_node = get_node_vars(uttt, equations, dg, i, j)
+        multiply_add_to_node_vars!(U_cell, 1.0 / 24.0, uttt_node, equations, dg, i, j)
+
+        fttt = compute_third_derivative_enzyme_2d(u_node, ut_node, utt_node, uttt_node,
+                                            1, equations)
+        multiply_add_to_node_vars!(F_cell, 1.0 / 24.0, fttt, equations, dg, i, j)
+        gttt = compute_third_derivative_enzyme_2d(u_node, ut_node, utt_node, uttt_node,
+                                            2, equations)
+        multiply_add_to_node_vars!(G_cell, 1.0 / 24.0, gttt, equations, dg, i, j)
+
+        for ii in eachnode(dg)
+            # ut              += -lam * D * ft for each variable
+            # i.e.,  ut[ii,j] += -lam * Dm[ii,i] ft[i,j] (sum over i)
+            multiply_add_to_node_vars!(utttt, -dt * derivative_matrix[ii, i], fttt,
+                                       equations, dg, ii, j)
+        end
+        for jj in eachnode(dg)
+            # C += -lam*gt*Dm' for each variable
+            # C[i,jj] += -lam*gt[i,j]*Dm[jj,j] (sum over j)
+            multiply_add_to_node_vars!(utttt, -dt * derivative_matrix[jj, j], gttt,
+                                       equations, dg, i, jj)
+        end
+    end
+
+    # Apply jacobian on utttt
+    for j in eachnode(dg), i in eachnode(dg)
+        # inv_jacobian = inverse_jacobian[i,j,element]
+        for v in eachvariable(equations)
+            utttt[v, i, j] *= inv_jacobian
+        end
+    end
+
+    # Add source term contribution to utttt and some to S
+    for j in eachnode(dg), i in eachnode(dg)
+        # Add source term contribution to ut
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+        x = get_node_coords(node_coordinates, equations, dg, i, j, element)
+        # TODO - add source term support
+        # sttt = calc_source_ttt_N34(u_node, up_node, upp_node, um_node, umm_node,
+        #                            x, t, dt, source_terms,
+        #                            equations, dg, cache)
+        # multiply_add_to_node_vars!(S, 1.0 / 24.0, sttt, equations, dg, i, j)
+        # multiply_add_to_node_vars!(utttt, dt, sttt, equations, dg, i, j) # has no jacobian factor
+    end
+
+    for j in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+        ut_node = get_node_vars(ut, equations, dg, i, j)
+        utt_node = get_node_vars(utt, equations, dg, i, j)
+        uttt_node = get_node_vars(uttt, equations, dg, i, j)
+        utttt_node = get_node_vars(utttt, equations, dg, i, j)
+        multiply_add_to_node_vars!(U_cell, 1.0 / 120.0, utttt_node, equations, dg, i, j)
+
+        # Updating u_np1_low here
+        F_ = get_node_vars(F_cell, equations, dg, i, j)
+        G_ = get_node_vars(G_cell, equations, dg, i, j)
+
+        for ii in eachnode(dg)
+            # res              += -lam * D * F for each variable
+            # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
+            multiply_add_to_node_vars!(u_np1_low,
+                                       -dt * inv_jacobian * derivative_matrix[ii, i],
+                                       F_, equations, dg, ii, j)
+        end
+
+        for jj in eachnode(dg)
+            # C += -lam*g*Dm' for each variable
+            # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+            multiply_add_to_node_vars!(u_np1_low,
+                                       -dt * inv_jacobian * derivative_matrix[jj, j],
+                                       G_, equations, dg, i, jj)
+        end
+
+        # UPDATING u_np1_low ENDS!!!
+
+        ftttt = compute_fourth_derivative_enzyme_2d(u_node, ut_node, utt_node,
+                                            uttt_node, utttt_node, 1, equations)
+        gtttt = compute_fourth_derivative_enzyme_2d(u_node, ut_node, utt_node,
+                                            uttt_node, utttt_node, 2, equations)
+        multiply_add_to_node_vars!(F_cell, 1.0 / 120.0, ftttt, equations, dg, i, j)
+        multiply_add_to_node_vars!(G_cell, 1.0 / 120.0, gtttt, equations, dg, i, j)
+
+        F_node = get_node_vars(F_cell, equations, dg, i, j)
+        G_node = get_node_vars(G_cell, equations, dg, i, j)
+
+        for ii in eachnode(dg)
+            # res              += -lam * D * F for each variable
+            # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
+            multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], F_node,
+                                       equations, dg, ii, j, element)
+
+            multiply_add_to_node_vars!(u_np1,
+                                       -dt * inv_jacobian * derivative_matrix[ii, i],
+                                       F_node, equations, dg, ii, j)
+        end
+
+        for jj in eachnode(dg)
+            # C += -lam*g*Dm' for each variable
+            # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+            multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], G_node,
+                                       equations, dg, i, jj, element)
+            multiply_add_to_node_vars!(u_np1,
+                                       -dt * inv_jacobian * derivative_matrix[jj, j],
+                                       G_node, equations, dg, i, jj)
+        end
+
+        u_node = get_node_vars(u, equations, dg, i, j, element)
 
         # TODO - update to v1.8 and call with @inline
         # Give u1_ or U depending on dissipation model
