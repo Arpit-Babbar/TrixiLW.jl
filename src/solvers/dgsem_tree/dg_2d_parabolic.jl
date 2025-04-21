@@ -146,21 +146,20 @@ using MuladdMacro
     # Hacky fix because calc_gradient! is different for P4estMesh and TreeMesh
     # in Trixi, but TrixiLW wants to call the same function
     function calc_gradient!(gradients, u_transformed, t,
-        mesh::P4estMesh{2}, equations_parabolic,
-        boundary_conditions_parabolic,
-        dg::DGSEM{<:Any, <:Any, <:Any,
-        <:Union{VolumeIntegralFR{LW},
-                VolumeIntegralFRShockCapturing{TrixiLW.LW,
-                                               <:Any}}},
-        parabolic_scheme,
-        cache, cache_parabolic)
+                            mesh::P4estMesh{2}, equations_parabolic,
+                            boundary_conditions_parabolic,
+                            dg::DGSEM{<:Any, <:Any, <:Any,
+                                      <:Union{VolumeIntegralFR{LW},
+                                              VolumeIntegralFRShockCapturing{TrixiLW.LW,
+                                                                             <:Any}}},
+                            parabolic_scheme,
+                            cache, cache_parabolic)
         calc_gradient!(gradients, u_transformed, t,
-            mesh, equations_parabolic,
-            boundary_conditions_parabolic,
-            dg, 
-            cache, cache_parabolic)
+                       mesh, equations_parabolic,
+                       boundary_conditions_parabolic,
+                       dg,
+                       cache, cache_parabolic)
     end
-
 
     # Parabolic cache
     # TODO - Merge with hyperbolic cache

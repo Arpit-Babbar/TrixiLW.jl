@@ -84,8 +84,8 @@ visualization_callback = VisualizationCallback(interval = 100,
 # Create a CallbackSet to collect all callbacks such that they can be passed to the ODE solver
 callbacks = (summary_callback,
              analysis_callback,
-             alive_callback,
-            #  visualization_callback
+             alive_callback
+             #  visualization_callback
              );
 
 ###############################################################################
