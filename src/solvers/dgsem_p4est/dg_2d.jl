@@ -554,7 +554,7 @@ function calc_mortar_flux!(surface_flux_values,
                            time_discretization::AbstractLWTimeDiscretization, dg::DG, cache)
     @unpack neighbor_ids, node_indices = cache.mortars
     @unpack contravariant_vectors = cache.elements
-    @unpack fstar_upper_threaded, fstar_lower_threaded = cache
+    @unpack fstar_upper_threaded, fstar_lower_threaded = cache.lw_mortars.tmp
     index_range = eachnode(dg)
     dt = cache.dt[1]
 
@@ -599,9 +599,75 @@ function calc_mortar_flux!(surface_flux_values,
         # copying in the correct orientation
         u_buffer = cache.u_threaded[Threads.threadid()]
 
-        mortar_fluxes_to_elements!(surface_flux_values,
-                                   mesh, equations, mortar_l2, dg, cache,
-                                   mortar, fstar, u_buffer)
+        # TODO - Use the Trixi.jl version please. This is a hack using the old version of
+        # Trixi.jl
+        my_mortar_fluxes_to_elements!(surface_flux_values,
+                                      mesh, equations, mortar_l2, dg, cache,
+                                      mortar, fstar, u_buffer)
+    end
+
+    return nothing
+end
+
+# TODO - Use the Trixi.jl version please. This is a hack using the old version of
+# Trixi.jl
+@inline function my_mortar_fluxes_to_elements!(surface_flux_values,
+                                               mesh::Union{P4estMesh{2}, T8codeMesh{2}},
+                                               equations,
+                                               mortar_l2::LobattoLegendreMortarL2,
+                                               dg::DGSEM, cache, mortar, fstar, u_buffer)
+    @unpack neighbor_ids, node_indices = cache.mortars
+
+    # Copy solution small to small
+    small_indices = node_indices[1, mortar]
+    small_direction = indices2direction(small_indices)
+
+    for position in 1:2
+        element = neighbor_ids[position, mortar]
+        for i in eachnode(dg)
+            for v in eachvariable(equations)
+                surface_flux_values[v, i, small_direction, element] = fstar[position][v,
+                                                                                      i]
+            end
+        end
+    end
+
+    # Project small fluxes to large element.
+    multiply_dimensionwise!(u_buffer,
+                            mortar_l2.reverse_upper, fstar[2],
+                            mortar_l2.reverse_lower, fstar[1])
+
+    # The flux is calculated in the outward direction of the small elements,
+    # so the sign must be switched to get the flux in outward direction
+    # of the large element.
+    # The contravariant vectors of the large element (and therefore the normal
+    # vectors of the large element as well) are twice as large as the
+    # contravariant vectors of the small elements. Therefore, the flux needs
+    # to be scaled by a factor of 2 to obtain the flux of the large element.
+    u_buffer .*= -2
+
+    # Copy interpolated flux values from buffer to large element face in the
+    # correct orientation.
+    # Note that the index of the small sides will always run forward but
+    # the index of the large side might need to run backwards for flipped sides.
+    large_element = neighbor_ids[3, mortar]
+    large_indices = node_indices[2, mortar]
+    large_direction = indices2direction(large_indices)
+
+    if :i_backward in large_indices
+        for i in eachnode(dg)
+            for v in eachvariable(equations)
+                surface_flux_values[v, end + 1 - i, large_direction, large_element] = u_buffer[v,
+                                                                                               i]
+            end
+        end
+    else
+        for i in eachnode(dg)
+            for v in eachvariable(equations)
+                surface_flux_values[v, i, large_direction, large_element] = u_buffer[v,
+                                                                                     i]
+            end
+        end
     end
 
     return nothing
