@@ -94,8 +94,9 @@ visualization_callback = VisualizationCallback(interval = 10000,
 
 callbacks = (save_solution,
              analysis_callback,
-             alive_callback,
-             visualization_callback);
+             alive_callback
+             #  visualization_callback
+             );
 
 ###############################################################################
 # run the simulation

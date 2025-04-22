@@ -223,7 +223,8 @@ visualization_callback = VisualizationCallback(interval = 100,
                                                solution_variables = cons2prim)
 
 callbacks = (analysis_callback, alive_callback, save_solution,
-             visualization_callback, summary_callback)
+             #  visualization_callback, 
+             summary_callback)
 
 # positivity limiter necessary for this example with strong shocks
 stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds = (5.0e-6, 5.0e-6),
