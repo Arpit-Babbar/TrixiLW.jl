@@ -4,7 +4,7 @@ using Plots
 using DelimitedFiles
 using Plots
 using SimpleUnPack: @unpack
-using LinearAlgebra
+using TrixiLW.Trixi.LinearAlgebra
 using Printf
 # plotlyjs()
 gr()

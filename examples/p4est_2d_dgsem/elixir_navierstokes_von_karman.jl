@@ -3,7 +3,7 @@ using TrixiLW
 using TrixiLW: AnalysisSurfaceIntegral, AnalysisSurfaceIntegralViscous,
                slip_wall_approximate_trixi
 using TrixiLW.Trixi
-using LinearAlgebra
+using TrixiLW.Trixi.LinearAlgebra
 # using Plots
 
 ###############################################################################

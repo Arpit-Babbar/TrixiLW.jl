@@ -2,7 +2,7 @@ using Downloads: download
 using TrixiLW
 using TrixiLW: AnalysisSurfaceIntegral, AnalysisSurfaceIntegralViscous
 using TrixiLW.Trixi
-using LinearAlgebra
+using TrixiLW.Trixi.LinearAlgebra
 # using Plots
 
 ###############################################################################

@@ -16,7 +16,7 @@
 using Downloads: download
 using TrixiLW.Trixi
 using TrixiLW
-using LinearAlgebra
+using TrixiLW.Trixi.LinearAlgebra
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations
