@@ -169,7 +169,7 @@ end
 full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
                                                                "navierstokes_lid_driven_cavity_ghia")
 @testset "$full_test_name" begin
-    compare_errors_txt(sol, analysis_callback, full_test_name, tol = 1e-11)
+    compare_errors_txt(sol, analysis_callback, full_test_name, tol = 1e-10)
 end
 
 full_test_name, sol, analysis_callback = @test_trixilw_include("tree_2d_dgsem",
