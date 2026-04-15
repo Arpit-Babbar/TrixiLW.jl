@@ -930,7 +930,7 @@ end
 @inline function compute_ftttt_stttt_du!(du, cell_arrays, t, dt, u, source_terms,
                                          equations, dg,
                                          cache, element, alpha)
-    @unpack derivative_matrix, derivative_dhat = dg.basis
+    @unpack derivative_matrix, derivative_hat = dg.basis
     @unpack lw_res_cache, element_cache = cache
     @unpack contravariant_vectors, inverse_jacobian, node_coordinates = cache.elements
     @unpack f, g, ftilde, gtilde, Ftilde, Gtilde, ut, utt, uttt, utttt, U,
@@ -1014,7 +1014,7 @@ end
             inv_jacobian = inverse_jacobian[ii, j, element]
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i],
+            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_hat[ii, i],
                                              Ftilde_node,
                                              equations, dg, ii, j, element)
 
@@ -1028,7 +1028,7 @@ end
             inv_jacobian = inverse_jacobian[i, jj, element]
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j],
+            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_hat[jj, j],
                                              Gtilde_node,
                                              equations, dg, i, jj, element)
 
@@ -1075,7 +1075,7 @@ function lw_volume_kernel_1!(du, u, t, dt, tolerances,
                              cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack contravariant_vectors, inverse_jacobian, node_coordinates = cache.elements
     @unpack lw_res_cache, element_cache = cache
     @unpack cell_arrays = lw_res_cache
@@ -1203,7 +1203,7 @@ function lw_volume_kernel_1!(du, u, t, dt, tolerances,
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i],
+            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_hat[ii, i],
                                              Ftilde_node, equations, dg, ii, j, element)
 
             Trixi.multiply_add_to_node_vars!(u_np1,
@@ -1215,7 +1215,7 @@ function lw_volume_kernel_1!(du, u, t, dt, tolerances,
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j],
+            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_hat[jj, j],
                                              Gtilde_node, equations, dg, i, jj, element)
 
             Trixi.multiply_add_to_node_vars!(u_np1,
@@ -1275,7 +1275,7 @@ function lw_volume_kernel_1!(du, u, t, dt, tolerances,
                              cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack contravariant_vectors, inverse_jacobian, node_coordinates = cache.elements
     @unpack lw_res_cache, element_cache = cache
     @unpack cell_arrays = lw_res_cache
@@ -1389,7 +1389,7 @@ function lw_volume_kernel_1!(du, u, t, dt, tolerances,
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i],
+            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_hat[ii, i],
                                              Ftilde_node, equations, dg, ii, j, element)
 
             Trixi.multiply_add_to_node_vars!(u_np1,
@@ -1401,7 +1401,7 @@ function lw_volume_kernel_1!(du, u, t, dt, tolerances,
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j],
+            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_hat[jj, j],
                                              Gtilde_node, equations, dg, i, jj, element)
 
             Trixi.multiply_add_to_node_vars!(u_np1,
@@ -1462,7 +1462,7 @@ function lw_volume_kernel_2!(du, u, t, dt, tolerances,
                              cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack contravariant_vectors, inverse_jacobian, node_coordinates = cache.elements
     @unpack lw_res_cache, element_cache = cache
     @unpack cell_arrays = lw_res_cache
@@ -1649,7 +1649,7 @@ function lw_volume_kernel_2!(du, u, t, dt, tolerances,
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i],
+            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_hat[ii, i],
                                              Ftilde_node, equations, dg, ii, j, element)
 
             Trixi.multiply_add_to_node_vars!(u_np1,
@@ -1661,7 +1661,7 @@ function lw_volume_kernel_2!(du, u, t, dt, tolerances,
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j],
+            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_hat[jj, j],
                                              Gtilde_node, equations, dg, i, jj, element)
 
             Trixi.multiply_add_to_node_vars!(u_np1,
@@ -1721,7 +1721,7 @@ function lw_volume_kernel_2!(du, u, t, dt, tolerances,
                              cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack contravariant_vectors, inverse_jacobian, node_coordinates = cache.elements
     @unpack lw_res_cache, element_cache = cache
     @unpack cell_arrays = lw_res_cache
@@ -1891,7 +1891,7 @@ function lw_volume_kernel_2!(du, u, t, dt, tolerances,
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i],
+            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_hat[ii, i],
                                              Ftilde_node, equations, dg, ii, j, element)
 
             Trixi.multiply_add_to_node_vars!(u_np1,
@@ -1903,7 +1903,7 @@ function lw_volume_kernel_2!(du, u, t, dt, tolerances,
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j],
+            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_hat[jj, j],
                                              Gtilde_node, equations, dg, i, jj, element)
 
             Trixi.multiply_add_to_node_vars!(u_np1,
@@ -1964,7 +1964,7 @@ function lw_volume_kernel_3!(du, u, t, dt, tolerances,
                              cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack contravariant_vectors, inverse_jacobian, node_coordinates = cache.elements
     @unpack element_cache, lw_res_cache = cache
     @unpack cell_arrays = lw_res_cache
@@ -2233,7 +2233,7 @@ function lw_volume_kernel_3!(du, u, t, dt, tolerances,
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], Ftilde_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[ii, i], Ftilde_node,
                                        equations, dg, ii, j, element)
 
             multiply_add_to_node_vars!(u_np1,
@@ -2243,7 +2243,7 @@ function lw_volume_kernel_3!(du, u, t, dt, tolerances,
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], Gtilde_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[jj, j], Gtilde_node,
                                        equations, dg, i, jj, element)
 
             multiply_add_to_node_vars!(u_np1,
@@ -2303,7 +2303,7 @@ function lw_volume_kernel_3!(du, u, t, dt, tolerances,
                              cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack contravariant_vectors, inverse_jacobian, node_coordinates = cache.elements
     @unpack element_cache, lw_res_cache = cache
     @unpack cell_arrays = lw_res_cache
@@ -2536,7 +2536,7 @@ function lw_volume_kernel_3!(du, u, t, dt, tolerances,
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], Ftilde_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[ii, i], Ftilde_node,
                                        equations, dg, ii, j, element)
 
             multiply_add_to_node_vars!(u_np1,
@@ -2546,7 +2546,7 @@ function lw_volume_kernel_3!(du, u, t, dt, tolerances,
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], Gtilde_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[jj, j], Gtilde_node,
                                        equations, dg, i, jj, element)
 
             multiply_add_to_node_vars!(u_np1,
@@ -2609,7 +2609,7 @@ function lw_volume_kernel_4!(du, u, t, dt, tolerances,
 
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack contravariant_vectors, inverse_jacobian, node_coordinates = cache.elements
     @unpack lw_res_cache, element_cache = cache
     @unpack cell_arrays = lw_res_cache
@@ -2976,7 +2976,7 @@ function lw_volume_kernel_4!(du, u, t, dt, tolerances,
             inv_jacobian = inverse_jacobian[ii, j, element]
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i],
+            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_hat[ii, i],
                                              Ftilde_node,
                                              equations, dg, ii, j, element)
 
@@ -2990,7 +2990,7 @@ function lw_volume_kernel_4!(du, u, t, dt, tolerances,
             inv_jacobian = inverse_jacobian[i, jj, element]
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j],
+            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_hat[jj, j],
                                              Gtilde_node,
                                              equations, dg, i, jj, element)
 
@@ -3083,7 +3083,7 @@ function lw_volume_kernel_4!(du, u, t, dt, tolerances,
 
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack contravariant_vectors, inverse_jacobian, node_coordinates = cache.elements
     @unpack lw_res_cache, element_cache = cache
     @unpack cell_arrays = lw_res_cache
@@ -3382,7 +3382,7 @@ function lw_volume_kernel_4!(du, u, t, dt, tolerances,
             inv_jacobian = inverse_jacobian[ii, j, element]
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i],
+            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_hat[ii, i],
                                              Ftilde_node,
                                              equations, dg, ii, j, element)
 
@@ -3396,7 +3396,7 @@ function lw_volume_kernel_4!(du, u, t, dt, tolerances,
             inv_jacobian = inverse_jacobian[i, jj, element]
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j],
+            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_hat[jj, j],
                                              Gtilde_node,
                                              equations, dg, i, jj, element)
 

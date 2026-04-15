@@ -311,7 +311,7 @@ end
     gradients_x, gradients_y = gradients
     flux_viscous_x, flux_viscous_y = flux_viscous # viscous fluxes computed by correction
 
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack node_coordinates = cache.elements
 
     @unpack lw_res_cache, element_cache = cache
@@ -498,7 +498,7 @@ end
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F,
+            multiply_add_to_node_vars!(du, derivative_hat[ii, i], F,
                                        equations, dg, ii, j, element)
             multiply_add_to_node_vars!(u_low, -dt * inv_jacobian * derivative_matrix[ii, i],
                                        F_node_low, equations, dg, ii, j, element)
@@ -507,7 +507,7 @@ end
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G,
+            multiply_add_to_node_vars!(du, derivative_hat[jj, j], G,
                                        equations, dg, i, jj, element)
             multiply_add_to_node_vars!(u_low, -dt * inv_jacobian * derivative_matrix[jj, j],
                                        G_node_low, equations, dg, i, jj, element)
@@ -605,7 +605,7 @@ end
 
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack node_coordinates = cache.elements
 
     @unpack lw_res_cache, element_cache = cache
@@ -774,14 +774,14 @@ end
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F, equations, dg, ii, j,
+            multiply_add_to_node_vars!(du, derivative_hat[ii, i], F, equations, dg, ii, j,
                                        element)
         end
 
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G, equations, dg, i, jj,
+            multiply_add_to_node_vars!(du, derivative_hat[jj, j], G, equations, dg, i, jj,
                                        element)
         end
 

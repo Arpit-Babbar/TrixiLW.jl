@@ -108,7 +108,7 @@ end
                                 dg::DGSEM, cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack contravariant_vectors, node_coordinates, inverse_jacobian = cache.elements
 
     @unpack lw_res_cache, element_cache = cache
@@ -232,7 +232,7 @@ end
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], F_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[ii, i], F_node,
                                        equations, dg, ii, j, element)
             inv_jacobian = inverse_jacobian[ii, j, element]
             multiply_add_to_node_vars!(u_np1_low,
@@ -243,7 +243,7 @@ end
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], G_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[jj, j], G_node,
                                        equations, dg, i, jj, element)
             inv_jacobian = inverse_jacobian[i, jj, element]
             multiply_add_to_node_vars!(u_np1_low,
@@ -280,7 +280,7 @@ end
 
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack contravariant_vectors, inverse_jacobian, node_coordinates = cache.elements
 
     @unpack lw_res_cache, element_cache, temporal_errors = cache
@@ -420,7 +420,7 @@ end
             inv_jacobian = inverse_jacobian[ii, j, element]
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], Ftilde_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[ii, i], Ftilde_node,
                                        equations, dg,
                                        ii, j, element)
 
@@ -436,7 +436,7 @@ end
             inv_jacobian = inverse_jacobian[i, jj, element]
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], Gtilde_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[jj, j], Gtilde_node,
                                        equations, dg,
                                        i, jj, element)
 
