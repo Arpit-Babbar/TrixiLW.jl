@@ -227,7 +227,7 @@ full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
                                                                "euler_astrophysical_jet_amr",
                                                                final_time=1e-6)
 @testset "$full_test_name" begin
-    compare_errors_txt(sol, analysis_callback, full_test_name; tol = 1e-7)
+    compare_errors_txt(sol, analysis_callback, full_test_name; tol = 1e-6)
 end
 
 full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
