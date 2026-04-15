@@ -60,9 +60,9 @@ end
 # Use its a subfield of LWIntegrator and make additions as needed, following
 # https://github.com/JuliaLang/julia/issues/4935#issuecomment-877302452.
 # There are two problems with it
-# (a) Trixi.jl uses the ODEIntegrator from OrdinaryDiffEq.jl, that is a heavy Library
+# (a) Trixi.jl uses the ODEIntegrator from OrdinaryDiffEq.jl, which is a heavy Library
 # (b) ODEIntegrator requires the algorithm type to be <: Union{OrdinaryDiffEqAlgorithm, DAEAlgorithm},
-# that is unnatural to put here.
+# which is unnatural to put here.
 # Thus, some code repetition is currently happening, even though it could be improved at a later stage
 
 # For some callbacks from Trixi
@@ -113,7 +113,7 @@ function initialize_callbacks!(callbacks::NTuple{N, Any},
 end
 
 function initialize!(cb::DiscreteCallback{Condition, Affect!}, u, t,
-                     integrator) where {Condition, Affect! <: AMRCallback}
+                     integrator::LWIntegrator) where {Condition, Affect! <: AMRCallback}
     amr_callback = cb.affect!
     semi = integrator.p
 

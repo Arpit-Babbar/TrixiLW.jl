@@ -105,8 +105,8 @@ function SemidiscretizationHyperbolicParabolic(mesh,
                                                                 mesh, solver, cache)
 
     cache_parabolic = (;
-                       create_cache_parabolic(mesh, equations, equations_parabolic,
-                                              solver, solver_parabolic, RealT, uEltype)...,
+                       create_cache_parabolic(mesh, equations,
+                                              solver, nelements(solver, cache), uEltype)...,
                        initial_cache_parabolic...)
 
     cache_parabolic = (;

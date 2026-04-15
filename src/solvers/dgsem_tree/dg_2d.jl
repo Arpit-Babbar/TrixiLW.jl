@@ -2959,7 +2959,7 @@ end
 function create_cache(mesh::Union{TreeMesh{2}, StructuredMesh{2}, UnstructuredMesh2D,
                                   P4estMesh{2}},
                       equations, ::VolumeIntegralFRShockCapturing,
-                      dg::DG, uEltype)
+                      dg::DG, cache, uEltype)
     element_ids_dg = Int[]
     element_ids_dgfv = Int[]
 
