@@ -519,8 +519,6 @@ fluxes(u, equations::AbstractEquations{2}) = (Trixi.flux(u, 1, equations),
     for j in eachnode(dg), i in eachnode(dg)
         u_node = get_node_vars(u, equations, dg, i, j, element)
 
-        @assert false inv_jacobian
-
         flux1, flux2 = fluxes(u_node, equations)
         for ii in eachnode(dg)
             # ut              += -lam * D * f for each variable
