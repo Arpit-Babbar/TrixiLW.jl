@@ -66,7 +66,7 @@ function rhs_mdrk1!(du, u,
                     time_discretization::MDRK, cache, cache_parabolic,
                     tolerances::NamedTuple)
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+    @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
     @unpack viscous_container = cache_parabolic
     @unpack u_transformed, gradients, flux_viscous = viscous_container
 
@@ -95,7 +95,7 @@ function rhs_mdrk1!(du, u,
                                                                           cache_parabolic)
 
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+    @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
 
     # Calculate volume integral
     @trixi_timeit timer() "volume integral" calc_volume_integral_mdrk1!(du, flux_viscous,
@@ -187,7 +187,7 @@ function rhs_mdrk2!(du, u,
                     tolerances::NamedTuple)
 
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+    @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
     @unpack u_transformed, gradients, flux_viscous = cache_parabolic
 
     dt = cache.dt[1]
@@ -218,7 +218,7 @@ function rhs_mdrk2!(du, u,
                                                                           cache_parabolic)
 
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+    @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
 
     # Calculate volume integral
     @trixi_timeit timer() "volume integral" calc_volume_integral_mdrk2!(du, flux_viscous,
@@ -311,7 +311,7 @@ end
     gradients_x, gradients_y = gradients
     flux_viscous_x, flux_viscous_y = flux_viscous # viscous fluxes computed by correction
 
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack node_coordinates = cache.elements
 
     @unpack lw_res_cache, element_cache = cache
@@ -498,7 +498,7 @@ end
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F,
+            multiply_add_to_node_vars!(du, derivative_hat[ii, i], F,
                                        equations, dg, ii, j, element)
             multiply_add_to_node_vars!(u_low, -dt * inv_jacobian * derivative_matrix[ii, i],
                                        F_node_low, equations, dg, ii, j, element)
@@ -507,7 +507,7 @@ end
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G,
+            multiply_add_to_node_vars!(du, derivative_hat[jj, j], G,
                                        equations, dg, i, jj, element)
             multiply_add_to_node_vars!(u_low, -dt * inv_jacobian * derivative_matrix[jj, j],
                                        G_node_low, equations, dg, i, jj, element)
@@ -605,7 +605,7 @@ end
 
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack node_coordinates = cache.elements
 
     @unpack lw_res_cache, element_cache = cache
@@ -774,14 +774,14 @@ end
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F, equations, dg, ii, j,
+            multiply_add_to_node_vars!(du, derivative_hat[ii, i], F, equations, dg, ii, j,
                                        element)
         end
 
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G, equations, dg, i, jj,
+            multiply_add_to_node_vars!(du, derivative_hat[jj, j], G, equations, dg, i, jj,
                                        element)
         end
 

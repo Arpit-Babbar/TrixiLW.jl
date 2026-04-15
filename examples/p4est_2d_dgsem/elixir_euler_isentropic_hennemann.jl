@@ -67,7 +67,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
-visualization_callback = VisualizationCallback(interval = 100,
+visualization_callback = VisualizationCallback(semi, interval = 100,
                                                save_initial_solution = true,
                                                save_final_solution = true)
 

@@ -6,7 +6,7 @@ import Trixi: create_cache, calc_volume_integral!, ninterfaces, nboundaries,
 # TODO - Reorder these
 using Trixi: TreeMesh, P4estMesh, BoundaryConditionPeriodic,
              have_nonconservative_terms,
-             calc_surface_integral!, apply_jacobian!, reset_du!,
+             calc_surface_integral!, apply_jacobian!, set_zero!,
              max_dt, calcflux_fv!, index_to_start_step_2d,
              AbstractMesh, StructuredMesh, UnstructuredMesh2D,
              LobattoLegendreMortarL2,
@@ -121,7 +121,7 @@ function rhs!(du, u, t, dt, mesh::Union{TreeMesh{2}, P4estMesh{2}}, equations,
               tolerances::NamedTuple)
 
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+    @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
 
     # Update dt in cache and the callback will just take it from there
 
@@ -362,8 +362,7 @@ function load_fn_low!(fn_low, mesh::Union{UnstructuredMesh2D, P4estMesh{2}}, dg,
 end
 
 @inline function fv_kernel!(du, u, dt, ::FirstOrderReconstruction,
-                            mesh::Union{TreeMesh{2}, StructuredMesh{2},
-                                        UnstructuredMesh2D, P4estMesh{2}},
+                            mesh::Union{TreeMesh{2}},
                             nonconservative_terms, equations,
                             volume_flux_fv, dg::DGSEM, cache, element, alpha = true)
     @unpack fstar1_L_threaded, fstar1_R_threaded, fstar2_L_threaded, fstar2_R_threaded = cache
@@ -499,7 +498,7 @@ fluxes(u, equations::AbstractEquations{2}) = (Trixi.flux(u, 1, equations),
                                      cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack node_coordinates = cache.elements
 
     @unpack lw_res_cache, element_cache = cache
@@ -584,7 +583,7 @@ fluxes(u, equations::AbstractEquations{2}) = (Trixi.flux(u, 1, equations),
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], F_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[ii, i], F_node,
                                        equations,
                                        dg, ii, j, element)
         end
@@ -592,7 +591,7 @@ fluxes(u, equations::AbstractEquations{2}) = (Trixi.flux(u, 1, equations),
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], G_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[jj, j], G_node,
                                        equations,
                                        dg, i, jj, element)
         end
@@ -634,7 +633,7 @@ end
                                      cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack node_coordinates = cache.elements
 
     @unpack lw_res_cache, element_cache = cache
@@ -707,7 +706,7 @@ end
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], F_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[ii, i], F_node,
                                        equations,
                                        dg, ii, j, element)
         end
@@ -715,7 +714,7 @@ end
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], G_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[jj, j], G_node,
                                        equations,
                                        dg, i, jj, element)
         end
@@ -758,7 +757,7 @@ end
                                      cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack node_coordinates = cache.elements
 
     @unpack lw_res_cache, element_cache = cache
@@ -900,7 +899,7 @@ end
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], F_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[ii, i], F_node,
                                        equations,
                                        dg, ii, j, element)
         end
@@ -908,7 +907,7 @@ end
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], G_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[jj, j], G_node,
                                        equations,
                                        dg, i, jj, element)
         end
@@ -949,7 +948,7 @@ end
                                      cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack node_coordinates = cache.elements
 
     @unpack lw_res_cache, element_cache = cache
@@ -1074,7 +1073,7 @@ end
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], F_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[ii, i], F_node,
                                        equations,
                                        dg, ii, j, element)
         end
@@ -1082,7 +1081,7 @@ end
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], G_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[jj, j], G_node,
                                        equations,
                                        dg, i, jj, element)
         end
@@ -1124,7 +1123,7 @@ end
                                      cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack node_coordinates = cache.elements
 
     @unpack lw_res_cache, element_cache = cache
@@ -1329,14 +1328,14 @@ end
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], F_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[ii, i], F_node,
                                        equations, dg, ii, j, element)
         end
 
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], G_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[jj, j], G_node,
                                        equations, dg, i, jj, element)
         end
 
@@ -1380,7 +1379,7 @@ end
                                      cache, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack node_coordinates = cache.elements
 
     @unpack lw_res_cache, element_cache = cache
@@ -1551,14 +1550,14 @@ end
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], F_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[ii, i], F_node,
                                        equations, dg, ii, j, element)
         end
 
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], G_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[jj, j], G_node,
                                        equations, dg, i, jj, element)
         end
 
@@ -1603,7 +1602,7 @@ end
                                      alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack node_coordinates = cache.elements
 
     @unpack lw_res_cache, element_cache = cache
@@ -1902,7 +1901,7 @@ end
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], F_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[ii, i], F_node,
                                        equations, dg, ii, j, element)
 
             multiply_add_to_node_vars!(u_np1,
@@ -1913,7 +1912,7 @@ end
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], G_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[jj, j], G_node,
                                        equations, dg, i, jj, element)
             multiply_add_to_node_vars!(u_np1,
                                        -dt * inv_jacobian * derivative_matrix[jj, j],
@@ -1974,7 +1973,7 @@ end
                                      alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack node_coordinates = cache.elements
 
     @unpack lw_res_cache, element_cache = cache
@@ -2223,7 +2222,7 @@ end
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], F_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[ii, i], F_node,
                                        equations, dg, ii, j, element)
 
             multiply_add_to_node_vars!(u_np1,
@@ -2234,7 +2233,7 @@ end
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], G_node,
+            multiply_add_to_node_vars!(du, alpha * derivative_hat[jj, j], G_node,
                                        equations, dg, i, jj, element)
             multiply_add_to_node_vars!(u_np1,
                                        -dt * inv_jacobian * derivative_matrix[jj, j],

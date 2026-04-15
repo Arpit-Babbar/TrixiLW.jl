@@ -1,5 +1,5 @@
 using Trixi: UnstructuredMesh2D, P4estMesh, calc_surface_integral!, apply_jacobian!,
-             reset_du!, get_surface_normal, get_one_sided_surface_node_vars, False
+             set_zero!, get_surface_normal, get_one_sided_surface_node_vars, False
 
 using TrixiLW: calc_volume_integral! # defined in dgsem_structured
 
@@ -15,7 +15,7 @@ using MuladdMacro
                   dg::DG, time_discretization::AbstractLWTimeDiscretization, cache,
                   tolerances::NamedTuple)
         # Reset du
-        @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+        @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
 
         # Calculate volume integral
         alpha = @trixi_timeit timer() "volume integral" calc_volume_integral!(du, u, t, dt,

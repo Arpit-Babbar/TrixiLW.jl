@@ -245,7 +245,7 @@ save_solution = SaveSolutionCallback(interval = 1000,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
 
-visualization_callback = VisualizationCallback(interval = 200,
+visualization_callback = VisualizationCallback(semi, interval = 200,
                                                save_initial_solution = true,
                                                save_final_solution = true)
 

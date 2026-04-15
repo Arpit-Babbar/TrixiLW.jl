@@ -115,7 +115,7 @@ function lw_volume_kernel_1!(du, flux_viscous, gradients, u_transformed, u, t, d
     gradients_x, gradients_y = gradients
     flux_viscous_x, flux_viscous_y = flux_viscous # viscous fluxes computed by correction
 
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack node_coordinates, contravariant_vectors, inverse_jacobian = cache.elements
 
     @unpack lw_res_cache, element_cache = cache
@@ -292,14 +292,14 @@ function lw_volume_kernel_1!(du, flux_viscous, gradients, u_transformed, u, t, d
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F_node, equations,
+            multiply_add_to_node_vars!(du, derivative_hat[ii, i], F_node, equations,
                                        dg, ii, j, element)
         end
 
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G_node, equations,
+            multiply_add_to_node_vars!(du, derivative_hat[jj, j], G_node, equations,
                                        dg, i, jj, element)
         end
 
@@ -335,7 +335,7 @@ function lw_volume_kernel_2!(du, flux_viscous, gradients, u_transformed, u, t, d
     gradients_x, gradients_y = gradients
     flux_viscous_x, flux_viscous_y = flux_viscous # viscous fluxes computed by correction
 
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack node_coordinates, contravariant_vectors = cache.elements
 
     @unpack lw_res_cache, element_cache = cache
@@ -646,14 +646,14 @@ function lw_volume_kernel_2!(du, flux_viscous, gradients, u_transformed, u, t, d
         for ii in eachnode(dg)
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F_node, equations,
+            multiply_add_to_node_vars!(du, derivative_hat[ii, i], F_node, equations,
                                        dg, ii, j, element)
         end
 
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G_node, equations,
+            multiply_add_to_node_vars!(du, derivative_hat[jj, j], G_node, equations,
                                        dg, i, jj, element)
         end
 
@@ -689,7 +689,7 @@ function lw_volume_kernel_3!(du, flux_viscous, gradients, u_transformed, u, t, d
     gradients_x, gradients_y = gradients
     flux_viscous_x, flux_viscous_y = flux_viscous # viscous fluxes computed by correction
 
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack node_coordinates, contravariant_vectors = cache.elements
 
     @unpack lw_res_cache, element_cache = cache
@@ -1220,7 +1220,7 @@ function lw_volume_kernel_3!(du, flux_viscous, gradients, u_transformed, u, t, d
             inv_jacobian = inverse_jacobian[ii, j, element]
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F_node, equations,
+            multiply_add_to_node_vars!(du, derivative_hat[ii, i], F_node, equations,
                                        dg, ii, j, element)
 
             multiply_add_to_node_vars!(u_np1, -dt * inv_jacobian * derivative_matrix[ii, i],
@@ -1230,7 +1230,7 @@ function lw_volume_kernel_3!(du, flux_viscous, gradients, u_transformed, u, t, d
         for jj in eachnode(dg)
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G_node, equations,
+            multiply_add_to_node_vars!(du, derivative_hat[jj, j], G_node, equations,
                                        dg, i, jj, element)
 
             multiply_add_to_node_vars!(u_np1, -dt * inv_jacobian * derivative_matrix[jj, j],
@@ -1289,7 +1289,7 @@ function lw_volume_kernel_4!(du, flux_viscous, gradients, u_transformed, u, t, d
     gradients_x, gradients_y = gradients
     flux_viscous_x, flux_viscous_y = flux_viscous # viscous fluxes computed by correction
 
-    @unpack derivative_dhat, derivative_matrix = dg.basis
+    @unpack derivative_hat, derivative_matrix = dg.basis
     @unpack node_coordinates, contravariant_vectors = cache.elements
 
     @unpack lw_res_cache, element_cache = cache
@@ -1890,7 +1890,7 @@ function lw_volume_kernel_4!(du, flux_viscous, gradients, u_transformed, u, t, d
             inv_jacobian = inverse_jacobian[ii, j, element]
             # res              += -lam * D * F for each variable
             # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-            multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F_node, equations, dg,
+            multiply_add_to_node_vars!(du, derivative_hat[ii, i], F_node, equations, dg,
                                        ii, j, element)
 
             multiply_add_to_node_vars!(u_np1, -dt * inv_jacobian * derivative_matrix[ii, i],
@@ -1901,7 +1901,7 @@ function lw_volume_kernel_4!(du, flux_viscous, gradients, u_transformed, u, t, d
             inv_jacobian = inverse_jacobian[i, jj, element]
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-            multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G_node, equations, dg, i,
+            multiply_add_to_node_vars!(du, derivative_hat[jj, j], G_node, equations, dg, i,
                                        jj, element)
 
             Trixi.multiply_add_to_node_vars!(u_np1,

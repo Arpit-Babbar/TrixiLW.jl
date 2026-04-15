@@ -1,5 +1,5 @@
 using Trixi: @trixi_timeit, SemidiscretizationHyperbolic, boundary_condition_periodic,
-             digest_boundary_conditions, wrap_array
+             digest_boundary_conditions, wrap_array, PerformanceCounter
 
 function rhs!(du_ode, u_ode, semi::SemidiscretizationHyperbolic, t,
               tolerances = (; abstol = 0.0, reltol = 0.0))
@@ -78,10 +78,16 @@ function SemidiscretizationHyperbolic(mesh,
     cache = create_cache(mesh, equations, time_discretization, solver, RealT, uEltype,
                          cache)
 
+    # Also from TrixiLW.jl
+    cache = (; cache...,
+             create_cache(mesh, equations, solver.volume_integral, solver, uEltype)...)
+
     _boundary_conditions = digest_boundary_conditions(boundary_conditions, mesh, solver,
                                                       cache)
 
     cache = (; boundary_conditions = _boundary_conditions, cache...)
+
+    performance_counter = PerformanceCounter()
 
     # Now call the main constructor
     semi = SemidiscretizationHyperbolic{typeof(mesh), typeof(equations),
@@ -91,7 +97,8 @@ function SemidiscretizationHyperbolic(mesh,
                                                                        initial_condition,
                                                                        _boundary_conditions,
                                                                        source_terms, solver,
-                                                                       cache)
+                                                                       cache,
+                                                                       performance_counter)
 
     return semi
 end

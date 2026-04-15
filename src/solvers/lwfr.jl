@@ -1,5 +1,7 @@
-using Trixi: SemidiscretizationHyperbolic, SemidiscretizationHyperbolicParabolic,
-             initialize!, SummaryCallback, timer, have_constant_speed, ParallelTreeMesh
+using Trixi: SemidiscretizationHyperbolic,
+             SummaryCallback, timer, have_constant_speed, ParallelTreeMesh,
+             DiscreteCallback, compute_coefficients!, u_modified!, @trixi_timeit, max_level
+import Trixi: initialize!
 import DiffEqBase
 
 # Contains all that is needed to perform LW update
@@ -108,6 +110,45 @@ function initialize_callbacks!(callbacks::NTuple{N, Any},
     remaining_callbacks = Base.tail(callbacks)
     callback.initialize(callback, integrator.u, 0.0, integrator)
     initialize_callbacks!(remaining_callbacks, integrator)
+end
+
+function initialize!(cb::DiscreteCallback{Condition, Affect!}, u, t,
+                     integrator::LWIntegrator) where {Condition, Affect! <: AMRCallback}
+    amr_callback = cb.affect!
+    semi = integrator.p
+
+    @trixi_timeit timer() "initial condition AMR" if amr_callback.adapt_initial_condition
+        # iterate until mesh does not change anymore
+        has_changed = amr_callback(integrator,
+                                   only_refine = amr_callback.adapt_initial_condition_only_refine)
+        iterations = 1
+        while has_changed
+            compute_coefficients!(integrator.u, t, semi)
+            u_modified!(integrator, true)
+            has_changed = amr_callback(integrator,
+                                       only_refine = amr_callback.adapt_initial_condition_only_refine)
+            iterations = iterations + 1
+            allowed_max_iterations = max(10, max_level(amr_callback.controller))
+            if iterations > allowed_max_iterations
+                @warn "AMR for initial condition did not settle within $(allowed_max_iterations) iterations!\n" *
+                      "Consider adjusting thresholds or setting `adapt_initial_condition_only_refine`."
+                break
+            end
+        end
+
+        # # Update initial state integrals of analysis callback if it exists
+        # # See https://github.com/trixi-framework/Trixi.jl/issues/2536 for more information.
+        # index = findfirst(cb -> cb.affect! isa AnalysisCallback,
+        #                   integrator.opts.callback.discrete_callbacks)
+        # if !isnothing(index)
+        #     analysis_callback = integrator.opts.callback.discrete_callbacks[index].affect!
+
+        #     initial_state_integrals = integrate(integrator.u, semi)
+        #     analysis_callback.initial_state_integrals = initial_state_integrals
+        # end
+    end
+
+    return nothing
 end
 
 function initialize_callbacks!(callbacks::Tuple{}, integrator::LWIntegrator)

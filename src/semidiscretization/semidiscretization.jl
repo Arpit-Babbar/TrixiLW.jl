@@ -1,4 +1,4 @@
-using Trixi: SemidiscretizationHyperbolic, SemidiscretizationHyperbolicParabolic
+using Trixi: SemidiscretizationHyperbolic
 using Trixi: compute_coefficients
 
 function semidiscretize(semi::Union{SemidiscretizationHyperbolic,

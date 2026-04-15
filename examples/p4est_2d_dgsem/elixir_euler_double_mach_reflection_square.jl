@@ -217,13 +217,13 @@ save_solution = SaveSolutionCallback(interval = 100,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
 
-visualization_callback = VisualizationCallback(interval = 100,
+visualization_callback = VisualizationCallback(semi, interval = 100,
                                                save_initial_solution = true,
                                                save_final_solution = true,
                                                solution_variables = cons2prim)
 
 callbacks = (analysis_callback, alive_callback, save_solution,
-             #  visualization_callback, 
+             #  visualization_callback,
              summary_callback)
 
 # positivity limiter necessary for this example with strong shocks

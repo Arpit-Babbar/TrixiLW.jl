@@ -1,10 +1,11 @@
-using Trixi: AbstractEquationsParabolic, reset_du!, have_constant_speed,
+using Trixi: AbstractEquationsParabolic, set_zero!, have_constant_speed,
              calc_viscous_fluxes!, transform_variables!, have_nonconservative_terms,
              prolong2interfaces!, calc_surface_integral!, apply_jacobian!, timer,
              get_node_coords, eachinterface, get_surface_node_vars,
-             eachboundary, get_unsigned_normal_vector_2d
+             eachboundary, get_unsigned_normal_vector_2d, init_viscous_container_2d
 
-import Trixi: create_cache, calc_volume_integral!, prolong2boundaries!, calc_boundary_flux!
+import Trixi: create_cache, calc_volume_integral!, prolong2boundaries!, calc_boundary_flux!,
+              create_cache_parabolic
 import Trixi
 import Trixi: calc_gradient!
 
@@ -21,7 +22,7 @@ using MuladdMacro
                   cache_parabolic, tolerances::NamedTuple)
 
         # Reset du
-        @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+        @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
         @unpack viscous_container = cache_parabolic
         @unpack u_transformed, gradients, flux_viscous = viscous_container
 
@@ -32,9 +33,7 @@ using MuladdMacro
                                                                          mesh,
                                                                          equations_parabolic,
                                                                          dg,
-                                                                         parabolic_scheme,
-                                                                         cache,
-                                                                         cache_parabolic)
+                                                                         cache)
 
         # Compute the gradients of the transformed variables
         @trixi_timeit timer() "calculate gradient" calc_gradient!(gradients, u_transformed,
@@ -42,7 +41,7 @@ using MuladdMacro
                                                                   equations_parabolic,
                                                                   boundary_conditions_parabolic,
                                                                   dg, parabolic_scheme,
-                                                                  cache, cache_parabolic)
+                                                                  cache)
 
         # Compute and store the viscous fluxes computed with S variable
         @trixi_timeit timer() "calculate viscous fluxes" calc_viscous_fluxes!(flux_viscous,
@@ -50,11 +49,10 @@ using MuladdMacro
                                                                               u_transformed,
                                                                               mesh,
                                                                               equations_parabolic,
-                                                                              dg, cache,
-                                                                              cache_parabolic)
+                                                                              dg, cache)
 
         # Reset du
-        @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+        @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
 
         # Calculate volume integral
         @trixi_timeit timer() "volume integral" calc_volume_integral!(du, flux_viscous,
@@ -72,9 +70,9 @@ using MuladdMacro
 
         # # Prolong solution to interfaces
         # TODO - This seems unnecessary because the next function also does this prolongation
-        @trixi_timeit timer() "prolong2interfaces" prolong2interfaces!(cache, u, mesh,
-                                                                       equations,
-                                                                       dg.surface_integral,
+        @trixi_timeit timer() "prolong2interfaces" prolong2interfaces!(cache, u_transformed,
+                                                                       mesh,
+                                                                       equations_parabolic,
                                                                        dg)
 
         # Prolong F, U to interfaces
@@ -301,7 +299,7 @@ using MuladdMacro
         gradients_x, gradients_y = gradients
         flux_viscous_x, flux_viscous_y = flux_viscous # viscous fluxes computed by correction
 
-        @unpack derivative_dhat, derivative_matrix = dg.basis
+        @unpack derivative_hat, derivative_matrix = dg.basis
         @unpack node_coordinates = cache.elements
 
         @unpack lw_res_cache = cache
@@ -461,14 +459,14 @@ using MuladdMacro
             for ii in eachnode(dg)
                 # res              += -lam * D * F for each variable
                 # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-                multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F, equations,
+                multiply_add_to_node_vars!(du, derivative_hat[ii, i], F, equations,
                                            dg, ii, j, element)
             end
 
             for jj in eachnode(dg)
                 # C += -lam*g*Dm' for each variable
                 # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-                multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G, equations,
+                multiply_add_to_node_vars!(du, derivative_hat[jj, j], G, equations,
                                            dg, i, jj, element)
             end
 
@@ -508,7 +506,7 @@ using MuladdMacro
         gradients_x, gradients_y = gradients
         flux_viscous_x, flux_viscous_y = flux_viscous # viscous fluxes computed by correction
 
-        @unpack derivative_dhat, derivative_matrix = dg.basis
+        @unpack derivative_hat, derivative_matrix = dg.basis
         @unpack node_coordinates = cache.elements
 
         @unpack lw_res_cache = cache
@@ -783,14 +781,14 @@ using MuladdMacro
             for ii in eachnode(dg)
                 # res              += -lam * D * F for each variable
                 # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-                multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F, equations,
+                multiply_add_to_node_vars!(du, derivative_hat[ii, i], F, equations,
                                            dg, ii, j, element)
             end
 
             for jj in eachnode(dg)
                 # C += -lam*g*Dm' for each variable
                 # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-                multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G, equations,
+                multiply_add_to_node_vars!(du, derivative_hat[jj, j], G, equations,
                                            dg, i, jj, element)
             end
 
@@ -832,7 +830,7 @@ using MuladdMacro
         gradients_x, gradients_y = gradients
         flux_viscous_x, flux_viscous_y = flux_viscous # viscous fluxes computed by correction
 
-        @unpack derivative_dhat, derivative_matrix = dg.basis
+        @unpack derivative_hat, derivative_matrix = dg.basis
         @unpack node_coordinates = cache.elements
 
         @unpack lw_res_cache = cache
@@ -1270,14 +1268,14 @@ using MuladdMacro
             for ii in eachnode(dg)
                 # res              += -lam * D * F for each variable
                 # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-                multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F, equations, dg, ii,
+                multiply_add_to_node_vars!(du, derivative_hat[ii, i], F, equations, dg, ii,
                                            j, element)
             end
 
             for jj in eachnode(dg)
                 # C += -lam*g*Dm' for each variable
                 # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-                multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G, equations, dg, i,
+                multiply_add_to_node_vars!(du, derivative_hat[jj, j], G, equations, dg, i,
                                            jj, element)
             end
 
@@ -1321,7 +1319,7 @@ using MuladdMacro
         gradients_x, gradients_y = gradients
         flux_viscous_x, flux_viscous_y = flux_viscous # viscous fluxes computed by correction
 
-        @unpack derivative_dhat, derivative_matrix = dg.basis
+        @unpack derivative_hat, derivative_matrix = dg.basis
         @unpack node_coordinates = cache.elements
 
         @unpack lw_res_cache, element_cache = cache
@@ -1953,7 +1951,7 @@ using MuladdMacro
             for ii in eachnode(dg)
                 # res              += -lam * D * F for each variable
                 # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)U_node
-                multiply_add_to_node_vars!(du, derivative_dhat[ii, i], F, equations, dg, ii,
+                multiply_add_to_node_vars!(du, derivative_hat[ii, i], F, equations, dg, ii,
                                            j, element)
 
                 multiply_add_to_node_vars!(u_np1,
@@ -1964,7 +1962,7 @@ using MuladdMacro
             for jj in eachnode(dg)
                 # C += -lam*g*Dm' for each variable
                 # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-                multiply_add_to_node_vars!(du, derivative_dhat[jj, j], G, equations, dg, i,
+                multiply_add_to_node_vars!(du, derivative_hat[jj, j], G, equations, dg, i,
                                            jj, element)
 
                 multiply_add_to_node_vars!(u_np1,
@@ -2281,5 +2279,34 @@ using MuladdMacro
         end
 
         return nothing
+    end
+
+    function create_cache_parabolic(mesh::TreeMesh{2},
+                                    equations_hyperbolic::AbstractEquations,
+                                    equations_parabolic::AbstractEquationsParabolic,
+                                    dg::DG, parabolic_scheme, RealT, uEltype)
+        # Get cells for which an element needs to be created (i.e. all leaf cells)
+        leaf_cell_ids = local_leaf_cells(mesh.tree)
+
+        elements = init_elements(leaf_cell_ids, mesh, equations_hyperbolic, dg.basis, RealT,
+                                 uEltype)
+
+        interfaces = init_interfaces(leaf_cell_ids, mesh, elements)
+
+        boundaries = init_boundaries(leaf_cell_ids, mesh, elements)
+
+        # mortars = init_mortars(leaf_cell_ids, mesh, elements, dg.mortar)
+
+        viscous_container = init_viscous_container_2d(nvariables(equations_hyperbolic),
+                                                      nnodes(elements), nelements(elements),
+                                                      uEltype)
+
+        # cache = (; elements, interfaces, boundaries, mortars)
+        cache = (; elements, interfaces, boundaries, viscous_container)
+
+        # Add specialized parts of the cache required to compute the mortars etc.
+        # cache = (;cache..., create_cache(mesh, equations_parabolic, dg.mortar, uEltype)...)
+
+        return cache
     end
 end # muladd macro
