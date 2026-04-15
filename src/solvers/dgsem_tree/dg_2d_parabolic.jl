@@ -1,4 +1,4 @@
-using Trixi: AbstractEquationsParabolic, reset_du!, have_constant_speed,
+using Trixi: AbstractEquationsParabolic, have_constant_speed,
              calc_viscous_fluxes!, transform_variables!, have_nonconservative_terms,
              prolong2interfaces!, calc_surface_integral!, apply_jacobian!, timer,
              get_node_coords, eachinterface, get_surface_node_vars,
@@ -21,7 +21,7 @@ using MuladdMacro
                   cache_parabolic, tolerances::NamedTuple)
 
         # Reset du
-        @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+        @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
         @unpack viscous_container = cache_parabolic
         @unpack u_transformed, gradients, flux_viscous = viscous_container
 
@@ -54,7 +54,7 @@ using MuladdMacro
                                                                               cache_parabolic)
 
         # Reset du
-        @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+        @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
 
         # Calculate volume integral
         @trixi_timeit timer() "volume integral" calc_volume_integral!(du, flux_viscous,

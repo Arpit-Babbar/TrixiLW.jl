@@ -395,8 +395,8 @@ function analyze(surface_variable::AnalysisSurfaceIntegralViscous, du, u, t,
     @unpack gradients, u_transformed = viscous_container
     gradients_x, gradients_y = gradients
 
-    reset_du!(gradients_x, dg, cache)
-    reset_du!(gradients_y, dg, cache)
+    set_zero!(gradients_x, dg, cache)
+    set_zero!(gradients_y, dg, cache)
 
     @unpack derivative_matrix = dg.basis
     @threaded for element in eachelement(dg, cache)

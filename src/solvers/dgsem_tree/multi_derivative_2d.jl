@@ -4,7 +4,7 @@ function rhs_mdrk1!(du, u,
                     time_discretization::AbstractLWTimeDiscretization, cache,
                     tolerances::NamedTuple)
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+    @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
 
     dt = cache.dt[1]
 
@@ -81,7 +81,7 @@ function rhs_mdrk2!(du, u,
                     tolerances::NamedTuple)
 
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+    @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
 
     dt = cache.dt[1]
 

@@ -2,7 +2,7 @@
 using Trixi: prolong2mpimortars!, start_mpi_receive!, MPICache, init_elements,
              local_leaf_cells,
              init_interfaces, init_boundaries, init_mortars, init_mpi_mortars,
-             init_mpi_neighbor_connectivity, nmpiinterfaces, reset_du!,
+             init_mpi_neighbor_connectivity, nmpiinterfaces, set_zero!,
              get_surface_node_vars,
              finish_mpi_send!, calc_mpi_mortar_flux!, mpi_mortar_fluxes_to_elements!,
              ParallelTreeMesh, ParallelP4estMesh, eachmpiinterface, mpi_nranks, mpi_rank,
@@ -222,7 +222,7 @@ function rhs!(du, u, t, dt, mesh::Union{ParallelTreeMesh{2}, ParallelP4estMesh{2
     @trixi_timeit timer() "start MPI receive" start_mpi_receive!(cache.mpi_cache)
 
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+    @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
 
     # Calculate volume integral
     @trixi_timeit timer() "volume integral" begin

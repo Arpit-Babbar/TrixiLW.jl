@@ -6,7 +6,7 @@ import Trixi: create_cache, calc_volume_integral!, ninterfaces, nboundaries,
 # TODO - Reorder these
 using Trixi: TreeMesh, P4estMesh, BoundaryConditionPeriodic,
              have_nonconservative_terms,
-             calc_surface_integral!, apply_jacobian!, reset_du!,
+             calc_surface_integral!, apply_jacobian!, set_zero!,
              max_dt, calcflux_fv!, index_to_start_step_2d,
              AbstractMesh, StructuredMesh, UnstructuredMesh2D,
              LobattoLegendreMortarL2,
@@ -121,7 +121,7 @@ function rhs!(du, u, t, dt, mesh::Union{TreeMesh{2}, P4estMesh{2}}, equations,
               tolerances::NamedTuple)
 
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+    @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
 
     # Update dt in cache and the callback will just take it from there
 
@@ -518,6 +518,8 @@ fluxes(u, equations::AbstractEquations{2}) = (Trixi.flux(u, 1, equations),
     # Calculate volume terms in one element
     for j in eachnode(dg), i in eachnode(dg)
         u_node = get_node_vars(u, equations, dg, i, j, element)
+
+        @assert false inv_jacobian
 
         flux1, flux2 = fluxes(u_node, equations)
         for ii in eachnode(dg)

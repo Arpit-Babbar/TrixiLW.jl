@@ -1,5 +1,5 @@
 import Trixi: init_mpi_interfaces, nmpiinterfaces, nvariables, nnodes
-using Trixi: eachinterface, count_required_mpi_interfaces, ElementContainer2D,
+using Trixi: eachinterface, count_required_mpi_interfaces, TreeElementContainer2D,
              ParallelTreeMesh, init_mpi_interfaces!
 
 function create_interface_cache(mesh::Union{TreeMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
@@ -119,7 +119,7 @@ end
 # Create MPI interface container and initialize MPI interface data in `elements`.
 function init_mpi_interfaces(cell_ids, mesh::ParallelTreeMesh,
                              time_discretization::AbstractLWTimeDiscretization,
-                             elements::ElementContainer2D)
+                             elements::TreeElementContainer2D)
     # Initialize container
     n_mpi_interfaces = count_required_mpi_interfaces(mesh, cell_ids)
     mpi_interfaces = MPIInterfaceContainerLW2D{eltype(elements)}(n_mpi_interfaces,

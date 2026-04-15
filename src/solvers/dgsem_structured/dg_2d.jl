@@ -1,7 +1,7 @@
 # import Trixi: create_cache, calc_volume_integral!, calc_interface_flux!
 using Trixi: TreeMesh, P4estMesh, BoundaryConditionPeriodic,
              prolong2mortars!, calc_mortar_flux!,
-             calc_surface_integral!, apply_jacobian!, reset_du!,
+             calc_surface_integral!, apply_jacobian!, set_zero!,
              max_dt,
              StructuredMesh, UnstructuredMesh2D,
              DG, DGSEM, nnodes, nelements, False,
@@ -21,7 +21,7 @@ function rhs!(du, u, t, dt,
               tolerances::NamedTuple)
 
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+    @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
 
     # Calculate volume integral
     alpha = @trixi_timeit timer() "volume integral" calc_volume_integral!(du, u,
