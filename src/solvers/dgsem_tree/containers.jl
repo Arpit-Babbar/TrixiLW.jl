@@ -63,9 +63,7 @@ function create_cache_serial(mesh::Union{TreeMesh, StructuredMesh, UnstructuredM
     cache = (; cache..., element_cache, lw_res_cache, cfl_number, dt,
              temporal_errors, interface_cache, boundary_cache, lw_mortars)
 
-    normal_vectors = NormalVectorContainer2D(mesh, dg, cache)
-
-    return (; cache..., normal_vectors)
+    return cache
 end
 
 function create_cache(mesh::Union{TreeMesh{NDIMS, <:Trixi.SerialTree{NDIMS}},
