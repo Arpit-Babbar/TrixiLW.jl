@@ -1,8 +1,8 @@
 using Trixi: compute_coefficients, wrap_array, default_parabolic_solver,
              boundary_condition_periodic, real, digest_boundary_conditions,
-             create_cache_parabolic, @trixi_timeit, timer
+             @trixi_timeit, timer, PerformanceCounterList, AbstractEquationsParabolic
 
-import Trixi: SemidiscretizationHyperbolicParabolic
+import Trixi: SemidiscretizationHyperbolicParabolic,  create_cache_parabolic
 
 # This name is terrible!
 function semidiscretize(semi::SemidiscretizationHyperbolicParabolic,
@@ -47,6 +47,25 @@ function rhs!(du_ode, u_ode,
     put!(semi.performance_counter.counters[2], runtime)
 
     return nothing
+end
+
+function create_cache_parabolic(mesh::P4estMesh{2},
+                                equations_hyperbolic::AbstractEquations,
+                                equations_parabolic::AbstractEquationsParabolic,
+                                dg::DG, parabolic_scheme, RealT, uEltype)
+    balance!(mesh)
+
+    elements = init_elements(mesh, equations_hyperbolic, dg.basis, uEltype)
+    interfaces = init_interfaces(mesh, equations_hyperbolic, dg.basis, elements)
+    boundaries = init_boundaries(mesh, equations_hyperbolic, dg.basis, elements)
+
+    viscous_container = init_viscous_container_2d(nvariables(equations_hyperbolic),
+                                                  nnodes(dg.basis), nelements(elements),
+                                                  uEltype)
+
+    cache = (; elements, interfaces, boundaries, viscous_container)
+
+    return cache
 end
 
 function SemidiscretizationHyperbolicParabolic(mesh,
@@ -114,20 +133,18 @@ function SemidiscretizationHyperbolicParabolic(mesh,
                                     RealT, uEltype, cache_parabolic)...,
                        cache_parabolic...) # LW Additions
 
+    performance_counter = PerformanceCounterList{2}(false)
+
+    # @assert false typeof(performance_counter)
+
     cache = (; cache_parabolic, cache...) # Add parabolic cache to hyperbolic to be used in callbacks
-    SemidiscretizationHyperbolicParabolic{typeof(mesh), typeof(equations),
-                                          typeof(equations_parabolic),
-                                          typeof(initial_condition),
-                                          typeof(_boundary_conditions),
-                                          typeof(_boundary_conditions_parabolic),
-                                          typeof(source_terms), typeof(solver),
-                                          typeof(solver_parabolic), typeof(cache),
-                                          typeof(cache_parabolic)}(mesh, equations,
+    Trixi.SemidiscretizationHyperbolicParabolic(mesh, equations,
                                                                    equations_parabolic,
                                                                    initial_condition,
                                                                    _boundary_conditions,
                                                                    _boundary_conditions_parabolic,
                                                                    source_terms,
                                                                    solver, solver_parabolic,
-                                                                   cache, cache_parabolic)
+                                                                   cache, cache_parabolic,
+                                                                   performance_counter)
 end
