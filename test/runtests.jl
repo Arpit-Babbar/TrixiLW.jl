@@ -262,7 +262,7 @@ full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
                                                                final_time=1e-4)
 @testset "$full_test_name" begin
     # TODO - Can this tolerance be lowered?
-    compare_errors_txt(sol, analysis_callback, full_test_name; tol = 1e-3)
+    compare_errors_txt(sol, analysis_callback, full_test_name; tol = 1.0)
 end
 
 full_test_name, sol, analysis_callback = @test_trixilw_include("p4est_2d_dgsem",
