@@ -93,7 +93,8 @@ function SemidiscretizationHyperbolic(mesh,
                                                                        initial_condition,
                                                                        _boundary_conditions,
                                                                        source_terms, solver,
-                                                                       cache, performance_counter)
+                                                                       cache,
+                                                                       performance_counter)
 
     return semi
 end
