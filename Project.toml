@@ -17,6 +17,7 @@ Trixi = "a7f1ee26-1774-49b1-8366-f1abc58fbfcb"
 
 [compat]
 Trixi = "~0.11"
+DiffEqBase = "~6.176"
 
 [extras]
 HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
