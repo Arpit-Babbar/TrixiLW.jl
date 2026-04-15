@@ -6,7 +6,7 @@ using DelimitedFiles
 
 # Replace solve_lwfr with a "do nothing" function
 
-struct MyNothing end
+struct MyNothing end;
 
 # Change this to regenerate the testing data
 to_overwrite_errors() = false
