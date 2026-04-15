@@ -2,7 +2,7 @@ using Trixi: compute_coefficients, wrap_array, default_parabolic_solver,
              boundary_condition_periodic, real, digest_boundary_conditions,
              @trixi_timeit, timer, PerformanceCounterList, AbstractEquationsParabolic
 
-import Trixi: SemidiscretizationHyperbolicParabolic,  create_cache_parabolic
+import Trixi: SemidiscretizationHyperbolicParabolic, create_cache_parabolic
 
 # This name is terrible!
 function semidiscretize(semi::SemidiscretizationHyperbolicParabolic,
@@ -102,6 +102,7 @@ function SemidiscretizationHyperbolicParabolic(mesh,
                                                initial_condition,
                                                solver;
                                                solver_parabolic = default_parabolic_solver(),
+                                               source_terms_parabolic = nothing,
                                                source_terms = nothing,
                                                boundary_conditions = boundary_condition_periodic,
                                                boundary_conditions_parabolic = boundary_condition_periodic,
@@ -135,16 +136,15 @@ function SemidiscretizationHyperbolicParabolic(mesh,
 
     performance_counter = PerformanceCounterList{2}(false)
 
-    # @assert false typeof(performance_counter)
-
     cache = (; cache_parabolic, cache...) # Add parabolic cache to hyperbolic to be used in callbacks
-    Trixi.SemidiscretizationHyperbolicParabolic(mesh, equations,
-                                                                   equations_parabolic,
-                                                                   initial_condition,
-                                                                   _boundary_conditions,
-                                                                   _boundary_conditions_parabolic,
-                                                                   source_terms,
-                                                                   solver, solver_parabolic,
-                                                                   cache, cache_parabolic,
-                                                                   performance_counter)
+    SemidiscretizationHyperbolicParabolic(mesh, equations,
+                                          equations_parabolic,
+                                          initial_condition,
+                                          _boundary_conditions,
+                                          _boundary_conditions_parabolic,
+                                          source_terms,
+                                          source_terms_parabolic,
+                                          solver, solver_parabolic,
+                                          cache, cache_parabolic,
+                                          performance_counter)
 end

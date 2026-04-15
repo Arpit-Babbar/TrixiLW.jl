@@ -25,7 +25,7 @@ function resize_element_cache!(mesh::Union{StructuredMesh, UnstructuredMesh2D}, 
 end
 
 function resize_element_cache!(mesh::Union{TreeMesh, P4estMesh}, equations, solver, cache)
-    @unpack element_cache = cache
+    @unpack element_cache, normal_vectors = cache
     @unpack _U, _F, _fn_low = element_cache
 
     n_variables = nvariables(equations)

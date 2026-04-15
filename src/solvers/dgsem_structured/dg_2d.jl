@@ -1,7 +1,7 @@
 # import Trixi: create_cache, calc_volume_integral!, calc_interface_flux!
 using Trixi: TreeMesh, P4estMesh, BoundaryConditionPeriodic,
              prolong2mortars!, calc_mortar_flux!,
-             calc_surface_integral!, apply_jacobian!, reset_du!,
+             calc_surface_integral!, apply_jacobian!, set_zero!,
              max_dt,
              StructuredMesh, UnstructuredMesh2D,
              DG, DGSEM, nnodes, nelements, False,
@@ -21,7 +21,7 @@ function rhs!(du, u, t, dt,
               tolerances::NamedTuple)
 
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+    @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
 
     # Calculate volume integral
     alpha = @trixi_timeit timer() "volume integral" calc_volume_integral!(du, u,
@@ -190,6 +190,75 @@ end
     return nothing
 end
 
+@inline function my_calcflux_fv!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u,
+                                 mesh::Union{StructuredMesh{2}, StructuredMeshView{2},
+                                             UnstructuredMesh2D,
+                                             P4estMesh{2}, T8codeMesh{2}},
+                                 nonconservative_terms::False, equations,
+                                 volume_flux_fv, dg::DGSEM, element, cache)
+    @unpack contravariant_vectors = cache.elements
+    @unpack weights, derivative_matrix = dg.basis
+
+    # Performance improvement if the metric terms of the subcell FV method are only computed
+    # once at the beginning of the simulation, instead of at every Runge-Kutta stage
+    fstar1_L[:, 1, :] .= zero(eltype(fstar1_L))
+    fstar1_L[:, nnodes(dg) + 1, :] .= zero(eltype(fstar1_L))
+    fstar1_R[:, 1, :] .= zero(eltype(fstar1_R))
+    fstar1_R[:, nnodes(dg) + 1, :] .= zero(eltype(fstar1_R))
+
+    for j in eachnode(dg)
+        normal_direction = get_contravariant_vector(1, contravariant_vectors, 1, j,
+                                                    element)
+
+        for i in 2:nnodes(dg)
+            u_ll = get_node_vars(u, equations, dg, i - 1, j, element)
+            u_rr = get_node_vars(u, equations, dg, i, j, element)
+
+            for m in 1:nnodes(dg)
+                normal_direction += weights[i - 1] * derivative_matrix[i - 1, m] *
+                                    get_contravariant_vector(1, contravariant_vectors,
+                                                             m, j, element)
+            end
+
+            # Compute the contravariant flux
+            contravariant_flux = volume_flux_fv(u_ll, u_rr, normal_direction, equations)
+
+            set_node_vars!(fstar1_L, contravariant_flux, equations, dg, i, j)
+            set_node_vars!(fstar1_R, contravariant_flux, equations, dg, i, j)
+        end
+    end
+
+    fstar2_L[:, :, 1] .= zero(eltype(fstar2_L))
+    fstar2_L[:, :, nnodes(dg) + 1] .= zero(eltype(fstar2_L))
+    fstar2_R[:, :, 1] .= zero(eltype(fstar2_R))
+    fstar2_R[:, :, nnodes(dg) + 1] .= zero(eltype(fstar2_R))
+
+    for i in eachnode(dg)
+        normal_direction = get_contravariant_vector(2, contravariant_vectors, i, 1,
+                                                    element)
+
+        for j in 2:nnodes(dg)
+            u_ll = get_node_vars(u, equations, dg, i, j - 1, element)
+            u_rr = get_node_vars(u, equations, dg, i, j, element)
+
+            for m in 1:nnodes(dg)
+                normal_direction += weights[j - 1] * derivative_matrix[j - 1, m] *
+                                    get_contravariant_vector(2, contravariant_vectors,
+                                                             i, m, element)
+            end
+
+            # Compute the contravariant flux by taking the scalar product of the
+            # normal vector and the flux vector
+            contravariant_flux = volume_flux_fv(u_ll, u_rr, normal_direction, equations)
+
+            set_node_vars!(fstar2_L, contravariant_flux, equations, dg, i, j)
+            set_node_vars!(fstar2_R, contravariant_flux, equations, dg, i, j)
+        end
+    end
+
+    return nothing
+end
+
 function calcflux_muscl!(fstar1_L, fstar1_R, fstar2_L, fstar2_R,
                          uf, uext, alpha, u, Δt,
                          mesh::Union{StructuredMesh{2}, UnstructuredMesh2D,
@@ -202,9 +271,10 @@ function calcflux_muscl!(fstar1_L, fstar1_R, fstar2_L, fstar2_R,
         nbrs = cache.boundaries.neighbor_ids[boundary]
         if element in nbrs
             # If element neighbours boundary, reduce to first order
-            calcflux_fv!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u, mesh,
-                         nonconservative_terms, equations, volume_flux_fv, dg, element,
-                         cache)
+            my_calcflux_fv!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u, mesh,
+                            nonconservative_terms, equations, volume_flux_fv, dg,
+                            element,
+                            cache)
             return nothing
         end
     end
@@ -337,6 +407,43 @@ function calcflux_muscl!(fstar1_L, fstar1_R, fstar2_L, fstar2_R,
     return nothing
 end
 
+@inline function fv_kernel!(du, u, dt, ::FirstOrderReconstruction,
+                            mesh::Union{StructuredMesh{2},
+                                        UnstructuredMesh2D, P4estMesh{2}},
+                            nonconservative_terms, equations,
+                            volume_flux_fv, dg::DGSEM, cache, element, alpha = true)
+    @unpack fstar1_L_threaded, fstar1_R_threaded, fstar2_L_threaded, fstar2_R_threaded = cache
+    @unpack fn_low = cache.element_cache
+    @unpack inverse_weights = dg.basis
+
+    # Calculate FV two-point fluxes
+    fstar1_L = fstar1_L_threaded[Threads.threadid()]
+    fstar2_L = fstar2_L_threaded[Threads.threadid()]
+    fstar1_R = fstar1_R_threaded[Threads.threadid()]
+    fstar2_R = fstar2_R_threaded[Threads.threadid()]
+    my_calcflux_fv!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u, mesh,
+                    nonconservative_terms, equations, volume_flux_fv, dg, element,
+                    cache)
+
+    for j in eachnode(dg), i in eachnode(dg)
+        for v in eachvariable(equations)
+            du[v, i, j, element] += (alpha *
+                                     (inverse_weights[i] *
+                                      (fstar1_L[v, i + 1, j] - fstar1_R[v, i, j]) +
+                                      inverse_weights[j] *
+                                      (fstar2_L[v, i, j + 1] - fstar2_R[v, i, j])))
+        end
+    end
+
+    #= Since numbering is different for structured and unstructured meshes, it is
+       done differently for both =#
+
+    load_fn_low!(fn_low, mesh, dg, nonconservative_terms,
+                 fstar1_L, fstar2_L, fstar1_R, fstar2_R, element)
+
+    return nothing
+end
+
 function calcflux_mh!(fstar1_L, fstar1_R, fstar2_L, fstar2_R,
                       unph, uf, uext, alpha, u, Δt,
                       mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
@@ -347,9 +454,10 @@ function calcflux_mh!(fstar1_L, fstar1_R, fstar2_L, fstar2_R,
     for boundary in eachboundary(dg, cache)
         if element in cache.boundaries.neighbor_ids[boundary]
             # If element neighbours boundary, reduce to first order
-            calcflux_fv!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u, mesh,
-                         nonconservative_terms, equations, volume_flux_fv, dg, element,
-                         cache)
+            my_calcflux_fv!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u, mesh,
+                            nonconservative_terms, equations, volume_flux_fv, dg,
+                            element,
+                            cache)
             return nothing
         end
     end

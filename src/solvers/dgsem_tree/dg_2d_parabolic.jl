@@ -1,4 +1,4 @@
-using Trixi: AbstractEquationsParabolic, reset_du!, have_constant_speed,
+using Trixi: AbstractEquationsParabolic, set_zero!, have_constant_speed,
              calc_viscous_fluxes!, transform_variables!, have_nonconservative_terms,
              prolong2interfaces!, calc_surface_integral!, apply_jacobian!, timer,
              get_node_coords, eachinterface, get_surface_node_vars,
@@ -22,7 +22,7 @@ using MuladdMacro
                   cache_parabolic, tolerances::NamedTuple)
 
         # Reset du
-        @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+        @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
         @unpack viscous_container = cache_parabolic
         @unpack u_transformed, gradients, flux_viscous = viscous_container
 
@@ -33,9 +33,7 @@ using MuladdMacro
                                                                          mesh,
                                                                          equations_parabolic,
                                                                          dg,
-                                                                         parabolic_scheme,
-                                                                         cache,
-                                                                         cache_parabolic)
+                                                                         cache)
 
         # Compute the gradients of the transformed variables
         @trixi_timeit timer() "calculate gradient" calc_gradient!(gradients, u_transformed,
@@ -43,7 +41,7 @@ using MuladdMacro
                                                                   equations_parabolic,
                                                                   boundary_conditions_parabolic,
                                                                   dg, parabolic_scheme,
-                                                                  cache, cache_parabolic)
+                                                                  cache)
 
         # Compute and store the viscous fluxes computed with S variable
         @trixi_timeit timer() "calculate viscous fluxes" calc_viscous_fluxes!(flux_viscous,
@@ -51,11 +49,10 @@ using MuladdMacro
                                                                               u_transformed,
                                                                               mesh,
                                                                               equations_parabolic,
-                                                                              dg, cache,
-                                                                              cache_parabolic)
+                                                                              dg, cache)
 
         # Reset du
-        @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+        @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
 
         # Calculate volume integral
         @trixi_timeit timer() "volume integral" calc_volume_integral!(du, flux_viscous,
@@ -73,9 +70,9 @@ using MuladdMacro
 
         # # Prolong solution to interfaces
         # TODO - This seems unnecessary because the next function also does this prolongation
-        @trixi_timeit timer() "prolong2interfaces" prolong2interfaces!(cache, u, mesh,
-                                                                       equations,
-                                                                       dg.surface_integral,
+        @trixi_timeit timer() "prolong2interfaces" prolong2interfaces!(cache, u_transformed,
+                                                                       mesh,
+                                                                       equations_parabolic,
                                                                        dg)
 
         # Prolong F, U to interfaces
@@ -2292,7 +2289,7 @@ using MuladdMacro
         leaf_cell_ids = local_leaf_cells(mesh.tree)
 
         elements = init_elements(leaf_cell_ids, mesh, equations_hyperbolic, dg.basis, RealT,
-                                uEltype)
+                                 uEltype)
 
         interfaces = init_interfaces(leaf_cell_ids, mesh, elements)
 
@@ -2301,8 +2298,8 @@ using MuladdMacro
         # mortars = init_mortars(leaf_cell_ids, mesh, elements, dg.mortar)
 
         viscous_container = init_viscous_container_2d(nvariables(equations_hyperbolic),
-                                                    nnodes(elements), nelements(elements),
-                                                    uEltype)
+                                                      nnodes(elements), nelements(elements),
+                                                      uEltype)
 
         # cache = (; elements, interfaces, boundaries, mortars)
         cache = (; elements, interfaces, boundaries, viscous_container)
@@ -2313,4 +2310,3 @@ using MuladdMacro
         return cache
     end
 end # muladd macro
-

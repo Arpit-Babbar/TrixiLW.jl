@@ -78,7 +78,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 # The AliveCallback prints short status information in regular intervals
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
-visualization_callback = VisualizationCallback(interval = 1000,
+visualization_callback = VisualizationCallback(semi, interval = 1000,
                                                save_initial_solution = true,
                                                save_final_solution = true)
 

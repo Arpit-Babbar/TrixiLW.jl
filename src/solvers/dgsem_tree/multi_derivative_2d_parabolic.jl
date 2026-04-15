@@ -66,7 +66,7 @@ function rhs_mdrk1!(du, u,
                     time_discretization::MDRK, cache, cache_parabolic,
                     tolerances::NamedTuple)
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+    @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
     @unpack viscous_container = cache_parabolic
     @unpack u_transformed, gradients, flux_viscous = viscous_container
 
@@ -95,7 +95,7 @@ function rhs_mdrk1!(du, u,
                                                                           cache_parabolic)
 
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+    @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
 
     # Calculate volume integral
     @trixi_timeit timer() "volume integral" calc_volume_integral_mdrk1!(du, flux_viscous,
@@ -187,7 +187,7 @@ function rhs_mdrk2!(du, u,
                     tolerances::NamedTuple)
 
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+    @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
     @unpack u_transformed, gradients, flux_viscous = cache_parabolic
 
     dt = cache.dt[1]
@@ -218,7 +218,7 @@ function rhs_mdrk2!(du, u,
                                                                           cache_parabolic)
 
     # Reset du
-    @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
+    @trixi_timeit timer() "reset ∂u/∂t" set_zero!(du, dg, cache)
 
     # Calculate volume integral
     @trixi_timeit timer() "volume integral" calc_volume_integral_mdrk2!(du, flux_viscous,

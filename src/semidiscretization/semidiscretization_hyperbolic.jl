@@ -79,7 +79,8 @@ function SemidiscretizationHyperbolic(mesh,
                          cache)
 
     # Also from TrixiLW.jl
-    cache = (; cache..., create_cache(mesh, equations, solver.volume_integral, solver, uEltype)...)
+    cache = (; cache...,
+             create_cache(mesh, equations, solver.volume_integral, solver, uEltype)...)
 
     _boundary_conditions = digest_boundary_conditions(boundary_conditions, mesh, solver,
                                                       cache)
@@ -96,7 +97,8 @@ function SemidiscretizationHyperbolic(mesh,
                                                                        initial_condition,
                                                                        _boundary_conditions,
                                                                        source_terms, solver,
-                                                                       cache, performance_counter)
+                                                                       cache,
+                                                                       performance_counter)
 
     return semi
 end
